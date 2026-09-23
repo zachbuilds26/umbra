@@ -27,7 +27,7 @@ services:
       - key: FINNHUB_API_KEY
         sync: false
       - key: CORS_ORIGINS
-        value: https://umbra.onrender.com # service URL; no localhost in prod
+        value: https://umbra-gwz9.onrender.com # service URL; no localhost in prod
 
 databases:
   - name: umbra-db
