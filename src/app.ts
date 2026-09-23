@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import compress from '@fastify/compress';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { ZodError } from 'zod';
@@ -31,6 +32,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: env.corsOrigins.length > 0 ? env.corsOrigins : false,
   });
+
+  // gzip/deflate for everything textual (442KB lucide, index.html, JSON).
+  // Big first-paint win on mobile data; images already compressed.
+  await app.register(compress, { global: true });
 
   // Global generous limit; stricter per-route limits are set on the
   // quote/transaction routes themselves (plan §29).
@@ -102,6 +107,13 @@ export async function buildApp(): Promise<FastifyInstance> {
       root: frontendDir,
       prefix: '/',
       index: ['index.html'],
+      // Logos/bundle never change content without a deploy: cache a year.
+      // index.html + JSON stay revalidating (default etag behavior).
+      setHeaders: (reply, pathName) => {
+        if (/\/assets\//.test(pathName)) {
+          reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
     });
   }
 

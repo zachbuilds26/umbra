@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@fastify/compress": "^9.2.0",
     "@fastify/cors": "^10.1.0",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/static": "^10.1.4",

@@ -18,6 +18,23 @@ async function main(): Promise<void> {
     app.log.error(err, 'failed to start');
     process.exit(1);
   }
+  // Self-prime on boot (fire-and-forget): fill directory + tape caches so the
+  // first visitor after a sleep/wake or deploy doesn't pay the full cold cost
+  // (xStocks stalls + Jupiter pacing). Never throws, never blocks listen.
+  void (async () => {
+    try {
+      const base = `http://127.0.0.1:${env.PORT}`;
+      const assets: { assets?: Array<{ symbol: string }> } = await fetch(`${base}/api/assets`).then((r) =>
+        r.ok ? (r.json() as Promise<{ assets?: Array<{ symbol: string }> }>) : {},
+      ).catch(() => ({}));
+      void assets;
+      await fetch(
+        `${base}/api/assets/ticker?symbols=NVDAx,AAPLx,TSLAx,MSFTx,AMZNx,GOOGLx,METAx,SPYx,QQQx,TSMx,AVGOx,AMDx,NFLXx,PLTRx,COINx,HOODx,MSTRx,GLDx,SPACEX,OPENAI,ANTHROPIC,NEURALINK,ANDURIL,KALSHI,POLYMARKET,FIGUREAI`,
+      ).catch(() => undefined);
+    } catch {
+      // caches warm on first visitor instead
+    }
+  })();
 }
 
 void main().catch((err: unknown) => {
