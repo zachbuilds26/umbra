@@ -1,0 +1,34 @@
+# Render blueprint: single free web service (API + frontend) + free Postgres.
+# Deploy: dashboard.render.com -> New -> Blueprint -> point at the repo.
+# Then fill the `sync: false` values in the dashboard (or a dashboard env group).
+services:
+  - type: web
+    name: umbra
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: umbra-db
+          property: connectionString
+      - key: SOLANA_RPC_URL
+        sync: false # Helius mainnet URL (has the API key in it)
+      - key: JUPITER_API_KEY
+        sync: false
+      - key: ZEROEX_API_KEY
+        sync: false
+      - key: PYTH_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://umbra.onrender.com # service URL; no localhost in prod
+
+databases:
+  - name: umbra-db
+    plan: free # 1GB, expires after 90 days — export/upgrade before then

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+data/
+# Local-only reference screenshots / personal photos — never publish
+assets/swap.jpg
+assets/trx.jpg
+assets/photo_2026-09-20_11-57-55.jpg

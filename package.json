@@ -1,0 +1,40 @@
+{
+  "name": "umbra-backend",
+  "version": "0.1.0",
+  "description": "Umbra backend — bring tokenized stocks to Solana and trade them there. Stateless Fastify API over xStocks public data + Jupiter Swap V2.",
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@fastify/cors": "^10.1.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^10.1.4",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.12",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0",
+    "decimal.js": "^10.5.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.2.0",
+    "pg": "^8.23.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.2.0",
+    "@types/node": "^22.7.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

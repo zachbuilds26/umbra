@@ -1,0 +1,4407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Umbra - Dex aggregator for tokenized stocks on solana</title>
+  <meta name="description" content="Umbra - Dex aggregator for tokenized stocks on solana." />
+  <link rel="icon" type="image/png" href="./assets/logo-white.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Cinzel:wght@600;700&family=Syne:wght@700;800&display=swap"
+    rel="stylesheet"
+  />
+  <script src="./assets/lucide.min.js"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    rel="stylesheet"
+  />
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      user-select: none;
+      visibility: hidden;
+    }
+    body.ms-ready .material-symbols-outlined {
+      visibility: visible;
+    }
+  </style>
+  <script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
+  <style>
+    /*
+     * Umbra header:
+     * bar px-4/sm:px-6 + py-4 · left gap-4/sm:gap-8 · logo ml-8/mr-4, box 40px (48px ≥640px)
+     * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
+     * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
+     * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
+     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
+     */
+    :root {
+      --umbra-bg: #121212;
+      --umbra-surface: #1a1a1a;
+      --umbra-secondary: rgba(255, 255, 255, 0.07);
+      --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
+      --umbra-accent: #55b98a;
+      --umbra-accent-soft: rgba(85, 185, 138, 0.2);
+      --umbra-accent-ink: #121212;
+      --umbra-text: #ffffff;
+      --umbra-muted: #9aa0a6;
+      --umbra-border: rgba(255, 255, 255, 0.08);
+      --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --umbra-font-display: "Cinzel", Georgia, serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a2a transparent;
+    }
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    html::-webkit-scrollbar-track,
+    body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    html::-webkit-scrollbar-thumb,
+    body::-webkit-scrollbar-thumb {
+      background: #2a2a2a;
+      border-radius: 999px;
+    }
+    html::-webkit-scrollbar-thumb:hover,
+    body::-webkit-scrollbar-thumb:hover {
+      background: #3a3a3a;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
+        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
+        linear-gradient(#121212 0%, #121212 45%, #0e1512 100%);
+      background-attachment: fixed;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      -webkit-font-smoothing: antialiased;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a2a transparent;
+    }
+
+    /* ---------- Header ---------- */
+    .site-header {
+        position: relative;
+        z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+        padding: 16px 16px 12px;
+        background: var(--umbra-surface);
+        border: 1px solid var(--umbra-border);
+        border-top: 0;
+        border-left: 0;
+        border-right: 0;
+    }
+
+    @media (min-width: 640px) {
+      .site-header {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+    }
+
+    .nav-left,
+    .nav-right {
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-left {
+      gap: 16px;
+    }
+
+    @media (min-width: 640px) {
+      .nav-left {
+        gap: 32px;
+      }
+    }
+
+    .nav-right {
+      gap: 8px;
+    }
+
+    @media (min-width: 640px) {
+      .nav-right {
+        gap: 12px;
+      }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0;
+      margin-right: 16px;
+      gap: 6px;
+      text-decoration: none;
+      color: var(--umbra-text);
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .brand span {
+      font-family: "Syne", var(--umbra-font-body);
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+      margin-left: 0;
+    }
+
+    .nav-links {
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+
+    @media (min-width: 1200px) {
+      .nav-links {
+        display: flex;
+      }
+    }
+
+    .nav-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 0;
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      background: transparent;
+      color: var(--umbra-muted);
+    }
+
+    .nav-pill:hover {
+      color: var(--umbra-text);
+      background: var(--umbra-secondary);
+    }
+
+    .nav-pill.active {
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      font-weight: 600;
+    }
+
+    .network-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 0;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: default;
+      transition: background 0.15s ease;
+    }
+
+    .network-btn:hover {
+      background: rgba(85, 185, 138, 0.28);
+    }
+    .network-btn .short { display: none; }
+    @media (max-width: 640px) {
+      .network-btn .full { display: none; }
+      .network-btn .short { display: inline; }
+    }
+    /* On phones/tablets header Connect + chain live inside the menu sheet, not the bar.
+       Scoped to .nav-right: the Transactions empty-state uses .connect-btn too and must stay visible. */
+    @media (max-width: 768px) {
+      .network-btn { display: none !important; }
+      .nav-right .connect-btn { display: none !important; }
+    }
+
+    .network-btn .disc {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .network-btn .disc img {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
+
+    .network-btn .chev {
+      color: var(--umbra-muted);
+    }
+
+    .icon-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--umbra-muted);
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+    }
+
+    @media (min-width: 640px) {
+      .icon-btn.settings {
+        display: inline-flex;
+      }
+    }
+
+    .connect-btn {
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 22px;
+      background: var(--umbra-accent);
+      color: var(--umbra-accent-ink);
+      border: 0;
+      border-radius: 0;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+    }
+    .connect-btn .short { display: none; }
+    @media (max-width: 640px) {
+      .connect-btn { padding: 0 16px; }
+      .connect-btn .full { display: none; }
+      .connect-btn .short { display: inline; }
+    }
+
+    .connect-btn:hover {
+      opacity: 0.9;
+    }
+    /* Dropdown chevron on the connected address (pure CSS, no font icons) */
+    /* Address chevron: near-black ink on green, static — no animation at all */
+    .connect-btn .dd-chev,
+    .mobile-connect .dd-chev {
+      display: inline-flex;
+      margin-left: 8px;
+      vertical-align: middle;
+      color: var(--umbra-accent-ink);
+    }
+    .connect-btn .dd-chev svg,
+    .mobile-connect .dd-chev svg { display: block; }
+    /* (no flip/hover motion on the chevron by request — it stays put) */
+
+    .menu-btn {
+      display: inline-flex;
+    }
+
+    @media (min-width: 1200px) {
+      .menu-btn {
+        display: none;
+      }
+    }
+
+    [disabled] {
+      cursor: not-allowed !important;
+      opacity: 0.55;
+    }
+
+    .chev {
+      width: 16px;
+      height: 16px;
+      flex: none;
+    }
+
+    .chev-sm {
+      width: 14px;
+      height: 14px;
+      flex: none;
+    }
+
+    /* CSS-only chevron — paints everywhere, depends on nothing */
+    .css-chev {
+      width: 8px;
+      height: 8px;
+      flex: none;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg) translateY(-2px);
+      border-bottom-right-radius: 2px;
+    }
+
+    /* Mobile menu (sheet: icon rows + connect/chain at the bottom). */
+      .mobile-menu {
+          display: none;
+          position: fixed;
+          top: 80px;
+          left: 8px;
+          right: 8px;
+          bottom: -2px;
+          z-index: 49;
+          background: var(--umbra-surface);
+          border: 1px solid var(--umbra-border);
+          border-bottom: 0;
+          border-radius: 22px 22px 0 0;
+          padding: 10px;
+          flex-direction: column;
+        }
+
+    .mobile-menu.open {
+      display: flex;
+    }
+
+    body.menu-open .site-header {
+      z-index: 60;
+    }
+
+    body.menu-open::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 48;
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    .mobile-menu .micon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .mobile-menu.open {
+      display: flex;
+    }
+
+    .mobile-menu a.mrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      color: var(--umbra-text);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .mobile-menu a.mrow:hover {
+      background: var(--umbra-secondary);
+    }
+
+    .mobile-menu a.mrow:hover {
+      background: #242424;
+    }
+    .mobile-menu a.mrow.active {
+      background: transparent;
+    }
+    .mobile-menu a.mrow.active .marrow {
+      color: var(--umbra-accent);
+    }
+
+    .mobile-menu a.mrow .marrow {
+      margin-left: auto;
+      color: var(--umbra-muted);
+    }
+
+    .mobile-menu a.mrow.active .marrow {
+      color: var(--umbra-accent);
+    }
+
+    .mobile-foot {
+      margin-top: auto;
+      padding: 10px 8px max(10px, env(safe-area-inset-bottom, 0px));
+      border-top: 0;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .mobile-connect {
+      height: 40px;
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px;
+      border-radius: 0;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+      border: 0;
+      background: var(--umbra-accent);
+      color: var(--umbra-accent-ink);
+      font-family: var(--umbra-font-body);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .mobile-connect img {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .mobile-chain {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--umbra-text);
+      background: var(--umbra-secondary);
+      border-radius: 12px;
+      padding: 6px 12px 6px 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .mobile-chain .mchain-disc {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .mobile-chain .mchain-disc img {
+      width: 15px;
+      height: 15px;
+      display: block;
+    }
+
+    /* ---------- Page + hero backdrop (their recipe, our colour) ---------- */
+    main {
+      padding-top: 0;
+      min-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      background:
+        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
+      position: relative;
+    }
+
+    main::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px);
+      background-size: 22px 22px;
+      pointer-events: none;
+    }
+
+    /* ---------- Shared page sections (exclusive views — one visible at a time) ---------- */
+    .page-section {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+    .page-section.active {
+      display: flex;
+    }
+
+    /* ---------- Swap card (their structure, our colour) ----------
+     * Card #1A1A1A rounded-2xl · Swap/Bridge tabs · activity + slippage icons
+     * Sell box (balance + 50%/Max) · flip button · Receive box · full action button. */
+    .swap-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px 16px 48px;
+      gap: 32px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .swap-card {
+      width: 100%;
+      max-width: 28rem;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 0;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Corner ticks top-left + bottom-right (reference card) */
+    .swap-card::before,
+    .swap-card::after {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      pointer-events: none;
+    }
+
+    .swap-card::before {
+      top: -1px;
+      left: -1px;
+      border-top: 2px solid rgba(255, 255, 255, 0.65);
+      border-left: 2px solid rgba(255, 255, 255, 0.65);
+    }
+
+    .swap-card::after {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.65);
+      border-right: 2px solid rgba(255, 255, 255, 0.65);
+    }
+
+    /* Card top: mini Swap/Bridge pill tabs + slippage tool */
+    .swap-top {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .swap-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      background: var(--umbra-bg);
+      padding: 4px;
+    }
+
+    .swap-tab {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 999px;
+      border: 0;
+      background: transparent;
+      color: var(--umbra-muted);
+      font-family: var(--umbra-font-body);
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .swap-tab.active {
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+    }
+
+    .swap-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ox-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .ox-balance {
+      font-size: 13px;
+      color: var(--umbra-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ox-balance button {
+      background: none;
+      border: 0;
+      color: var(--umbra-accent);
+      font-family: var(--umbra-font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .ox-balance button:hover:not([disabled]) {
+      opacity: 0.85;
+    }
+
+    .ox-side {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+    }
+
+    .ox-side-label {
+      font-size: 14px;
+      color: var(--umbra-muted);
+      padding: 2px 0 4px;
+    }
+
+    .ox-div {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 2px 0;
+    }
+
+    .ox-div > span {
+      flex: 1;
+      height: 1px;
+      background: var(--umbra-border);
+    }
+
+    .ox-div .flip-btn {
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--umbra-border);
+      background: var(--umbra-secondary);
+      color: var(--umbra-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .ox-div .flip-btn svg,
+    .ox-div .flip-btn i {
+      transition: transform 0.35s ease;
+    }
+
+    .ox-div .flip-btn:hover svg,
+    .ox-div .flip-btn:hover i {
+      transform: rotate(180deg);
+    }
+
+    #buyChange {
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    #buyChange.up { color: var(--umbra-accent); }
+    #buyChange.down { color: #f6465d; }
+
+    .ox-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--umbra-muted);
+    }
+
+    .ox-meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .ox-meta-item .slip-val {
+      color: var(--umbra-accent);
+      font-weight: 700;
+    }
+
+    .ox-meta-sep {
+      width: 1px;
+      height: 14px;
+      background: var(--umbra-border);
+    }
+
+    .details-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      background: none;
+      border: 0;
+      color: var(--umbra-accent);
+      font-family: var(--umbra-font-body);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px 0 0;
+      cursor: pointer;
+    }
+
+    .details-toggle svg {
+      transition: transform 0.15s ease;
+    }
+
+    .details-toggle[aria-expanded="true"] svg {
+      transform: rotate(180deg);
+    }
+
+    .swap-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tool-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--umbra-text);
+      cursor: pointer;
+      font-family: var(--umbra-font-body);
+      font-size: 12px;
+      font-weight: 500;
+      transition: background 0.15s ease;
+      text-decoration: none;
+    }
+
+    .tool-btn:hover {
+      background: var(--umbra-secondary);
+    }
+
+    .tool-btn .slip-val {
+      color: var(--umbra-accent);
+      font-weight: 700;
+    }
+
+    .ox-balance button {
+      background: none;
+      border: 0;
+      color: var(--umbra-accent);
+      font-family: var(--umbra-font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .ox-balance button:hover:not([disabled]) {
+      opacity: 0.85;
+    }
+
+    .token-select {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 8px;
+      background: var(--umbra-secondary);
+      padding: 8px 12px;
+      border: 0;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      flex: none;
+      max-width: 46%;
+      min-width: 0;
+    }
+    .token-select #sellSymbol,
+    .token-select #buySymbol {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .token-select:hover {
+      background: var(--umbra-secondary-hover);
+    }
+
+    .token-select .coin {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex: none;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--umbra-accent);
+    }
+
+    .token-select .coin img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .amount-wrap {
+      margin-left: auto;
+      flex: 1;
+      min-width: 0;
+      text-align: right;
+      overflow: hidden;
+    }
+
+    .amount-wrap input {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      background: transparent;
+      border: 0;
+      outline: none;
+      text-align: right;
+      font-family: var(--umbra-font-body);
+      font-weight: 600;
+      color: var(--umbra-text);
+      font-size: 36px;
+      height: 40px;
+      padding-right: 0;
+    }
+
+    .amount-wrap input::placeholder {
+      color: var(--umbra-muted);
+      opacity: 0.6;
+    }
+
+    .amount-wrap input::-webkit-outer-spin-button,
+    .amount-wrap input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .amount-wrap input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* Price-change pulse on the receive amount */
+    @keyframes recvBump {
+      0% { opacity: 0.35; }
+      100% { opacity: 1; }
+    }
+
+    #buyAmount.bump {
+      animation: recvBump 0.6s ease;
+    }
+
+    .usd-line {
+      font-size: 14px;
+      color: var(--umbra-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .flip-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--umbra-secondary);
+      border: 1px solid var(--umbra-border);
+      color: var(--umbra-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .flip-btn:hover {
+      background: var(--umbra-accent);
+      color: var(--umbra-accent-ink);
+    }
+
+    .quote-lines {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--umbra-muted);
+    }
+
+    .quote-lines .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .quote-lines .good {
+      color: var(--umbra-accent);
+      font-weight: 600;
+    }
+
+    .quote-lines .bad {
+      color: #f6465d;
+      font-weight: 600;
+    }
+
+    .quote-lines .error {
+      color: #f6465d;
+    }
+
+    /* Receive-price typing dots: three bouncing dots inside the price field
+       while a quote is in flight (replaces the tofu "…" placeholder). */
+    .tdots {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: none;
+      align-items: center;
+      gap: 5px;
+      pointer-events: none;
+    }
+    .tdots.on { display: inline-flex; }
+    .tdots i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--umbra-muted);
+      animation: dot-bounce 1.2s ease-in-out infinite;
+    }
+    .tdots i:nth-child(2) { animation-delay: 0.15s; }
+    .tdots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes dot-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    .details-toggle[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .swap-action {
+      width: 100%;
+      height: 56px;
+      margin-top: 16px;
+      border-radius: 0;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+      border: 0;
+      background: var(--umbra-accent);
+      color: var(--umbra-accent-ink);
+      font-family: var(--umbra-font-body);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .swap-action:hover {
+      opacity: 0.9;
+    }
+
+    .swap-action.swap-danger {
+      background: #f6465d;
+      color: var(--umbra-accent-ink);
+    }
+
+    .quick-pick {
+      margin: 16px auto 0;
+      width: 100%;
+      max-width: 440px;
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Swap confirm card: signed amounts + grey detail rows */
+    #swapModalTitle { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+    #swapModalTitle em { font-style: normal; color: var(--umbra-accent); }
+    /* Title takes state color: green confirmed, red failed */
+    #swapModalTitle.tone-ok { color: var(--umbra-accent); }
+    #swapModalTitle.tone-bad { color: #f6465d; }
+    .okx-amt-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.25;
+    }
+    .okx-amt-row.recv { font-size: 23px; font-weight: 700; }
+    .okx-amt-row .sym { color: var(--umbra-muted); font-weight: 600; }
+    /* Trade direction colors: red = leaving, green = arriving */
+    .okx-amt-row .neg { color: #f6465d; }
+    .okx-amt-row .pos { color: var(--umbra-accent); }
+    .okx-amt-row .usd { font-size: 14px; font-weight: 500; color: var(--umbra-muted); }
+    .okx-conn {
+      width: 2px;
+      height: 22px;
+      background: var(--umbra-border);
+      margin: 6px 0 6px 17px;
+      border-radius: 2px;
+    }
+    .okx-hair { height: 1px; background: var(--umbra-border); margin: 16px 0; }
+    .okx-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .okx-row .val {
+      color: var(--umbra-muted);
+      font-weight: 400;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .okx-row .val img { width: 20px; height: 20px; border-radius: 50%; }
+    @keyframes shake-x {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+    /* Hairline between detail rows */
+    .quote-lines .row + .row { border-top: 1px solid var(--umbra-border); padding-top: 8px; }
+    .swap-explorer-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--umbra-border);
+      color: var(--umbra-accent);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .swap-explorer-btn:hover { border-color: var(--umbra-accent); }
+    #swapError { align-items: center; gap: 8px; }
+    #swapError.shake { animation: shake-x 0.4s ease; }
+    /* Loading dots inside the green retry button */
+    #swapRetryBtn .tdots i { background: var(--umbra-accent-ink); }
+    #swapRetryBtn:disabled { opacity: 0.9; cursor: default; }
+
+    /* Token modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(0, 0, 0, 0.6);
+      align-items: flex-start;
+      justify-content: center;
+      padding: 100px 16px 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .token-modal {
+      width: 100%;
+      max-width: 400px;
+      max-height: 60vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    /* Swap confirm card: taller + scrollable so nothing clips on small screens */
+    #swapModal .token-modal {
+      max-width: 420px;
+      max-height: calc(100dvh - 88px);
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .modal-backdrop { padding: 40px 12px 12px; }
+      #swapModal .token-modal { max-height: calc(100dvh - 52px); border-radius: 14px; }
+    }
+
+    /* (removed: custom wallet modal styles — Reown AppKit renders its own modal) */
+    .slip-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .slip-pills button {
+      border: 0;
+      border-radius: 999px;
+      background: var(--umbra-secondary);
+      color: var(--umbra-muted);
+      font-family: var(--umbra-font-body);
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 16px;
+      cursor: pointer;
+    }
+
+    .slip-pills button.active {
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+    }
+
+    .slip-custom {
+      display: flex;
+      gap: 8px;
+    }
+
+    .slip-custom button {
+      border: 0;
+      border-radius: 999px;
+      background: var(--umbra-secondary);
+      color: var(--umbra-muted);
+      font-family: var(--umbra-font-body);
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 16px;
+      cursor: pointer;
+      flex: none;
+    }
+
+    .slip-custom button.active {
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+    }
+
+    .slip-custom input {
+      flex: 1;
+      min-width: 0;
+      border-radius: 999px;
+      border: 0;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 13.5px;
+      padding: 9px 16px;
+      outline: none;
+    }
+
+    .token-modal input {
+      margin: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--umbra-border);
+      background: var(--umbra-bg);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      outline: none;
+    }
+
+    #slipModal .token-modal input {
+      margin: 0;
+      border-radius: 999px;
+      border: 0;
+      background: var(--umbra-secondary);
+    }
+
+    .token-list {
+      overflow-y: auto;
+      padding: 0 8px 12px;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a2a transparent;
+    }
+    .token-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .token-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .token-list::-webkit-scrollbar-thumb {
+      background: #2a2a2a;
+      border-radius: 999px;
+    }
+    .token-list::-webkit-scrollbar-thumb:hover {
+      background: #3a3a3a;
+    }
+
+    .token-opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .token-opt:hover {
+      background: var(--umbra-secondary);
+    }
+
+    .token-opt .coin {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex: none;
+    }
+
+    .token-opt .coin img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .token-opt .meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .token-opt .meta b {
+      font-size: 14px;
+    }
+
+    .token-opt .meta span {
+      font-size: 12px;
+      color: var(--umbra-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .token-opt .tag {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--umbra-muted);
+      border: 1px solid var(--umbra-border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      flex: none;
+    }
+
+    /* ---------- Stock list card ---------- */
+    .stocks-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 16px 0;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .stocks-card {
+      width: 100%;
+      max-width: 780px;
+      flex: 1;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    @keyframes shimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+    .skeleton {
+      display: inline-block;
+      width: 48px;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--umbra-secondary);
+      animation: shimmer 1.2s ease-in-out infinite;
+    }
+    .skeleton.wide { width: 64px; }
+    .skeleton.short { width: 32px; }
+    .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 0;
+      background: transparent;
+      color: var(--umbra-muted);
+      cursor: pointer;
+      flex: none;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .info-icon i, .info-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+    .info-tip {
+      position: fixed;
+      z-index: 70;
+      max-width: 260px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--umbra-border);
+      background: var(--umbra-surface);
+      color: var(--umbra-text);
+      font-size: 12px;
+      line-height: 1.4;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      display: none;
+    }
+    .info-tip.open { display: block; }
+
+    .stocks-card-head {
+      padding: 16px;
+      border-bottom: 1px solid var(--umbra-border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .stocks-search {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--umbra-border);
+      background: var(--umbra-bg);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      outline: none;
+    }
+    .stocks-search::placeholder {
+      color: var(--umbra-muted);
+    }
+    .stocks-count {
+      font-size: 13px;
+      color: var(--umbra-muted);
+      white-space: nowrap;
+    }
+    .stocks-list {
+      max-height: 520px;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a2a transparent;
+    }
+    .stocks-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .stocks-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .stocks-list::-webkit-scrollbar-thumb {
+      background: #2a2a2a;
+      border-radius: 999px;
+    }
+    .stocks-list::-webkit-scrollbar-thumb:hover {
+      background: #3a3a3a;
+    }
+    .stock-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      transition: background 0.15s ease;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .stock-row:hover {
+      background: var(--umbra-secondary);
+    }
+    .stock-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .stock-left img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      background: var(--umbra-bg);
+      flex: none;
+    }
+    .stock-left .fallback {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex: none;
+    }
+    .stock-meta {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .stock-meta b {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stock-meta span {
+      font-size: 12px;
+      color: var(--umbra-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stock-right {
+      text-align: right;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .stock-price {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .stock-mcap {
+      font-size: 12px;
+      color: var(--umbra-muted);
+    }
+
+    /* ---------- Drawer ---------- */
+    .drawer-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: rgba(0,0,0,0.6);
+      align-items: stretch;
+      justify-content: flex-end;
+    }
+    .drawer-backdrop.open {
+      display: flex;
+    }
+    .drawer {
+      width: 100%;
+      max-width: 420px;
+      height: 100%;
+      background: var(--umbra-surface);
+      border-left: 1px solid var(--umbra-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--umbra-border);
+      background: var(--umbra-surface);
+    }
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a2a transparent;
+    }
+    .drawer-body::-webkit-scrollbar { width: 6px; }
+    .drawer-body::-webkit-scrollbar-track { background: transparent; }
+    .drawer-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 999px; }
+    @media (max-width: 640px) {
+      .drawer { max-width: 100%; }
+    }
+
+    /* ---------- Transactions (filter chips) ---------- */
+    .tx-tabs {
+      display: flex;
+      gap: 20px;
+      padding: 16px 16px 0;
+    }
+    .tx-tab {
+      background: none;
+      border: 0;
+      padding: 0 0 10px;
+      font-family: var(--umbra-font-body);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--umbra-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tx-tab.active {
+      color: var(--umbra-text);
+      font-weight: 700;
+      border-bottom-color: var(--umbra-accent);
+    }
+    .tx-chips {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      flex-wrap: wrap;
+    }
+    .tx-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 0;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .tx-chip:hover { background: var(--umbra-secondary-hover); }
+    .tx-chip.on {
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+    }
+    .tx-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 150px;
+      background: #262626;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      padding: 6px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      z-index: 50;
+    }
+    .tx-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tx-menu button:hover { background: var(--umbra-secondary-hover); }
+    .tx-explorer {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 999px;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .tx-explorer:hover { background: var(--umbra-secondary-hover); }
+
+    /* Footer: no card — content floats on the page, brand in site green. */
+    .site-footer {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+      padding: 24px;
+      border: 1px solid var(--umbra-border);
+      border-left: 0;
+      border-right: 0;
+      border-top: 0;
+      border-bottom: 0;
+      background: var(--umbra-surface);
+      font-size: 14px;
+      color: var(--umbra-muted);
+    }
+
+    .site-footer .foot-brand {
+      font-family: "Syne", var(--umbra-font-body);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      color: var(--umbra-accent);
+      text-decoration: none;
+    }
+
+    .api-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--umbra-muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .api-status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--umbra-muted);
+    }
+
+    .api-status.ok .dot {
+      background: var(--umbra-accent);
+    }
+
+    /* ---------- Ticker tape ---------- */
+    .tape {
+      overflow: hidden;
+      background: transparent;
+      border: 0;
+      position: relative;
+      z-index: 1;
+      margin-top: 4px;
+      mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    }
+
+    .tape-track {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: max-content;
+      padding: 10px 0;
+      animation: tape-scroll 50s linear infinite;
+    }
+
+    .tape:hover .tape-track {
+      animation-play-state: paused;
+    }
+
+    @keyframes tape-scroll {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(-50%);
+      }
+    }
+
+    .tape-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: background 0.15s ease;
+    }
+
+    .tape-chip:hover {
+      background: var(--umbra-secondary-hover);
+    }
+
+    .tape-chip img {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      background: var(--umbra-surface);
+    }
+
+    .tape-chip .letter {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    /* Badged token icon — main logo with Solana mark pinned bottom-right */
+    .tk {
+      position: relative;
+      display: inline-flex;
+      flex: none;
+    }
+    .tk .tk-main {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      background: var(--umbra-surface);
+    }
+    .tk .tk-letter {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    .tk .tk-chain {
+      position: absolute;
+      right: -3px;
+      bottom: -3px;
+      width: 42%;
+      height: 42%;
+      border-radius: 50%;
+      border: 2px solid var(--umbra-surface);
+      background: #121212;
+      object-fit: contain;
+      display: block;
+    }
+    .tk-20 { width: 20px; height: 20px; }
+    .tk-20 .tk-letter { font-size: 11px; }
+    .tk-24 { width: 24px; height: 24px; }
+    .tk-24 .tk-letter { font-size: 12px; }
+    .tk-28 { width: 28px; height: 28px; }
+    .tk-28 .tk-letter { font-size: 13px; }
+    .tk-36 { width: 36px; height: 36px; }
+    .tk-36 .tk-letter { font-size: 14px; }
+    .tk-48 { width: 48px; height: 48px; }
+    .tk-48 .tk-letter { font-size: 18px; }
+
+    .tape-chip .sym {
+      color: var(--umbra-muted);
+    }
+
+    .tape-chip .chg-up {
+      color: var(--umbra-accent);
+      font-weight: 600;
+    }
+
+    .tape-chip .chg-down {
+      color: #f6465d;
+      font-weight: 600;
+    }
+
+    .tape-note {
+      padding: 10px 24px;
+      font-size: 13px;
+      color: var(--umbra-muted);
+    }
+
+    .tape-skeleton {
+      display: flex;
+      gap: 8px;
+      padding: 10px 0;
+      width: max-content;
+    }
+
+    .tape-skeleton span {
+      width: 150px;
+      height: 34px;
+      border-radius: 999px;
+      background: var(--umbra-secondary);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 0.5;
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav-left">
+      <a class="brand" href="#swap" aria-label="Umbra home">
+        <!-- Umbra logo: white-bg mark (assets/logo-white.png), served copy here. -->
+        <span class="brand-mark">
+          <img src="./assets/logo-white.png" alt="Umbra logo" onerror="this.style.display='none'" />
+        </span>
+        <span>Umbra</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a class="nav-pill active" href="#swap">Swap</a>
+        <a class="nav-pill" href="#stocks">Stocks</a>
+        <a class="nav-pill" href="#transactions">Transactions</a>
+      </nav>
+    </div>
+
+    <div class="nav-right">
+      <span class="network-btn" title="Solana is the only network on Umbra">
+        <span class="disc"><img src="./assets/solana-mark.png" alt="" /></span>
+        <span class="full">Solana Mainnet</span><span class="short">Mainnet</span>
+      </span>
+      <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
+        <span class="full">Connect Wallet</span><span class="short">Connect</span>
+      </button>
+      <button class="icon-btn menu-btn" type="button" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span id="menuIconOpen"><i data-lucide="menu" width="20" height="20"></i></span>
+        <span id="menuIconClose" style="display:none;"><i data-lucide="x" width="20" height="20"></i></span>
+      </button>
+    </div>
+  </header>
+
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#swap" class="mrow active"><span class="micon"><i data-lucide="repeat" width="17" height="17"></i></span><span>Swap</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
+    <a href="#stocks" class="mrow"><span class="micon"><i data-lucide="trending-up" width="17" height="17"></i></span><span>Stocks</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
+    <a href="#transactions" class="mrow"><span class="micon"><span class="material-symbols-outlined" style="font-size:18px; line-height:1;">search_activity</span></span><span>Transactions</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
+    <div class="mobile-foot">
+      <button class="mobile-connect" id="menuConnectBtn" type="button"><span>Connect Wallet</span></button>
+      <span class="mobile-chain" title="Solana is the only network"><span class="mchain-disc"><img src="./assets/solana-mark.png" alt="" /></span>Mainnet</span>
+    </div>
+  </div>
+
+  <main>
+    <div class="tape" aria-label="Live token prices">
+      <div class="tape-skeleton" id="tapeSkeleton" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="tape-track" id="tapeTrack" hidden></div>
+      <div class="tape-note" id="tapeNote" hidden></div>
+    </div>
+    <!-- Swap card (OKX layout, Umbra skin). -->
+    <section id="swap" class="page-section active" aria-label="Swap">
+      <div class="swap-wrap">
+        <div class="swap-card ox">
+          <div class="swap-top">
+            <div class="swap-tabs" role="tablist" aria-label="Swap or bridge">
+              <button class="swap-tab active" id="tabSwap" role="tab" aria-selected="true">Swap</button>
+              <button class="swap-tab" id="tabBridge" role="tab" aria-selected="false" disabled style="opacity:0.45; cursor:not-allowed;" title="Bridge disabled for now">Bridge <span style="font-size:8px; font-weight:800; color:var(--umbra-accent-ink); background:var(--umbra-accent); border-radius:999px; padding:1px 4px; margin-left:4px; vertical-align:middle;">soon</span></button>
+            </div>
+            <div class="swap-tools">
+              <button class="tool-btn" id="slipBtn" title="Slippage - tap to change" aria-label="Slippage setting">
+                <i data-lucide="sliders-horizontal" width="20" height="20"></i>
+                <span class="slip-val" id="slipVal">0.5%</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="swapView">
+          <div class="ox-head"><span class="ox-side-label" style="padding:0;">Sell</span>
+            <span class="ox-balance"><i data-lucide="wallet" width="15" height="15"></i>
+              <span id="sellBalance">—</span>
+              <button id="halfBtn" title="Fill 50% of balance" hidden>50%</button>
+              <button id="maxBtn" title="Fill full balance">Max</button>
+            </span>
+          </div>
+
+          <div class="ox-side">
+            <button class="token-select" id="sellTokenBtn">
+              <span id="sellCoin" style="display:inline-flex;"></span>
+              <span id="sellSymbol">NVDAx</span>
+              <i data-lucide="chevron-down" width="16" height="16"></i>
+            </button>
+            <div class="amount-wrap">
+              <input id="sellAmount" type="number" min="0" step="any" placeholder="0.00" value="" inputmode="decimal" />
+              <div class="usd-line" id="sellUsd">$0.00</div>
+            </div>
+          </div>
+
+          <div class="ox-div"><span></span>
+            <button class="flip-btn" id="flipBtn" aria-label="Flip direction">
+              <i data-lucide="arrow-up-down" width="17" height="17"></i>
+            </button>
+          <span></span></div>
+
+          <div class="ox-side-label">Receive</div>
+          <div class="ox-side">
+            <button class="token-select" id="buyTokenBtn">
+              <span id="buyCoin" style="display:inline-flex;"></span>
+              <span id="buySymbol">USDC</span>
+              <i data-lucide="chevron-down" width="16" height="16"></i>
+            </button>
+            <div class="amount-wrap" style="position:relative;">
+              <input id="buyAmount" type="text" placeholder="0.00" readonly tabindex="-1" />
+              <span class="tdots" id="buyDots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <div class="usd-line"><span id="buyUsd">$0.00</span><span id="buyChange"></span><span id="buyLoading" style="display:none; margin-left:6px; color:var(--umbra-accent); animation:spin 0.9s linear infinite; line-height:0;"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></span></div>
+            </div>
+          </div>
+
+          <div class="ox-meta" id="quoteMeta" hidden>
+            <span class="ox-meta-item"><i data-lucide="sliders-horizontal" width="14" height="14"></i><span id="metaSlip">0.5%</span></span>
+            <span class="ox-meta-sep"></span>
+            <span class="ox-meta-item"><i data-lucide="scale" width="14" height="14"></i><span id="metaFair">—</span></span>
+          </div>
+
+          <button class="details-toggle" id="detailToggle" aria-expanded="false" disabled>
+            <span>Show details</span>
+            <i data-lucide="chevron-down" width="14" height="14"></i>
+          </button>
+
+          <div class="quote-lines" id="quoteLines" hidden></div>
+
+          <button class="swap-action" id="actionBtn" disabled title="Connect a wallet to swap">Connect Wallet</button>
+          </div>
+          <div id="bridgeView" hidden>
+            <div style="background: var(--umbra-secondary); border: 1px solid var(--umbra-border); border-radius: 16px; padding: 16px; margin-bottom: 8px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-size:13px; color:var(--umbra-muted);">Bridge from</span>
+                <span style="font-size:12px; color:var(--umbra-muted); display:flex; align-items:center; gap:6px;"><i data-lucide="wallet" width="12" height="12"></i> 0.00 50% Max</span>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <button class="token-select" id="bridgeFromChainBtn2" style="flex:none; background:var(--umbra-bg);">
+                  <span id="bridgeFromChainIcon2" style="width:20px; height:20px; border-radius:50%; background:var(--umbra-bg); display:inline-flex; align-items:center; justify-content:center; font-size:10px; overflow:hidden;"><img src="./assets/chains/Ethereum.png" alt="" style="width:20px; height:20px; display:none;" id="bridgeChainImg2" /></span>
+                  <span id="bridgeFromChainName2">Select chain</span>
+                  <i data-lucide="chevron-down" width="14" height="14"></i>
+                </button>
+                <div style="text-align:right; flex:1;">
+                  <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                    <button class="token-select" id="bridgeAssetBtn2" style="flex:none; background:var(--umbra-bg);">
+                      <span id="bridgeAssetCoin2" style="display:inline-flex;"></span>
+                      <span id="bridgeAssetSymbol2">USDC</span>
+                      <i data-lucide="chevron-down" width="14" height="14"></i>
+                    </button>
+                    <input id="bridgeAmount2" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal" style="flex:1; min-width:80px; background:transparent; border:0; color:var(--umbra-text); font-size:24px; font-weight:700; outline:none; text-align:right;" />
+                  </div>
+                  <div style="font-size:12px; color:var(--umbra-muted); text-align:right; margin-top:4px;">$0.00</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:center; margin:-14px 0 -14px; position:relative; z-index:1;">
+              <span style="width:32px; height:32px; border-radius:50%; background:var(--umbra-bg); border:1px solid var(--umbra-border); display:inline-flex; align-items:center; justify-content:center; color:var(--umbra-muted);"><i data-lucide="arrow-down" width="16" height="16"></i></span>
+            </div>
+            <div style="background: var(--umbra-secondary); border: 1px solid var(--umbra-border); border-radius: 16px; padding: 16px; margin-top:8px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <span style="font-size:13px; color:var(--umbra-muted);">Bridge to</span>
+                <span style="font-size:12px; color:var(--umbra-muted);">0.00</span>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <button class="token-select" style="flex:none; background:var(--umbra-bg); opacity:0.9;">
+                  <span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex;"><img src="./assets/solana-mark.png" alt="" style="width:20px; height:20px;" /></span>
+                  <span>Solana</span>
+                  <i data-lucide="chevron-down" width="14" height="14" style="opacity:0.3;"></i>
+                </button>
+                <div style="text-align:right; flex:1;">
+                  <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                    <span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:var(--umbra-bg);"><span id="bridgeToAssetIcon" style="display:inline-flex;"></span></span>
+                    <span style="font-weight:600; font-size:14px;" id="bridgeToAssetSymbol">USDC</span>
+                    <span style="font-size:24px; font-weight:700; color:var(--umbra-text); margin-left:8px;">0.00</span>
+                  </div>
+                  <div style="font-size:12px; color:var(--umbra-muted); text-align:right; margin-top:4px;">$0.00</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px;">
+              <button id="bridgeAddReceiverBtn" style="display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:12px; border:1px solid var(--umbra-border); background:var(--umbra-secondary); color:var(--umbra-text); font-size:13px; cursor:pointer;">
+                <i data-lucide="plus" width="14" height="14"></i> Add receiving wallet
+              </button>
+              <input id="bridgeReceiver2" type="text" placeholder="Solana address" autocomplete="off" hidden style="width:100%; margin-top:8px; padding:12px 14px; border-radius:12px; border:1px solid var(--umbra-border); background:var(--umbra-bg); color:var(--umbra-text); font-size:13px; outline:none;" />
+            </div>
+            <div class="quote-lines" id="bridgeLines2" hidden></div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--umbra-muted); margin-top:10px; padding:0 4px;">
+              <span>Bridge Fee<span class="info-icon" data-tip="The CCIP fee is paid on the source chain when the bridge executes — no fee oracle is wired yet, so no number is shown."><i data-lucide="info" width="14" height="14"></i></span></span><span id="bridgeFee2">—</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--umbra-muted); padding:0 4px;">
+              <span>Estimated Time<span class="info-icon" data-tip="Estimated CCIP delivery time — usually 2-5 minutes, up to 10."><i data-lucide="info" width="14" height="14"></i></span></span><span>2-5 minutes</span>
+            </div>
+            <button class="swap-action" id="bridgeActionBtn2" disabled>Connect Wallet</button>
+          </div>
+          
+        </div>
+
+        <div class="quick-pick" id="quickPick" hidden></div>
+      </div>
+    </section>
+    <section id="stocks" class="page-section" aria-label="Stocks">
+      <div class="stocks-wrap">
+        <div class="stocks-card">
+          <div class="stocks-card-head">
+            <input id="stocksSearch" class="stocks-search" type="text" placeholder="Search stocks…" autocomplete="off" />
+            <div style="position:relative; flex:none; align-self:center;">
+              <button id="stocksFilterBtn" class="token-select" style="padding:0 14px; font-size:13px; border-radius:999px; background:var(--umbra-secondary); height:40px; gap:10px; max-width:none;">
+                <span id="stocksFilterLabel" style="white-space:nowrap;">All</span>
+                <span class="css-chev" aria-hidden="true"></span>
+              </button>
+              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#262626; border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,0.6); z-index:50;">
+                <button class="token-opt" data-filter="all" style="width:100%;"><span class="meta"><b>All</b></span><span class="tag" id="countAll">—</span></button>
+                <button class="token-opt" data-filter="xstock" style="width:100%;"><span class="meta"><b>xStocks</b></span><span class="tag" id="countX">—</span></button>
+                <button class="token-opt" data-filter="pre" style="width:100%;"><span class="meta"><b>Pre-IPO</b></span><span class="tag" id="countPre">—</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="stocks-list" id="stocksList"></div>
+        </div>
+      </div>
+    </section>
+    <!-- (deleted: bridge page — #bridge now falls through to #swap) -->
+    <section id="transactions" class="page-section" aria-label="Transactions">
+      <div class="stocks-wrap">
+        <div class="stocks-card">
+          <div class="tx-chips" style="padding-top:16px;">
+            <div style="position:relative;">
+              <button class="tx-chip" id="chipRange"><span id="chipRangeLabel">Past orders</span><i data-lucide="chevron-down" width="13" height="13"></i></button>
+              <div class="tx-menu" id="menuRange" style="display:none;">
+                <button data-v="all">All time</button>
+                <button data-v="90">Past 90 days</button>
+                <button data-v="30">Past 30 days</button>
+                <button data-v="7">Past 7 days</button>
+              </div>
+            </div>
+            <div style="position:relative;">
+              <button class="tx-chip" id="chipType"><span id="chipTypeLabel">Type</span><i data-lucide="chevron-down" width="13" height="13"></i></button>
+              <div class="tx-menu" id="menuType" style="display:none;">
+                <button data-v="all">All types</button>
+                <button data-v="swap">Swaps</button>
+                <button data-v="bridge" disabled style="opacity:0.45; cursor:not-allowed;" title="Bridges coming soon">Bridges <span style="font-size:8px; font-weight:800; color:var(--umbra-accent-ink); background:var(--umbra-accent); border-radius:999px; padding:1px 4px; margin-left:4px; vertical-align:middle;">soon</span></button>
+              </div>
+            </div>
+            <div style="position:relative;">
+              <button class="tx-chip" id="chipStatus"><span id="chipStatusLabel">Status</span><i data-lucide="chevron-down" width="13" height="13"></i></button>
+              <div class="tx-menu" id="menuStatus" style="display:none;">
+                <button data-v="all">All statuses</button>
+                <button data-v="done">Completed</button>
+                <button data-v="pending">Pending</button>
+                <button data-v="failed">Failed</button>
+              </div>
+            </div>
+          </div>
+          <div id="activityContent" style="padding:0 16px 16px;">
+            <div id="activityConnect" style="border:0; background: transparent; padding:64px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-height:320px; width:100%;">
+              <div style="width:64px; height:64px; display:flex; align-items:center; justify-content:center;"><span class="material-symbols-outlined" style="font-size:48px; color:var(--umbra-text);">search_activity</span></div>
+              <b style="font-size:16px;">Connect wallet</b>
+              <span style="font-size:13px; color:var(--umbra-muted);">Connect your wallet to view transactions.</span>
+              <button class="connect-btn" onclick="document.getElementById('connectBtn').click()" style="margin-top:8px;"><span class="full">Connect Wallet</span><span class="short">Connect</span></button>
+            </div>
+            <div id="activityListWrap" style="display:none;">
+              <div class="stocks-list" id="activityList" style="max-height:420px;"></div>
+              <div id="activityEmpty" style="display:none; padding:32px 16px; text-align:center;">
+                <div style="width:72px; height:72px; margin:0 auto 16px; border-radius:50%; background:var(--umbra-secondary); display:flex; align-items:center; justify-content:center; color:var(--umbra-muted);"><i data-lucide="inbox" width="32" height="32"></i></div>
+                <div id="activityEmptyText" style="font-size:14px; font-weight:600; margin-bottom:16px;">No records found in the last 90 days</div>
+                <a id="activityExplorer" href="#" target="_blank" rel="noreferrer" class="tx-explorer">Check on Explorer</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span class="foot-brand">UMBRA</span>
+    <span style="display:flex; align-items:center; gap:6px;">
+      <a class="api-status" id="apiStatus" href="/health" target="_blank" rel="noreferrer"><span class="dot"></span><span id="apiStatusText">API</span></a>
+      <span id="umbraBuild" style="font-size:11px; color:var(--umbra-muted);">build 2026-09-23e</span>
+      <span class="info-icon" data-tip="API status — green is live. Check /health for xStocks, Jupiter, Solana, 0x."><i data-lucide="info" width="14" height="14"></i></span>
+    </span>
+  </footer>
+
+  <div class="modal-backdrop" id="tokenModal">
+    <div class="token-modal" role="dialog" aria-label="Select token">
+      <input id="tokenSearch" type="text" placeholder="Search tokens…" autocomplete="off" />
+      <div class="token-list" id="tokenList"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="slipModal">
+    <div class="token-modal" role="dialog" aria-label="Slippage settings" style="max-width: 420px; padding: 20px; gap: 14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <b style="font-size:16px;">Slippage Settings</b>
+        <button class="icon-btn" id="slipModalClose" aria-label="Close" style="display:inline-flex;"><i data-lucide="x" width="18" height="18"></i></button>
+      </div>
+      <div class="slip-pills" id="slipPills">
+        <button data-bps="10">0.1%</button>
+        <button data-bps="20">0.2%</button>
+        <button data-bps="50">0.5%</button>
+        <button data-bps="100">1%</button>
+        <button data-bps="500">5%</button>
+      </div>
+      <div class="slip-custom">
+        <button id="slipCustomBtn" type="button">Custom</button>
+        <input id="slipCustomInput" type="number" min="0" max="100" step="any" placeholder="0.0" inputmode="decimal" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Swap confirm modal: signed amounts, detail rows, Solscan link -->
+  <div class="modal-backdrop" id="swapModal">
+    <div class="token-modal" role="dialog" aria-label="Swap status" style="max-width: 420px; padding: 24px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <b id="swapModalTitle">Confirm <em>Swap</em></b>
+        <button class="icon-btn" id="swapModalClose" aria-label="Close" style="display:inline-flex;"><i data-lucide="x" width="18" height="18"></i></button>
+      </div>
+      <div id="swapPairHero" style="margin-bottom:4px;"></div>
+      <div id="swapExplorer" style="margin-top:12px; text-align:center; display:none;">
+        <a id="swapExplorerLink" class="swap-explorer-btn" href="#" target="_blank" rel="noreferrer">View on Solscan ↗</a>
+      </div>
+      <div id="swapError" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; background:rgba(246,70,93,0.1); color:#f6465d; font-size:13px;"></div>
+      <button id="swapRetryBtn" class="swap-action" style="display:none; margin-top:12px;">Try again</button>
+    </div>
+  </div>
+
+  <!-- (removed: custom wallet modal — Reown AppKit renders its own connect UI) -->
+
+  <!-- Stock detail drawer -->
+  <div class="drawer-backdrop" id="stockDrawer" aria-hidden="true">
+    <div class="drawer" role="dialog" aria-label="Stock details">
+      <div class="drawer-head">
+        <button class="icon-btn" id="drawerClose" aria-label="Close" style="display:inline-flex;">
+          <i data-lucide="x" width="20" height="20"></i>
+        </button>
+        <span style="margin-left:8px; font-weight:600;" id="drawerSymbol">—</span>
+      </div>
+      <div class="drawer-body" id="drawerBody">
+        <div style="display:flex; align-items:center; gap:12px; padding:16px;">
+          <span class="coin" id="drawerIcon" style="width:48px; height:48px; font-size:18px;">—</span>
+          <span style="display:flex; flex-direction:column;">
+            <b id="drawerName" style="font-size:16px;">—</b>
+            <span id="drawerSub" style="font-size:13px; color:var(--umbra-muted);">—</span>
+          </span>
+        </div>
+        <div style="padding:0 16px 16px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Price</span>
+            <b id="drawerPrice" style="font-size:20px;">—</b>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Market cap<span class="info-icon" data-tip="Market cap is total value — price × supply. For xStocks it's the underlying equity cap from OKX/Finnhub, for Pre-IPO it's the implied valuation."><i data-lucide="info" width="14" height="14"></i></span></span>
+            <span id="drawerMcap" style="font-size:13px; color:var(--umbra-muted);">—</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--umbra-muted); font-size:13px;">24h</span>
+            <span id="drawerChange" style="font-size:13px;">—</span>
+          </div>
+          <div id="drawerHoldRow" style="display:none; justify-content:space-between;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Your holdings</span>
+            <span id="drawerHold" style="font-size:13px; font-weight:600;">—</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Top 10 holders<span class="info-icon" data-tip="Concentration — share of supply held by the 10 largest on-chain holders."><i data-lucide="info" width="14" height="14"></i></span></span>
+            <span id="drawerTop" style="font-size:13px;">—</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Liquidity</span>
+            <span id="drawerLiquidity" style="font-size:13px;">—</span>
+          </div>
+          <div style="text-align:center; margin-top:8px;">
+            <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Solscan <i data-lucide="external-link" width="14" height="14"></i></a>
+          </div>
+          <div id="drawerChart" style="margin-top:8px; height:80px; background:var(--umbra-bg); border:1px solid var(--umbra-border); border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--umbra-muted); font-size:13px;">No chart data yet</div>
+          <button id="drawerSwapBtn" class="swap-action" style="margin-top:8px;">Buy this stock</button>
+          <button id="drawerSellBtn" class="swap-action swap-danger" style="margin-top:8px;">Sell this stock</button>
+          <div id="drawerNote" style="font-size:12px; color:var(--umbra-muted); text-align:center; display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      if (window.lucide) window.lucide.createIcons();
+      // Reveal Material icons only once the font is ready (kills the text flash)
+      function msReady() { document.body.classList.add('ms-ready'); }
+      if (document.fonts && document.fonts.load) {
+        document.fonts.load('20px "Material Symbols Outlined"').then(msReady).catch(msReady);
+        setTimeout(msReady, 1500);
+      } else {
+        msReady();
+      }
+
+      // Local python server (:3000) talks to local backend (:3002). Anywhere
+      // else (Render single-service deploy) the backend serves this file, so
+      // same-origin is the API.
+      var API_BASE = (function () {
+        try {
+          var h = window.location.hostname || '';
+          var p = String(window.location.port || '');
+          if (window.location.protocol === 'file:') return 'http://localhost:3002';
+          if ((h === 'localhost' || h === '127.0.0.1') && p === '3000') return 'http://localhost:3002';
+          if (!h) return 'http://localhost:3002';
+          return window.location.origin;
+        } catch (_) { return window.location.origin; }
+      })();
+      var TAPE_SYMBOLS = [
+        'NVDAx', 'AAPLx', 'TSLAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'METAx', 'SPYx', 'QQQx',
+        'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
+        'SPACEX', 'OPENAI', 'ANTHROPIC', 'NEURALINK', 'ANDURIL', 'KALSHI', 'POLYMARKET', 'FIGUREAI',
+      ];
+      var btn = document.getElementById('menuBtn');
+      var menu = document.getElementById('mobileMenu');
+      function lockBody(locked) {
+        document.body.style.overflow = locked ? 'hidden' : '';
+        document.documentElement.style.overflow = locked ? 'hidden' : '';
+        document.body.classList.toggle('menu-open', locked);
+      }
+      function closeMenu() {
+        menu.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Open menu');
+        document.getElementById('menuIconOpen').style.display = '';
+        document.getElementById('menuIconClose').style.display = 'none';
+        lockBody(false);
+      }
+      // Resizing to desktop with the sheet open must not leave it floating
+      window.addEventListener('resize', function () {
+        if (window.innerWidth >= 1200 && menu.classList.contains('open')) closeMenu();
+      });
+      btn.addEventListener('click', function () {
+        var open = menu.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+        document.getElementById('menuIconOpen').style.display = open ? 'none' : '';
+        document.getElementById('menuIconClose').style.display = open ? '' : 'none';
+        lockBody(open);
+      });
+      menu.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') closeMenu();
+      });
+
+      // Tab views: exactly one section visible; pills highlight the current one.
+      function on(id, evt, fn) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener(evt, fn);
+      }
+      var pills = Array.prototype.slice.call(document.querySelectorAll('a.nav-pill'));
+      var mobileLinks = Array.prototype.slice.call(document.querySelectorAll('.mobile-menu a'));
+      function showSection(hash) {
+        var shown = false;
+        document.querySelectorAll('.page-section').forEach(function (sec) {
+          var on = '#' + sec.id === hash;
+          sec.classList.toggle('active', on);
+          if (on) shown = true;
+        });
+        if (!shown) {
+          document.getElementById('swap').classList.add('active');
+        }
+      }
+      function setActive(hash) {
+        pills.forEach(function (p) {
+          p.classList.toggle('active', p.getAttribute('href') === hash);
+        });
+        mobileLinks.forEach(function (a) {
+          a.classList.toggle('active', a.getAttribute('href') === hash);
+        });
+        showSection(hash);
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+      pills.concat(mobileLinks).forEach(function (el) {
+        el.addEventListener('click', function (e) {
+          e.preventDefault();
+          var hash = el.getAttribute('href');
+          try { history.replaceState(null, '', hash); } catch (err) {}
+          setActive(hash);
+          if (menu.classList.contains('open')) closeMenu();
+        });
+      });
+      // Initial highlight from URL or default to #swap
+      (function initSection() {
+        var hash = '#swap';
+        try { if (location.hash && document.querySelector(location.hash)) hash = location.hash; } catch (_) {}
+        setActive(hash);
+      })();
+
+      /* ---------- Wallet: Reown AppKit ----------
+         Reown module script (end of body) owns connect/session and publishes
+         window.umbraReown + window.umbraReownSigner. This glue forwards state
+         into setConnected/setDisconnected and resolves the swap signer.
+         Downstream contract (unchanged): window.umbraWallet = base58 string,
+         walletProvider.signTransaction(VersionedTransaction). */
+      window.umbraWallet = null;
+      var walletProvider = null;
+      function shortKey(k) {
+        return k.slice(0, 4) + '…' + k.slice(-4);
+      }
+      function setConnected(pubkey) {
+        window.umbraWallet = pubkey;
+        var btn = document.getElementById('connectBtn');
+        btn.innerHTML = shortKey(pubkey) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+        btn.classList.add('connected');
+        btn.classList.remove('flipped');
+        try {
+          var mbtn2 = document.getElementById('menuConnectBtn');
+          if (mbtn2 && window.umbraWallet) {
+            mbtn2.innerHTML = shortKey(pubkey) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+            mbtn2.classList.add('connected');
+            mbtn2.classList.remove('flipped');
+          }
+        } catch (_) {}
+        btn.title = pubkey + ' — click for account';
+        btn.setAttribute('aria-label', 'Connected ' + pubkey);
+        // Connected shows truncated address (no responsive spans needed)
+        var half = document.getElementById('halfBtn');
+        var max = document.getElementById('maxBtn');
+        half.removeAttribute('disabled');
+        max.removeAttribute('disabled');
+        half.removeAttribute('hidden');
+        if (max) max.removeAttribute('hidden');
+        half.title = 'Fill 50% of balance';
+        max.title = 'Fill full balance';
+        refreshWalletBalances();
+        updateActionBtn();
+        if (typeof updateActivityView === 'function') updateActivityView();
+      }
+      function setDisconnected() {
+        window.umbraWallet = null;
+        walletProvider = null;
+        var btn = document.getElementById('connectBtn');
+        btn.classList.remove('connected', 'flipped');
+        btn.innerHTML = '<span class="full">Connect Wallet</span><span class="short">Connect</span>';
+        var mbtn = document.getElementById('menuConnectBtn');
+        if (mbtn) { mbtn.classList.remove('connected', 'flipped'); mbtn.textContent = 'Connect Wallet'; }
+        btn.title = 'Connect wallet';
+        btn.setAttribute('aria-label', 'Connect wallet');
+        var half = document.getElementById('halfBtn');
+        var max = document.getElementById('maxBtn');
+        half.setAttribute('disabled', '');
+        max.setAttribute('disabled', '');
+        half.setAttribute('hidden', '');
+        if (max) max.setAttribute('hidden', '');
+        half.title = 'Needs a connected wallet';
+        max.title = 'Needs a connected wallet';
+        document.getElementById('sellBalance').textContent = '—';
+        updateActionBtn();
+        if (typeof updateActivityView === 'function') updateActivityView();
+      }
+      function updateActionBtn() {
+        var action = document.getElementById('actionBtn');
+        if (window.umbraWallet) {
+          action.removeAttribute('disabled');
+          action.textContent = 'Swap';
+          action.title = 'Sign and submit this swap';
+          action.setAttribute('aria-label', 'Swap now');
+        } else {
+          action.setAttribute('disabled', '');
+          action.textContent = 'Connect Wallet';
+          action.title = 'Connect a wallet to swap';
+          action.setAttribute('aria-label', 'Connect wallet to swap');
+        }
+      }
+      async function refreshWalletBalances() {
+        var w = window.umbraWallet;
+        if (!w) return;
+        try {
+          var res = await fetch(API_BASE + '/api/wallet/' + w + '/balances');
+          if (!res.ok) return;
+          var data = await res.json();
+          var bal = (data.balances || []).find(function (b) {
+            return b.symbol === sellSym;
+          });
+          document.getElementById('sellBalance').textContent = bal ? bal.display + ' ' + bal.symbol : '0.00 ' + sellSym;
+          window.umbraBalances = data.balances || [];
+        } catch (e) {
+          /* balances are a bonus — don't block the UI */
+        }
+      }
+      // (removed: custom wallet detection + grid — Reown AppKit owns discovery now)
+      // (removed: custom wallet modal — Reown AppKit renders the connect UI)
+      // Reown glue: Connect -> modal.open(); chip while connected ->
+      // modal Account view; disconnect lives in that view.
+      function resolveReownSigner() {
+        try {
+          if (window.umbraReownSigner && typeof window.umbraReownSigner.signTransaction === 'function') {
+            walletProvider = window.umbraReownSigner;
+            return true;
+          }
+        } catch (_) {}
+        return !!(walletProvider && typeof walletProvider.signTransaction === 'function');
+      }
+      function connectWallet() {
+        try {
+          if (window.umbraReown && window.umbraReown.ready) { window.umbraReown.open(); return; }
+        } catch (_) {}
+        console.warn('[umbra] wallet module still loading — try again in a second.');
+        /* CDN blocked/slow: the button must say so (browse-only still works). */
+        try {
+          var _cb = document.getElementById('connectBtn');
+          var _mb = document.getElementById('menuConnectBtn');
+          var _hint = 'Wallet module still loading (CDN/ad-blocker?) — browsing works, tap again to retry.';
+          if (_cb) _cb.title = _hint;
+          if (_mb) _mb.title = _hint;
+          if (_cb && !window.umbraWallet && !_cb.getAttribute('data-hint')) {
+            _cb.setAttribute('data-hint', '1');
+            _cb.innerHTML = '<span class="full">Loading wallet…</span><span class="short">Loading…</span>';
+            if (_mb && !window.umbraWallet) _mb.textContent = 'Loading wallet…';
+            setTimeout(function () {
+              try {
+                _cb.removeAttribute('data-hint');
+                if (!window.umbraWallet) {
+                  _cb.innerHTML = '<span class="full">Connect Wallet</span><span class="short">Connect</span>';
+                  var _mb2 = document.getElementById('menuConnectBtn');
+                  if (_mb2 && !window.umbraWallet) _mb2.textContent = 'Connect Wallet';
+                }
+              } catch (_) {}
+            }, 1600);
+          }
+        } catch (_) {}
+      }
+      function openAccount() {
+        try {
+          if (window.umbraReown && window.umbraReown.ready) { window.umbraReown.openAccount(); return; }
+        } catch (_) {}
+        console.warn('[umbra] wallet module still loading — try again in a second.');
+        try {
+          var _ab = document.getElementById('connectBtn');
+          if (_ab) _ab.title = 'Wallet module still loading — tap again in a second.';
+        } catch (_) {}
+      }
+      function disconnectWallet() {
+        try {
+          if (window.umbraReown && window.umbraReown.ready) window.umbraReown.disconnect();
+        } catch (e) {}
+        /* keep window.umbraReownSigner (live wrapper over solProvider) so a
+           later reconnect can sign without a page reload */
+        setDisconnected();
+      }
+      on('connectBtn', 'click', function () {
+        if (window.umbraWallet) openAccount();
+        else connectWallet();
+      });
+      on('menuConnectBtn', 'click', function () {
+        // Full menu teardown (not just the class): otherwise body keeps the
+        // menu-open dim overlay + scroll lock underneath the Reown modal, and
+        // closing Reown lands back on a "stuck dim" page.
+        try { closeMenu(); } catch (_) {}
+        if (window.umbraWallet) openAccount();
+        else connectWallet();
+      });
+      // Classic/module bridge: the Reown module script calls these on session change.
+      window.umbraWalletHooks = { connected: setConnected, disconnected: setDisconnected };
+      /* ---------- Ticker tape ---------- */
+      var track = document.getElementById('tapeTrack');
+      var skeleton = document.getElementById('tapeSkeleton');
+      var note = document.getElementById('tapeNote');
+      var manifest = {};
+
+      function fmtPrice(raw) {
+        var n = Number(raw);
+        if (!isFinite(n)) return '$—';
+        if (n >= 1000) {
+          return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      function fmtChg(pct) {
+        if (pct === null || pct === undefined) return '';
+        var sign = pct > 0 ? '+' : '';
+        var cls = pct >= 0 ? 'chg-up' : 'chg-down';
+        return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
+      }
+
+      // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
+      function tkIcon(symbol, size) {
+        var file = manifest[symbol];
+        var main = file
+          ? '<img class="tk-main" src="./assets/tokens/' + file + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + symbol.charAt(0) + '</span>\'" />'
+          : '<span class="tk-letter">' + symbol.charAt(0) + '</span>';
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
+      }
+      function iconHtml(symbol) {
+        return tkIcon(symbol, 'tk-20');
+      }
+
+      function chipHtml(item) {
+        return (
+          '<span class="tape-chip" data-symbol="' + item.symbol + '" style="cursor:default;">' +
+          iconHtml(item.symbol) +
+          '<span class="sym">$' + item.symbol + '</span>' +
+          '<span>' + fmtPrice(item.price) + '</span>' +
+          fmtChg(item.change24hPct) +
+          '</span>'
+        );
+      }
+
+      function showNote(text) {
+        skeleton.hidden = true;
+        skeleton.style.display = 'none';
+        track.hidden = true;
+        track.style.display = 'none';
+        note.hidden = false;
+        note.style.display = 'block';
+        note.textContent = text;
+      }
+
+      async function loadTape() {
+        // Manifest (icons) and prices fetch in parallel — neither blocks the other.
+        var manPromise = fetch('./assets/tokens/manifest.json')
+          .then(function (man) {
+            return man.ok ? man.json() : {};
+          })
+          .catch(function () {
+            return {};
+          });
+        var tickerPromise = fetch(url0()).then(function (res) {
+          if (!res.ok) throw new Error('ticker ' + res.status);
+          return res.json();
+        });
+        var results = await Promise.all([manPromise, tickerPromise]);
+        manifest = results[0] || {};
+        var data = results[1];
+        var items = (data.ticker || []).filter(function (t) {
+          return t.price !== null;
+        });
+        if (items.length === 0) {
+          showNote('Prices are warming up — check back in a minute.');
+          return;
+        }
+        var half = items.map(chipHtml).join('');
+        track.innerHTML = half + half; // doubled for a seamless loop
+        skeleton.hidden = true;
+        skeleton.style.display = 'none';
+        if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
+        note.hidden = true;
+        note.style.display = 'none';
+        track.hidden = false;
+        track.style.display = '';
+        refreshSelectors(); // upgrade sell/buy coins from letters to real icons
+      }
+
+      function url0() {
+        return API_BASE + '/api/assets/ticker?symbols=' + TAPE_SYMBOLS.join(',');
+      }
+
+      loadTape().catch(function () {
+        showNote('Prices unavailable — is the Umbra backend running on :3002?');
+      });
+      setInterval(function () {
+        if (!track.hidden) loadTape().catch(function () {});
+      }, 30000);
+
+      /* ---------- Swap card ---------- */
+      var sellSym = 'NVDAx';
+      var buySym = 'USDC';
+      var slippageBps = 50;
+      var directory = [];
+      var sellUsdPer = 0; // 0 = unknown: paintSellUsd shows '—', never amt×$1 ("$4.00" flash)
+      var quoteTimer = null;
+      var modalSide = 'sell';
+
+      var sellAmountEl = document.getElementById('sellAmount');
+      if (!sellAmountEl) { console.error('umbra: missing #sellAmount, aborting'); return; }
+      var buyAmountEl = document.getElementById('buyAmount');
+      var sellUsdEl = document.getElementById('sellUsd');
+      var buyUsdEl = document.getElementById('buyUsd');
+      var quoteLinesEl = document.getElementById('quoteLines');
+      var sellSymbolEl = document.getElementById('sellSymbol');
+      var buySymbolEl = document.getElementById('buySymbol');
+      var sellCoinEl = document.getElementById('sellCoin');
+      var buyCoinEl = document.getElementById('buyCoin');
+      var slipValEl = document.getElementById('slipVal');
+      var quickPickEl = document.getElementById('quickPick');
+      var tokenModalEl = document.getElementById('tokenModal');
+      var tokenSearchEl = document.getElementById('tokenSearch');
+      var tokenListEl = document.getElementById('tokenList');
+
+      function coinHtml(symbol) {
+        return tkIcon(symbol, 'tk-36');
+      }
+      function coinHtml28(symbol) {
+        return tkIcon(symbol, 'tk-36');
+      }
+
+      function refreshSelectors() {
+        sellSymbolEl.textContent = sellSym;
+        buySymbolEl.textContent = buySym;
+        sellCoinEl.innerHTML = coinHtml(sellSym);
+        buyCoinEl.innerHTML = coinHtml(buySym);
+      }
+
+      async function loadDirectory() {
+        try {
+          var res = await fetch(API_BASE + '/api/assets');
+          if (!res.ok) return;
+          var data = await res.json();
+          // Picker shows EXACTLY the Stocks shelf: stables + ALLOWLIST + PREIPO.
+          // All 56 are live quote-verified, so no price gate is needed (and none
+          // may silently drop a row the Stocks page shows).
+          directory = (data.assets || [])
+            .filter(function (a) {
+              return a.symbol === 'USDC' || a.symbol === 'USDT' ||
+                ALLOWLIST.indexOf(a.symbol) !== -1 || PREIPO.indexOf(a.symbol) !== -1;
+            })
+            .map(function (a) {
+              var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
+              return { symbol: a.symbol, name: a.name, kind: kind };
+            });
+        } catch (e) {
+          directory = [];
+        }
+      }
+
+      function openModal(side) {
+        modalSide = side;
+        tokenSearchEl.value = '';
+        renderTokenList('');
+        tokenModalEl.classList.add('open');
+        tokenSearchEl.focus();
+        // If the page loaded while the backend was down, directory is still
+        // empty — refetch now instead of showing a blank list forever.
+        if (!directory.length) {
+          loadDirectory().then(function () { renderTokenList(tokenSearchEl.value || ''); });
+        }
+      }
+
+      function closeModal() {
+        tokenModalEl.classList.remove('open');
+      }
+
+      function renderTokenList(filter) {
+        var f = (filter || '').trim().toUpperCase();
+        var rows = directory
+          .filter(function (t) {
+            return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
+          })
+          .slice(0, 60);
+        var html = rows
+          .map(function (t) {
+            return (
+              '<button class="token-opt" data-symbol="' + t.symbol + '">' +
+              coinHtml28(t.symbol) +
+              '<span class="meta"><b>' + t.symbol + '</b><span>' + (t.name || '') + '</span></span>' +
+              '<span class="tag">' + t.kind + '</span>' +
+              '</button>'
+            );
+          })
+          .join('');
+        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (!f ? 'Loading stocks…' : 'No matches found.') + '</div>';
+        Array.prototype.forEach.call(tokenListEl.querySelectorAll('.token-opt'), function (btn) {
+          btn.addEventListener('click', function () {
+            var sym = btn.getAttribute('data-symbol');
+            if (modalSide === 'sell') sellSym = sym;
+            else buySym = sym;
+            window.umbraLastReceive = null;
+            closeModal();
+            refreshSelectors();
+            refreshSellUsd();
+            if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+            scheduleQuote();
+          });
+        });
+      }
+
+      on('sellTokenBtn', 'click', function () {
+        openModal('sell');
+      });
+      on('buyTokenBtn', 'click', function () {
+        openModal('buy');
+      });
+      tokenSearchEl.addEventListener('input', function () {
+        renderTokenList(tokenSearchEl.value);
+      });
+      tokenModalEl.addEventListener('click', function (e) {
+        if (e.target === tokenModalEl) closeModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+      });
+
+      on('flipBtn', 'click', function () {
+        var s = sellSym;
+        sellSym = buySym;
+        buySym = s;
+        window.umbraLastReceive = null;
+        refreshSelectors();
+        refreshSellUsd();
+        if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+        scheduleQuote();
+      });
+
+      function fmtSlip(bps) {
+        var pct = bps / 100;
+        return (Number.isInteger(pct) ? pct.toString() : pct.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')) + '%';
+      }
+      function applySlippage(bps) {
+        slippageBps = Math.max(0, Math.min(10000, Math.round(bps)));
+        var label = fmtSlip(slippageBps);
+        slipValEl.textContent = label;
+        var ms = document.getElementById('metaSlip');
+        if (ms) ms.textContent = label;
+        paintSlipModal();
+        scheduleQuote();
+      }
+      function paintSlipModal() {
+        var pills = document.querySelectorAll('#slipPills button');
+        var matched = false;
+        Array.prototype.forEach.call(pills, function (b) {
+          var on = Number(b.getAttribute('data-bps')) === slippageBps;
+          b.classList.toggle('active', on);
+          if (on) matched = true;
+        });
+        var cb = document.getElementById('slipCustomBtn');
+        if (cb) cb.classList.toggle('active', !matched);
+        var ci = document.getElementById('slipCustomInput');
+        if (ci && document.activeElement !== ci) ci.value = matched ? '' : (slippageBps / 100).toString();
+      }
+      var slipModalEl = document.getElementById('slipModal');
+      function openSlipModal() {
+        paintSlipModal();
+        slipModalEl.classList.add('open');
+      }
+      function closeSlipModal() {
+        slipModalEl.classList.remove('open');
+      }
+      on('slipBtn', 'click', openSlipModal);
+      on('slipModalClose', 'click', closeSlipModal);
+      slipModalEl.addEventListener('click', function (e) {
+        if (e.target === slipModalEl) closeSlipModal();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSlipModal();
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('#slipPills button'), function (b) {
+        b.addEventListener('click', function () {
+          applySlippage(Number(b.getAttribute('data-bps')));
+          closeSlipModal();
+        });
+      });
+      on('slipCustomBtn', 'click', function () {
+        var ci = document.getElementById('slipCustomInput');
+        if (ci) ci.focus();
+      });
+      on('slipCustomInput', 'change', function () {
+        var ci = document.getElementById('slipCustomInput');
+        var v = parseFloat(ci.value);
+        if (isFinite(v) && v >= 0 && v <= 100) {
+          applySlippage(v * 100);
+          closeSlipModal();
+        } else {
+          paintSlipModal();
+        }
+      });
+
+      /* half/max stay disabled until setConnected() enables them */
+
+      async function refreshSellUsd() {
+        if (sellSym === 'USDC' || sellSym === 'USDT') {
+          sellUsdPer = 1;
+        } else {
+          try {
+            var res = await fetch(API_BASE + '/api/assets/' + sellSym + '/price');
+            if (res.ok) {
+              var data = await res.json();
+              sellUsdPer = Number(data.price) || 0;
+            } else {
+              sellUsdPer = 0;
+            }
+          } catch (e) {
+            sellUsdPer = 0;
+          }
+        }
+        paintSellUsd();
+      }
+
+      function paintSellUsd() {
+        var amt = Number(sellAmountEl.value);
+        if (!isFinite(amt) || amt <= 0 || !sellUsdPer) {
+          sellUsdEl.textContent = sellUsdPer ? '$0.00' : '—';
+          return;
+        }
+        sellUsdEl.textContent =
+          '$' + (amt * sellUsdPer).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      var quoteSeq = 0; // race guard: only the latest request may paint
+      function setBuyDots(on) {
+        var d = document.getElementById('buyDots');
+        if (d) d.classList.toggle('on', !!on);
+      }
+      function scheduleQuote() {
+        if (quoteTimer) clearTimeout(quoteTimer);
+        var amt = (sellAmountEl.value || '').trim();
+        if (amt && Number(amt) > 0) {
+          buyAmountEl.value = '';
+          buyAmountEl.placeholder = '';
+          setBuyDots(true);
+        } else {
+          setBuyDots(false);
+        }
+        quoteTimer = setTimeout(runQuote, 600);
+      }
+
+      // Money: always 2 decimals ($220.28). Token amounts: up to 6dp under 1,000, 2dp above.
+      function fmtMoney(n) {
+        n = Number(n);
+        if (!isFinite(n)) return '—';
+        return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function fmtAmt(n) {
+        n = Number(n);
+        if (!isFinite(n)) return '—';
+        if (Math.abs(n) >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+      }
+      function infoIcon(msg) {
+        return '<span class="info-icon" data-tip="'+msg.replace(/"/g,'&quot;')+'"><i data-lucide="info" width="14" height="14"></i></span>';
+      }
+      function fmtRate(rate) {
+        // "1 NVDAx = $220.277848..." -> "1 NVDAx = $220.28"
+        var parts = String(rate).split('$');
+        if (parts.length < 2) return rate;
+        var num = Number(parts[1]);
+        if (!isFinite(num)) return rate;
+        return parts[0] + '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      function quoteError(msg) {
+        if (/429/.test(msg || '')) msg = 'Quoting is busy right now — wait a moment and try again.';
+        quoteLinesEl.hidden = false;
+        quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + msg + '</span></div>';
+        resetQuoteSummary();
+        paintDetailToggle();
+        setBuyDots(false);
+      }
+
+      function setBuyChange(pct) {
+        var el = document.getElementById('buyChange');
+        if (!el) return;
+        if (pct === null || pct === undefined) {
+          el.textContent = '';
+          el.className = '';
+          return;
+        }
+        var sign = pct > 0 ? '+' : '';
+        el.textContent = '(' + sign + pct.toFixed(2) + '%)';
+        el.className = pct >= 0 ? 'up' : 'down';
+      }
+
+      function resetQuoteSummary() {
+        /* metaFee chip removed — no fee display pre-sign */
+        document.getElementById('quoteMeta').hidden = true;
+        document.getElementById('metaFair').textContent = '—';
+        setBuyChange(null);
+      }
+
+      var detailToggleEl = document.getElementById('detailToggle');
+      function paintDetailToggle() {
+        var open = !quoteLinesEl.hidden;
+        detailToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+        detailToggleEl.querySelector('span').textContent = open ? 'Hide details' : 'Show details';
+        detailToggleEl.toggleAttribute('disabled', !lastQuote);
+      }
+      detailToggleEl.addEventListener('click', function () {
+        if (detailToggleEl.hasAttribute('disabled')) return;
+        var open = quoteLinesEl.hidden;
+        quoteLinesEl.hidden = !open;
+        paintDetailToggle();
+      });
+
+      async function runQuote() {
+        var mySeq = ++quoteSeq;
+        var amt = (sellAmountEl.value || '').trim();
+        var buyLoadingEl = document.getElementById('buyLoading');
+        if (buyLoadingEl) buyLoadingEl.style.display = amt && Number(amt) > 0 ? 'inline-block' : 'none';
+        setBuyDots(!!(amt && Number(amt) > 0));
+        paintSellUsd();
+        if (!amt || Number(amt) <= 0) {
+          if (mySeq !== quoteSeq) return;
+          buyAmountEl.value = '';
+          buyAmountEl.placeholder = '0.00';
+          buyUsdEl.textContent = '$0.00';
+          if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+          setBuyDots(false);
+          quoteLinesEl.hidden = true;
+          quoteLinesEl.innerHTML = '';
+          lastQuote = null;
+          window.umbraLastReceive = null;
+          resetQuoteSummary();
+          paintDetailToggle();
+          return;
+        }
+        try {
+          var url =
+            API_BASE +
+            '/api/swap/quote?sell=' +
+            encodeURIComponent(sellSym) +
+            '&buy=' +
+            encodeURIComponent(buySym) +
+            '&amount=' +
+            encodeURIComponent(amt) +
+            '&slippageBps=' +
+            slippageBps;
+          var res = await fetch(url);
+          var data = await res.json();
+          if (mySeq !== quoteSeq) return; // superseded by newer typing — never paint stale
+          buyAmountEl.placeholder = '0.00';
+          if (!res.ok) {
+            buyAmountEl.value = '';
+            buyUsdEl.textContent = '$0.00';
+            lastQuote = null;
+            var is429 = res.status === 429 || (data.error && String(data.error.message).indexOf('429') !== -1);
+            if (is429) {
+              // Silent retry — don't flash the scary message, just try again
+              setTimeout(function () { if (quoteSeq === mySeq) runQuote(); }, 1200);
+              return;
+            }
+            if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+            var thinSym = THIN.indexOf(buySym) !== -1 || THIN.indexOf(sellSym) !== -1;
+            var errCode = data.error && data.error.code;
+            quoteError(thinSym && (errCode === 'INSUFFICIENT_LIQUIDITY' || errCode === 'SWAP_UNAVAILABLE')
+              ? 'Thin liquidity on this pair — try a smaller amount.'
+              : (data.error && data.error.message) || 'Quote unavailable.');
+            return;
+          }
+          var prevRecv = window.umbraLastReceive || null;
+          var newRecv = String(data.receive.amount);
+          buyAmountEl.value = fmtAmt(data.receive.amount);
+          buyUsdEl.textContent =
+            fmtMoney(data.receive.usdValue || 0);
+          if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+          setBuyDots(false);
+          // Flash when the live price moved since the last paint (not on first paint)
+          if (prevRecv !== null && prevRecv !== newRecv) {
+            try {
+              var oldN = Number(prevRecv);
+              var newN = Number(newRecv);
+              if (isFinite(oldN) && isFinite(newN) && oldN > 0 && Math.abs(newN - oldN) / oldN > 0.0005) {
+                buyAmountEl.classList.remove('bump');
+                void buyAmountEl.offsetWidth;
+                buyAmountEl.classList.add('bump');
+                setTimeout(function () { buyAmountEl.classList.remove('bump'); }, 650);
+              }
+            } catch (e2) { /* cosmetic only */ }
+          }
+          window.umbraLastReceive = newRecv;
+          lastQuote = {
+            quoteId: data.quoteId,
+            sell: data.sell,
+            receive: data.receive,
+            rate: data.rate,
+            minimumReceived: data.minimumReceived,
+            fairLine: null,
+            at: Date.now(),
+          };
+          var impact = data.priceImpactBps === null || data.priceImpactBps === undefined ? '—' : (data.priceImpactBps / 100).toFixed(2) + '%';
+          // No fee rows here: the wallet shows the network fee at signing time.
+          var wasOpen = !quoteLinesEl.hidden;
+          var html =
+            '<div class="row"><span>Rate</span><span>' + fmtRate(data.rate) + '</span></div>' +
+            '<div class="row"><span>Price impact</span><span>' + impact + '</span></div>' +
+            '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + data.receive.symbol + '</span></div>';
+          quoteLinesEl.innerHTML = html;
+          quoteLinesEl.hidden = !wasOpen;
+          paintDetailToggle();
+          if (window.lucide) window.lucide.createIcons();
+          // Summary strip: meta (slip/fair) — no fee chip
+          document.getElementById('quoteMeta').hidden = false;
+          document.getElementById('metaSlip').textContent = (slippageBps / 100).toFixed(1) + '%';
+          setBuyChange(null);
+          // Pyth deal line (best effort — absent on limited keys).
+          try {
+            var fairRes = await fetch(API_BASE + '/api/assets/' + buySym + '/fair-price');
+            if (mySeq !== quoteSeq) return;
+            if (fairRes.ok) {
+              var fair = await fairRes.json();
+              var bps = fair.tokenVsEquityBps !== null && fair.tokenVsEquityBps !== undefined ? fair.tokenVsEquityBps : fair.equityVsReferenceBps;
+              if (bps !== null && bps !== undefined && fair.equity) {
+                var cls = Math.abs(bps) <= 50 ? 'good' : 'bad';
+                var sign = bps > 0 ? '+' : '';
+                quoteLinesEl.innerHTML +=
+                  '<div class="row"><span>Fair value (Pyth)</span><span class="' + cls + '">$' + fair.equity.price + ' (' + sign + bps + ' bps)</span></div>';
+                if (lastQuote) lastQuote.fairLine = '$' + fair.equity.price + ' (' + sign + bps + ' bps)';
+                var mf = document.getElementById('metaFair');
+                if (mf) mf.textContent = sign + bps + ' bps';
+              }
+              // Receive-side 24h badge doubles as the deal pulse: fetch change
+              try {
+                var sumRes = await fetch(API_BASE + '/api/assets/' + buySym + '/summary');
+                if (mySeq === quoteSeq && sumRes.ok) {
+                  var sum = await sumRes.json();
+                  setBuyChange(sum.summary ? sum.summary.change24hPct : null);
+                }
+              } catch (e2) { /* badge optional */ }
+            }
+          } catch (e) {
+            /* deal line is a bonus, never blocks the quote */
+          }
+        } catch (e) {
+          if (mySeq !== quoteSeq) return;
+          buyAmountEl.value = '';
+          buyAmountEl.placeholder = '0.00';
+          buyUsdEl.textContent = '$0.00';
+          lastQuote = null;
+          quoteError('Quote unavailable — is the Umbra backend running on :3002?');
+        }
+      }
+
+      sellAmountEl.addEventListener('input', scheduleQuote);
+
+      // Live re-quote: like the big venues, refresh the executable price while
+      // the user sits on a valid amount (skipped when the tab is hidden to save quota).
+      setInterval(function () {
+        if (document.hidden) return;
+        var amt = (sellAmountEl.value || '').trim();
+        if (!amt || Number(amt) <= 0) return;
+        if (!window.umbraWallet && !lastQuote) return; // nothing live yet
+        runQuote();
+      }, 10000);
+
+      on('halfBtn', 'click', function () {
+        var w = window.umbraBalances || [];
+        var b = w.find(function (x) {
+          return x.symbol === sellSym;
+        });
+        if (!b) return;
+        var half = (Number(b.display) / 2).toString();
+        sellAmountEl.value = half;
+        scheduleQuote();
+      });
+      on('maxBtn', 'click', function () {
+        var w = window.umbraBalances || [];
+        var b = w.find(function (x) {
+          return x.symbol === sellSym;
+        });
+        if (!b) return;
+        sellAmountEl.value = b.display;
+        scheduleQuote();
+      });
+
+      // Swap/Bridge tabs in the card switch views just like the header pills.
+      function setCardTab(which) {
+        document.getElementById('tabSwap').classList.toggle('active', which === 'swap');
+        document.getElementById('tabBridge').classList.toggle('active', which === 'bridge');
+        document.getElementById('tabSwap').setAttribute('aria-selected', which === 'swap' ? 'true' : 'false');
+        document.getElementById('tabBridge').setAttribute('aria-selected', which === 'bridge' ? 'true' : 'false');
+      }
+      on('tabSwap', 'click', function () {
+        setCardTab('swap');
+        // Flip the card, don't navigate
+        document.getElementById('swapView').hidden = false;
+        document.getElementById('bridgeView').hidden = true;
+        setActive('#swap');
+      });
+      on('tabBridge', 'click', function () {
+        setCardTab('bridge');
+        document.getElementById('swapView').hidden = true;
+        document.getElementById('bridgeView').hidden = false;
+        // Keep URL at #swap so it doesn't look like a new page — just the card flips
+        history.replaceState(null, '', '#swap');
+      });
+
+      /* ---------- Swap execution + status modal ---------- */
+      var lastQuote = null;
+      var swapModalEl = document.getElementById('swapModal');
+      var swapTitleEl = document.getElementById('swapModalTitle');
+      var swapExplorerEl = document.getElementById('swapExplorer');
+      var swapExplorerLink = document.getElementById('swapExplorerLink');
+      var swapErrorEl = document.getElementById('swapError');
+      var swapRetryBtn = document.getElementById('swapRetryBtn');
+      var executing = false;
+      var retrying = false; // retry run in progress: keep card + button visible
+      function resetRetryBtn() {
+        retrying = false;
+        swapRetryBtn.disabled = false;
+        swapRetryBtn.innerHTML = 'Try again';
+      }
+
+      function lockSwapScroll(locked) {
+        try {
+          document.body.style.overflow = locked ? 'hidden' : '';
+          document.documentElement.style.overflow = locked ? 'hidden' : '';
+        } catch (_) {}
+      }
+      function openSwapModal() {
+        swapModalEl.classList.add('open');
+        lockSwapScroll(true);
+      }
+      function closeSwapModal() {
+        if (executing) return; // don't let users close mid-flight
+        swapModalEl.classList.remove('open');
+        lockSwapScroll(false);
+      }
+      document.getElementById('swapModalClose').addEventListener('click', closeSwapModal);
+      swapModalEl.addEventListener('click', function (e) { if (e.target === swapModalEl) closeSwapModal(); });
+
+      // Title carries state color (green = confirmed, red = failed).
+      function paintSwapTitle(text, tone) {
+        swapTitleEl.textContent = text;
+        swapTitleEl.classList.remove('tone-ok', 'tone-bad');
+        if (tone === 'ok') swapTitleEl.classList.add('tone-ok');
+        else if (tone === 'bad') swapTitleEl.classList.add('tone-bad');
+      }
+      // Confirm card: signed amounts, connector line, grey detail rows.
+      function swapHeroHtml(q) {
+        var sellN = Number(q.sell.amount);
+        var recvN = Number(q.receive.amount);
+        var recvUsd = Number(q.receive.usdValue);
+        var per = (isFinite(sellN) && sellN > 0 && isFinite(recvN))
+          ? (recvN / sellN).toLocaleString('en-US', { maximumFractionDigits: 6 })
+          : '—';
+        // Sell USD = the receive leg's USD value (same trade, execution price).
+        // Never the possibly still-loading sellUsdPer, which printed "$4.00".
+        var sellUsd = (isFinite(recvUsd) && recvUsd > 0)
+          ? '<span class="usd">' + fmtMoney(recvUsd) + '</span>'
+          : (typeof sellUsdPer === 'number' && sellUsdPer > 0 && isFinite(sellN))
+            ? '<span class="usd">' + fmtMoney(sellN * sellUsdPer) + '</span>' : '';
+        return (
+          '<div class="okx-amt-row">' + tkIcon(q.sell.symbol, 'tk-36') +
+          '<span class="neg">-' + q.sell.amount + '</span><span class="sym">' + q.sell.symbol + '</span>' + sellUsd + '</div>' +
+          '<div class="okx-conn"></div>' +
+          '<div class="okx-amt-row recv">' + tkIcon(q.receive.symbol, 'tk-36') +
+          '<span class="pos">+' + fmtAmt(recvN) + '</span><span class="sym">' + q.receive.symbol + '</span></div>' +
+          '<div class="okx-hair"></div>' +
+          '<div class="okx-row"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>' +
+          '<div class="okx-row"><span>Rate</span><span class="val">1 ' + q.sell.symbol + ' ≈ ' + per + ' ' + q.receive.symbol + '</span></div>' +
+          '<div class="okx-row"><span>Min to receive</span><span class="val">' + fmtAmt(Number(q.minimumReceived)) + ' ' + q.receive.symbol + '</span></div>'
+        );
+      }
+      function paintSwapHero(q) {
+        var hero = document.getElementById('swapPairHero');
+        if (hero) hero.innerHTML = swapHeroHtml(q);
+      }
+
+      function swapFail(msg, retry) {
+        executing = false;
+        paintSwapTitle('Swap failed', 'bad');
+        swapErrorEl.style.display = 'flex';
+        swapErrorEl.textContent = msg;
+        swapErrorEl.classList.remove('shake');
+        void swapErrorEl.offsetWidth;
+        swapErrorEl.classList.add('shake');
+        retrying = false;
+        swapRetryBtn.disabled = false;
+        swapRetryBtn.innerHTML = 'Try again';
+        swapRetryBtn.style.display = retry ? 'block' : 'none';
+      }
+
+      async function pollTx(id, sig) {
+        var tries = 0;
+        while (tries < 35) {
+          await new Promise(function (r) { setTimeout(r, 2000); });
+          tries++;
+          try {
+            var res = await fetch(API_BASE + '/api/transactions/' + id);
+            if (!res.ok) continue;
+            var data = await res.json();
+            var st = data.transaction && data.transaction.status;
+            if (st === 'confirmed') return 'confirmed';
+            if (st === 'failed' || st === 'expired') return st;
+          } catch (e) { /* keep polling */ }
+        }
+        return 'unknown';
+      }
+
+      async function executeSwap() {
+        if (executing) return;
+        if (!window.umbraWallet) { resetRetryBtn(); connectWallet(); return; }
+        var amt = (sellAmountEl.value || '').trim();
+        if (!amt || Number(amt) <= 0) { resetRetryBtn(); return; }
+        // Refresh the quote if older than 45s so the wallet signs something executable
+        if (!lastQuote || Date.now() - lastQuote.at > 45000) {
+          try { await runQuote(); } catch (_) { /* runQuote already paints card error */ }
+          if (!lastQuote || Date.now() - lastQuote.at > 45000) {
+            if (retrying) swapFail('Quote unavailable — try again.', true);
+            else resetRetryBtn();
+            return;
+          }
+        }
+        if (!window.solanaWeb3) {
+          swapFail('Swap library failed to load (check connection and refresh).', false);
+          return;
+        }
+        executing = true;
+        if (!retrying) {
+          swapErrorEl.style.display = 'none';
+          swapRetryBtn.style.display = 'none';
+          swapExplorerEl.style.display = 'none';
+        }
+        openSwapModal();
+        try {
+          var q = lastQuote;
+          paintSwapHero(q);
+          paintSwapTitle('Confirm in wallet', '');
+          // 1) Unsigned transaction from our backend
+          var txRes = await fetch(API_BASE + '/api/swap/transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quoteId: q.quoteId, userPublicKey: window.umbraWallet }),
+          });
+          var txData = await txRes.json();
+          if (!txRes.ok) throw new Error((txData.error && txData.error.message) || 'Could not build transaction.');
+          // 2) Wallet signs
+          var raw = Uint8Array.from(atob(txData.transaction), function (c) { return c.charCodeAt(0); });
+          var vtx = window.solanaWeb3.VersionedTransaction.deserialize(raw);
+          if ((!walletProvider || !walletProvider.signTransaction) && typeof resolveReownSigner === 'function') resolveReownSigner();
+          if (!walletProvider || !walletProvider.signTransaction) throw new Error('Connected wallet cannot sign.');
+          var signed = await walletProvider.signTransaction(vtx);
+          paintSwapTitle('Submitting…', '');
+          // 3) Backend records + confirms (signature = base58 of first signature bytes)
+          var subRes = await fetch(API_BASE + '/api/transactions/swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quoteId: q.quoteId, signature: (signed.__sig || bs58encode(signed.signatures[0])) }),
+          });
+          var subData = await subRes.json();
+          if (!subRes.ok) throw new Error((subData.error && subData.error.message) || 'Submission rejected.');
+          // 4) Poll to finality
+          paintSwapTitle('Confirming on Solana…', '');
+          var sig = subData.signature;
+          swapExplorerLink.href = 'https://solscan.io/tx/' + sig;
+          swapExplorerEl.style.display = 'block';
+          var final = await pollTx(subData.id, sig);
+          if (final === 'confirmed') {
+            executing = false;
+            paintSwapTitle('Swap confirmed', 'ok');
+            retrying = false;
+            swapRetryBtn.style.display = 'none';
+            if (typeof refreshActivity === 'function') refreshActivity();
+            if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+          } else if (final === 'failed') {
+            swapFail('Transaction landed but failed on-chain. Funds stay in your wallet (minus network fee).', false);
+          } else if (final === 'expired') {
+            swapFail('Timed out waiting for confirmation — check Solscan; it may still confirm.', false);
+          } else {
+            swapFail('Lost track of the transaction — check Solscan with the link above.', false);
+          }
+        } catch (e) {
+          var msg = (e && e.message) || String(e);
+          if (/rejected|denied|closed|cancel/i.test(msg)) {
+            swapFail('Signature rejected in wallet — nothing was sent.', true);
+          } else {
+            swapFail(msg, true);
+          }
+        }
+      }
+
+      // Minimal base58 encoder (Bitcoin alphabet) — avoids another dependency
+      // just to turn 64 signature bytes into the string the backend validates.
+      function bs58encode(bytes) {
+        var ALPH = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        var zeros = 0;
+        while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+        var digits = [0];
+        for (var i = zeros; i < bytes.length; i++) {
+          var carry = bytes[i];
+          for (var j = 0; j < digits.length; j++) {
+            carry += digits[j] * 256;
+            digits[j] = carry % 58;
+            carry = Math.floor(carry / 58);
+          }
+          while (carry > 0) {
+            digits.push(carry % 58);
+            carry = Math.floor(carry / 58);
+          }
+        }
+        var out = '';
+        for (var k = 0; k < zeros; k++) out += '1';
+        for (var l = digits.length - 1; l >= 0; l--) out += ALPH[digits[l]];
+        return out;
+      }
+
+      on('actionBtn', 'click', function () {
+        if (!window.umbraWallet) connectWallet();
+        else executeSwap();
+      });
+      // Retry keeps the whole card intact — only the green button turns into
+      // loading dots until the run settles (fail restores it, success hides it).
+      swapRetryBtn.addEventListener('click', function () {
+        retrying = true;
+        swapRetryBtn.disabled = true;
+        swapRetryBtn.style.display = 'block';
+        swapRetryBtn.innerHTML = '<span class="tdots on" style="position:static;transform:none;"><i></i><i></i><i></i></span>';
+        paintSwapTitle('Retrying…', '');
+        lastQuote = null;
+        executeSwap();
+      });
+
+      // API status dot in the footer (live health, not decoration).
+      (function apiStatus() {
+        try {
+          var _apiLink = document.getElementById('apiStatus');
+          if (_apiLink) _apiLink.href = API_BASE + '/health';
+        } catch (_) {}
+        fetch(API_BASE + '/health')
+          .then(function (res) {
+            if (res.ok) {
+              var _apiEl = document.getElementById('apiStatus');
+              if (_apiEl) _apiEl.classList.add('ok');
+              var _apiTx = document.getElementById('apiStatusText');
+              if (_apiTx) _apiTx.textContent = 'API online';
+            }
+          })
+          .catch(function () {});
+      })();
+
+      refreshSelectors();
+      // Keep directory and stocks card in sync (valuations come from OUR backend —
+      // no direct third-party fetch: avoids CORS failures and split-brain numbers).
+      function formatMcap(n) {
+        if (!n || !isFinite(n)) return '—';
+        if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+        if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+        if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+        return '$' + Number(n).toLocaleString('en-US');
+      }
+      function stockRowHtml(a) {
+        var icon = tkIcon(a.symbol, 'tk-36');
+        var price = a.price
+          ? '$' + Number(a.price.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : '<span class="skeleton short"></span>';
+        var mcap = a.marketCap
+          ? formatMcap(a.marketCap)
+          : a._mcapChecked
+            ? '—'
+            : '<span class="skeleton"></span>';
+        return (
+          '<a class="stock-row" href="#swap" data-symbol="' + a.symbol + '">' +
+          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + a.symbol + '</b><span>' + (a.name || '') + '</span></span></span>' +
+          '<span class="stock-right"><span class="stock-price">' + price + '</span><span class="stock-mcap">' + mcap + '</span></span>' +
+          '</a>'
+        );
+      }
+      // Every symbol here was live quote-verified (USDC pair). 37 deep + 11 thin + 8 Pre-IPO = 56.
+      // Removed as unquotable: 26 junk entries (bad tickers like "T", "KO", "MCHP", "BRK.Bx")
+      // and 6 dead pools (SNPSx, ONx, ACNx, AMATx, KLACx, LRCXx). Never list unverified symbols.
+      var ALLOWLIST = ["NVDAx","AAPLx","TSLAx","MSFTx","AMZNx","METAx","SPYx","TSMx","AVGOx","NFLXx","PLTRx","HOODx","GLDx","JPMx","JNJx","MAx","BACx","WMTx","UNHx","HDx","DISx","CRMx","PFEx","LLYx","QCOMx","TXNx","INTCx","MUx","ADIx","MRVLx","CDNSx","MPWRx","ARMx","CMCSAx","CHTRx","TMUSx","VZx","GOOGLx","QQQx","AMDx","COINx","MSTRx","Vx","PGx","ORCLx","KOx","NVOx","ASMLx"];
+      // Thin liquidity: quotes at $1, fail at $10+. Friendly error only — no badges.
+      var THIN = ["GOOGLx","QQQx","AMDx","COINx","MSTRx","Vx","PGx","ORCLx","KOx","NVOx","ASMLx"];
+      var PREIPO = ["SPACEX","OPENAI","ANTHROPIC","NEURALINK","ANDURIL","KALSHI","POLYMARKET","FIGUREAI"];
+      var stocksCache = [];
+      var stocksTotal = ALLOWLIST.length + PREIPO.length;
+      var currentStocksFilter = 'all';
+      function renderStocks(filter, containerId) {
+        var f = (filter || '').trim().toUpperCase();
+        var list = stocksCache.filter(function (a) {
+          var matchesSearch = !f || a.symbol.toUpperCase().indexOf(f) >= 0 || (a.name || '').toUpperCase().indexOf(f) >= 0;
+          var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
+          var matchesKind = currentStocksFilter === 'all' || (currentStocksFilter === 'xstock' && kind === 'XSTOCK') || (currentStocksFilter === 'pre' && kind === 'PRE-IPO');
+          return matchesSearch && matchesKind;
+        });
+        var el = document.getElementById(containerId);
+        if (!el) return;
+        if (!list.length) {
+          el.innerHTML = '<div style="padding:24px; text-align:center; color:var(--umbra-muted);">No stocks found</div>';
+          return;
+        }
+        el.innerHTML = list.map(stockRowHtml).join('');
+        Array.prototype.forEach.call(el.querySelectorAll('.stock-row'), function (row) {
+          row.addEventListener('click', function (e) {
+            e.preventDefault();
+            var sym = row.getAttribute('data-symbol');
+            openStockDrawer(sym);
+          });
+        });
+        // Update dropdown counts — fixed one-time total, not live filtered
+        var total = stocksTotal || stocksCache.length;
+        var ca = document.getElementById('countAll'); if (ca) ca.textContent = total || '—';
+        var cx = document.getElementById('countX'); if (cx) cx.textContent = ALLOWLIST.length || '—';
+        var cp = document.getElementById('countPre'); if (cp) cp.textContent = PREIPO.length || '—';
+        var label = document.getElementById('stocksFilterLabel');
+        if (label) {
+          var txt = currentStocksFilter === 'all' ? 'All' : currentStocksFilter === 'xstock' ? 'xStocks' : 'Pre-IPO';
+          label.textContent = txt;
+        }
+      }
+      function refreshStocksCards() {
+          var _listEl = document.getElementById('stocksList');
+          if (_listEl && !stocksCache.length) {
+            try {
+              var _cached = localStorage.getItem('umbra_stocks_cache');
+              if (_cached) {
+                var _parsed = JSON.parse(_cached);
+                if (Array.isArray(_parsed) && _parsed.length) {
+                  var _clean = _parsed.filter(function (a) { return a && typeof a.symbol === 'string' && (ALLOWLIST.indexOf(a.symbol) !== -1 || PREIPO.indexOf(a.symbol) !== -1); });
+                  if (_clean.length) {
+                    stocksCache = _clean;
+                    // stocksTotal is fixed (ALLOWLIST.length + PREIPO.length) and is
+                    // never overwritten by cached or fetched lengths — the count
+                    // cannot drift between visits.
+                    renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                    }
+                  }
+                }
+            } catch (_) {}
+            if (!stocksCache.length && _listEl) {
+              _listEl.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div>';
+            }
+          }
+          fetch(API_BASE + '/api/assets')
+            .then(function (r) { return r.ok ? r.json() : { assets: [] }; })
+            .then(function (data) {
+              var fresh = (data.assets || [])
+                .filter(function (a) { return a && (ALLOWLIST.indexOf(a.symbol) !== -1 || PREIPO.indexOf(a.symbol) !== -1); })
+                .sort(function (a, b) { return a.symbol.localeCompare(b.symbol); });
+              // Only update if fresh is not empty — keep cached if fetch is slow
+              if (fresh.length) {
+                stocksCache = fresh;
+                // Don't render yet — fetch first 20 prices so the first paint already has data like the drawer
+                var first20 = fresh.slice(0, 20).map(function (a) { return a.symbol; }).join(',');
+                if (first20) {
+                  fetch(API_BASE + '/api/assets/ticker?symbols=' + encodeURIComponent(first20))
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (td) {
+                      if (td && td.ticker) {
+                        var m = {};
+                        td.ticker.forEach(function (t) { if (t.price) m[t.symbol] = t; });
+                        stocksCache.forEach(function (a) {
+                          var t = m[a.symbol];
+                          if (t) {
+                            if (t.price) a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
+                            if (t.marketCap) a.marketCap = t.marketCap;
+                            // Don't lock Pre-IPO rows to "—" on an mcap-less tick;
+                            // their valuation arrives via ticker now or fetchMcaps.
+                            if (t.marketCap || PREIPO.indexOf(a.symbol) === -1) a._mcapChecked = true;
+                          }
+                        });
+                      }
+                      try { localStorage.setItem('umbra_stocks_cache', JSON.stringify(stocksCache.slice(0, 80).map(function (a) { return { symbol: a.symbol, name: a.name, logo: a.logo, price: a.price, marketCap: a.marketCap }; }))); } catch (_) {}
+                      renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                    })
+                    .catch(function () {
+                      renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                    });
+                } else {
+                  renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                }
+                /* umbra_stocks_total removed: the count is fixed, never cached. */
+              } else {
+                renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+              }
+              var listEl = document.getElementById('stocksList');
+              if (stocksCache.length) {
+                var syms = stocksCache.map(function (a) { return a.symbol; });
+                var CHUNK = 50;
+                function fetchChunk(i) {
+                  if (i >= syms.length) {
+                    // Rows are never dropped for missing prices: the count is fixed
+                    // and every row has a loading state. (Old code filtered here.)
+                    (function fetchMcaps(j) {
+                      if (j >= stocksCache.length) return;
+                      var slice = stocksCache.slice(j, j + 20);
+                      Promise.all(slice.map(function (a) {
+                        if (a.marketCap) { a._mcapChecked = true; return false; }
+                        return fetch(API_BASE + '/api/assets/' + a.symbol)
+                          .then(function (r) { return r.ok ? r.json() : null; })
+                          .then(function (d) {
+                            if (d && d.asset && d.asset.marketCap) { a.marketCap = d.asset.marketCap; a._mcapChecked = true; return true; }
+                            a._mcapChecked = true;
+                            return false;
+                          })
+                          .catch(function () { a._mcapChecked = true; return false; });
+                      })).then(function (results) {
+                        if (results.some(Boolean)) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                        setTimeout(function () { fetchMcaps(j + 20); }, 1200);
+                      });
+                    })(0);
+                    return;
+                  }
+                  // Price patch per chunk (rows are never dropped — count is fixed).
+                  var slice = syms.slice(i, i + CHUNK).join(',');
+                  fetch(API_BASE + '/api/assets/ticker?symbols=' + encodeURIComponent(slice))
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (td) {
+                      if (td && td.ticker) {
+                        var m = {};
+                        td.ticker.forEach(function (t) { m[t.symbol] = t; });
+                        var patched = false;
+                        stocksCache.forEach(function (a) {
+                          var t = m[a.symbol];
+                          if (t && t.price) {
+                            a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
+                            if (t.marketCap) a.marketCap = t.marketCap;
+                            patched = true;
+                          }
+                        });
+                        if (patched) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                      }
+                      fetchChunk(i + CHUNK);
+                    })
+                    .catch(function () { fetchChunk(i + CHUNK); });
+                }
+                fetchChunk(0);
+              }
+            })
+            .catch(function () {});
+        }
+      var allTransactions = [];
+      var txView = { tab: 'all', range: '90', type: 'all', status: 'all' };
+      function txMatches(tx) {
+        if (txView.tab !== 'all' && tx.type !== txView.tab) return false;
+        if (txView.type !== 'all' && tx.type !== txView.type) return false;
+        if (txView.range !== 'all') {
+          var cutoff = Date.now() - Number(txView.range) * 86400000;
+          var t = tx.createdAt ? new Date(tx.createdAt).getTime() : 0;
+          if (!(t >= cutoff)) return false;
+        }
+        var st = tx.status || '';
+        if (txView.status === 'done' && !(st === 'confirmed' || st === 'completed')) return false;
+        if (txView.status === 'pending' && !(st === 'submitted' || st === 'source_pending' || st === 'source_confirmed' || st === 'ccip_in_flight' || st === 'destination_pending')) return false;
+        if (txView.status === 'failed' && !(st === 'failed' || st === 'expired')) return false;
+        return true;
+      }
+      function renderActivity(transactions) {
+        var listEl = document.getElementById('activityList');
+        var emptyEl = document.getElementById('activityEmpty');
+        if (!listEl) return;
+        var filtered = (transactions || []).filter(txMatches);
+        if (!filtered.length) {
+          listEl.innerHTML = '';
+          if (emptyEl) {
+            emptyEl.style.display = 'block';
+            var rangeTxt = txView.range === 'all' ? '' : ' in the last ' + txView.range + ' days';
+            document.getElementById('activityEmptyText').textContent = 'No records found' + rangeTxt;
+          }
+          return;
+        }
+        if (emptyEl) emptyEl.style.display = 'none';
+        listEl.innerHTML = filtered.map(function (tx) {
+          var isSwap = tx.type === 'swap';
+          var icon = isSwap ? '↔' : '⤳';
+          var title = isSwap
+            ? ((tx.sourceAsset || '?') + ' → ' + (tx.destinationAsset || '?') + ' ' + (tx.sourceAmount || ''))
+            : ((tx.sourceAsset || tx.sourceNetwork || 'Bridge') + ' → Solana ' + (tx.sourceAmount || ''));
+          var status = tx.status || 'unknown';
+          var cls = status === 'confirmed' || status === 'completed' ? 'chg-up' : status === 'failed' || status === 'expired' ? 'chg-down' : '';
+          var time = tx.createdAt ? new Date(tx.createdAt).toLocaleString() : '';
+          return (
+            '<div class="stock-row" style="cursor:default;">' +
+            '<span class="stock-left"><span class="fallback" style="width:36px;height:36px;">' + icon + '</span><span class="stock-meta"><b>' + title + '</b><span>' + (isSwap ? 'Swap' : 'Bridge') + ' • ' + time + '</span></span></span>' +
+            '<span class="stock-right"><span class="stock-price ' + cls + '">' + status + '</span><span class="stock-mcap">' + (tx.id || '').slice(0,8) + '</span></span>' +
+            '</div>'
+          );
+        }).join('');
+      }
+      function updateActivityView() {
+        var isConnected = !!window.umbraWallet;
+        var connectEl = document.getElementById('activityConnect');
+        var wrapEl = document.getElementById('activityListWrap');
+        if (connectEl) connectEl.style.display = isConnected ? 'none' : 'flex';
+        if (wrapEl) wrapEl.style.display = isConnected ? 'block' : 'none';
+        var ex = document.getElementById('activityExplorer');
+        if (ex && isConnected) ex.href = 'https://solscan.io/account/' + window.umbraWallet;
+        if (isConnected) refreshActivity();
+      }
+      function refreshActivity() {
+        fetch(API_BASE + '/api/transactions?limit=30')
+          .then(function (r) { return r.ok ? r.json() : { transactions: [] }; })
+          .then(function (data) {
+            allTransactions = data.transactions || [];
+            renderActivity(allTransactions);
+            if (window.lucide) window.lucide.createIcons();
+          })
+          .catch(function () { renderActivity([]); });
+      }
+      function paintTxChips() {
+        var set = function (id, label, on) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.querySelector('span').textContent = label;
+          el.classList.toggle('on', !!on);
+        };
+        var rangeNames = { all: 'All time', 90: 'Past 90 days', 30: 'Past 30 days', 7: 'Past 7 days' };
+        var typeNames = { all: 'Type', swap: 'Swaps', bridge: 'Bridges' };
+        var statusNames = { all: 'Status', done: 'Completed', pending: 'Pending', failed: 'Failed' };
+        set('chipRange', txView.range === '90' ? 'Past orders' : (rangeNames[txView.range] || 'Past orders'), txView.range !== '90');
+        set('chipType', typeNames[txView.type] || 'Type', txView.type !== 'all');
+        set('chipStatus', statusNames[txView.status] || 'Status', txView.status !== 'all');
+      }
+      function wireTxMenu(menuId, chipId, key) {
+        var chip = document.getElementById(chipId);
+        var menu = document.getElementById(menuId);
+        if (!chip || !menu) return;
+        chip.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var isOpen = menu.style.display === 'block';
+          document.querySelectorAll('.tx-menu').forEach(function (m) { m.style.display = 'none'; });
+          menu.style.display = isOpen ? 'none' : 'block';
+        });
+        menu.querySelectorAll('[data-v]').forEach(function (opt) {
+          opt.addEventListener('click', function () {
+            txView[key] = opt.getAttribute('data-v');
+            menu.style.display = 'none';
+            paintTxChips();
+            renderActivity(allTransactions);
+          });
+        });
+        document.addEventListener('click', function (e) {
+          if (!chip.contains(e.target) && !menu.contains(e.target)) menu.style.display = 'none';
+        });
+      }
+      wireTxMenu('menuRange', 'chipRange', 'range');
+      wireTxMenu('menuType', 'chipType', 'type');
+      wireTxMenu('menuStatus', 'chipStatus', 'status');
+      paintTxChips();
+      // Initial activity view (shows Connect prompt if wallet not connected)
+      setTimeout(function () { if (typeof updateActivityView === 'function') updateActivityView(); }, 100);
+      // Search wiring for stocks + filter dropdown
+      var sSearch = document.getElementById('stocksSearch');
+      if (sSearch) sSearch.addEventListener('input', function () { renderStocks(sSearch.value, 'stocksList'); });
+      var filterBtn = document.getElementById('stocksFilterBtn');
+      var filterMenu = document.getElementById('stocksFilterMenu');
+      if (filterBtn && filterMenu) {
+        filterBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var isOpen = filterMenu.style.display === 'block';
+          filterMenu.style.display = isOpen ? 'none' : 'block';
+          if (window.lucide) window.lucide.createIcons();
+        });
+        filterMenu.querySelectorAll('[data-filter]').forEach(function (opt) {
+          opt.addEventListener('click', function () {
+            currentStocksFilter = opt.getAttribute('data-filter');
+            filterMenu.style.display = 'none';
+            renderStocks(sSearch ? sSearch.value : '', 'stocksList');
+          });
+        });
+        document.addEventListener('click', function (e) {
+          if (!filterBtn.contains(e.target) && !filterMenu.contains(e.target)) filterMenu.style.display = 'none';
+        });
+      }
+
+      // Stock detail drawer
+      var drawerEl = document.getElementById('stockDrawer');
+      var drawerSymbolEl = document.getElementById('drawerSymbol');
+      var drawerIconEl = document.getElementById('drawerIcon');
+      var drawerNameEl = document.getElementById('drawerName');
+      var drawerSubEl = document.getElementById('drawerSub');
+      var drawerPriceEl = document.getElementById('drawerPrice');
+      var drawerMcapEl = document.getElementById('drawerMcap');
+      var drawerChangeEl = document.getElementById('drawerChange');
+      var drawerChartEl = document.getElementById('drawerChart');
+      var drawerNoteEl = document.getElementById('drawerNote');
+      var drawerSwapBtn = document.getElementById('drawerSwapBtn');
+      var drawerCurrent = null;
+      var drawerReq = 0;
+      var drawerCtrl = null;
+      function closeStockDrawer() { drawerEl.classList.remove('open'); drawerEl.setAttribute('aria-hidden','true'); }
+      document.getElementById('drawerClose').addEventListener('click', closeStockDrawer);
+      drawerEl.addEventListener('click', function (e) { if (e.target === drawerEl) closeStockDrawer(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && drawerEl.classList.contains('open')) closeStockDrawer(); });
+      drawerSwapBtn.addEventListener('click', function () {
+        if (!drawerCurrent) return;
+        // BUY: stock goes to RECEIVE, sell resets to USDC
+        buySym = drawerCurrent;
+        if (sellSym !== 'USDC' && sellSym !== 'USDT') sellSym = 'USDC';
+        refreshSelectors();
+        closeStockDrawer();
+        history.pushState(null, '', '#swap');
+        setActive('#swap');
+        refreshSellUsd();
+        scheduleQuote();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      });
+      document.getElementById('drawerSellBtn').addEventListener('click', function () {
+        if (!drawerCurrent) return;
+        // SELL: stock goes to SELL, receive resets to USDC
+        sellSym = drawerCurrent;
+        if (buySym !== 'USDC' && buySym !== 'USDT') buySym = 'USDC';
+        refreshSelectors();
+        closeStockDrawer();
+        history.pushState(null, '', '#swap');
+        setActive('#swap');
+        refreshSellUsd();
+        scheduleQuote();
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      });
+      function renderSparkline(points) {
+        if (!points || points.length < 2) {
+          drawerChartEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:var(--umbra-muted);"><i data-lucide="line-chart" width="20" height="20"></i><span>No chart data yet — trading history will build after a few price samples.</span></div>';
+          if (window.lucide) window.lucide.createIcons();
+          return;
+        }
+        var w = 360, h = 80, pad = 8;
+        var vals = points.map(function (p) { return Number(p.p); });
+        var min = Math.min.apply(null, vals);
+        var max = Math.max.apply(null, vals);
+        if (!isFinite(min) || !isFinite(max) || min === max) { min -= 1; max += 1; }
+        var range = max - min;
+        // Add 10% padding top/bottom for breathing room
+        min -= range * 0.1; max += range * 0.1; range = max - min;
+        var coords = vals.map(function (v, i) {
+          var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+          var y = h - pad - ((v - min) / range) * (h - pad * 2);
+          return { x: x, y: y };
+        });
+        var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
+        var areaPath = linePath + ' L' + coords[coords.length-1].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' L' + coords[0].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' Z';
+        var up = vals[vals.length-1] >= vals[0];
+        var col = up ? '#55B98A' : '#f6465d';
+        var id = 'grad-' + Math.random().toString(36).slice(2,7);
+        // Grid lines
+        var grid = '';
+        for (var g = 1; g <= 2; g++) {
+          var gy = pad + (g/3)*(h - pad*2);
+          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1" /> ';
+        }
+        drawerChartEl.innerHTML =
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="80" preserveAspectRatio="none" style="display:block;">' +
+          '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + col + '" stop-opacity="0.32"/><stop offset="100%" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>' +
+          grid +
+          '<path d="' + areaPath + '" fill="url(#' + id + ')" />' +
+          '<path d="' + linePath + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />' +
+          '<circle cx="' + coords[coords.length-1].x.toFixed(1) + '" cy="' + coords[coords.length-1].y.toFixed(1) + '" r="3" fill="' + col + '" stroke="var(--umbra-surface)" stroke-width="1.5" />' +
+          '</svg>';
+      }
+      async function paintDrawerHoldings(symbol) {
+        var row = document.getElementById('drawerHoldRow');
+        var el = document.getElementById('drawerHold');
+        if (!window.umbraWallet || !row || !el) return;
+        row.style.display = 'none';
+        try {
+          var res = await fetch(API_BASE + '/api/wallet/' + window.umbraWallet + '/balances');
+          if (!res.ok) return;
+          var data = await res.json();
+          if (drawerCurrent !== symbol) return;
+          var bal = (data.balances || []).find(function (b) { return b.symbol === symbol; });
+          if (bal && Number(bal.display) > 0) {
+            el.textContent = Number(bal.display).toLocaleString('en-US', { maximumFractionDigits: 4 }) + ' ' + symbol;
+            row.style.display = 'flex';
+          }
+        } catch (e) { /* holdings are a bonus */ }
+      }
+      async function paintDrawerTop(symbol) {
+        var el = document.getElementById('drawerTop');
+        if (!el) return;
+        try {
+          var res = await fetch(API_BASE + '/api/assets/' + symbol + '/holders');
+          if (!res.ok) return;
+          var data = await res.json();
+          if (drawerCurrent !== symbol) return;
+          if (typeof data.top10Pct === 'number') el.textContent = 'hold ' + data.top10Pct.toFixed(1) + '%';
+        } catch (e) { /* concentration is a bonus */ }
+      }
+      async function openStockDrawer(symbol) {
+        drawerCurrent = symbol;
+        var myReq = ++drawerReq;
+        drawerSymbolEl.textContent = symbol;
+        drawerIconEl.innerHTML = tkIcon(symbol, 'tk-48');
+        drawerNameEl.textContent = (directory.find(function (d) { return d.symbol === symbol; }) || {}).name || symbol;
+        drawerSubEl.textContent = symbol;
+        drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
+        drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
+        drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
+        drawerChangeEl.style.color = 'var(--umbra-muted)';
+        // Reset every live field instantly — never show the previous stock's numbers
+        document.getElementById('drawerTop').innerHTML = '<span class="skeleton" style="width:48px; height:8px;"></span>';
+        document.getElementById('drawerHoldRow').style.display = 'none';
+        document.getElementById('drawerHold').innerHTML = '<span class="skeleton short" style="width:40px; height:12px;"></span>';
+        document.getElementById('drawerLiquidity').textContent = '—';
+        var _sol0 = document.getElementById('drawerSolscan');
+        if (_sol0) _sol0.style.display = 'none';
+        drawerChartEl.textContent = 'Loading…';
+        drawerNoteEl.style.display = 'none';
+        drawerEl.classList.add('open');
+        drawerEl.setAttribute('aria-hidden','false');
+        if (window.lucide) window.lucide.createIcons();
+        if (drawerCtrl) { try { drawerCtrl.abort(); } catch (_) {} }
+        var ctrl = drawerCtrl = new AbortController();
+        var timeout = setTimeout(function () { ctrl.abort(); }, 7000);
+        try {
+          var res = await fetch(API_BASE + '/api/assets/' + symbol + '/summary', { signal: ctrl.signal });
+          clearTimeout(timeout);
+          if (!res.ok) throw new Error('summary ' + res.status);
+          var data = await res.json();
+          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
+          var s = data.summary;
+          var price = s.asset && s.asset.price ? s.asset.price.value : null;
+          if (price) drawerPriceEl.textContent = '$' + Number(price).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+          else drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
+          var mcap = (s.asset && s.asset.marketCap) ? formatMcap(s.asset.marketCap) : null;
+          if (mcap) drawerMcapEl.textContent = mcap;
+          else if (s.asset && s.asset.price) drawerMcapEl.textContent = '—';
+          else drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
+          if (!mcap && s.asset && s.asset.price) {
+            drawerNoteEl.textContent = 'Market cap only for pre-IPO (SpaceX, OpenAI…). xStocks show price only — their on-chain supply isn’t exposed via the API, so we don’t fake a number.';
+            drawerNoteEl.style.display = 'block';
+          } else if (!mcap) {
+            drawerNoteEl.style.display = 'none';
+          } else {
+            drawerNoteEl.style.display = 'none';
+          }
+          var chg = s.change24hPct;
+          if (chg === null || chg === undefined) {
+            // Keep skeleton while still loading; only show — after we know it's truly missing
+            if (!price) drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
+            else drawerChangeEl.textContent = '—';
+            drawerChangeEl.style.color = 'var(--umbra-muted)';
+          } else {
+            var sign = chg > 0 ? '+' : '';
+            drawerChangeEl.textContent = sign + chg.toFixed(2) + '%';
+            drawerChangeEl.style.color = chg >= 0 ? 'var(--umbra-accent)' : '#f6465d';
+          }
+          drawerSubEl.textContent = (s.asset && s.asset.underlyingSymbol ? s.asset.underlyingSymbol + ' • ' : '') + (s.asset ? s.asset.network : '');
+          renderSparkline(s.sparkline || []);
+          paintDrawerHoldings(symbol);
+          paintDrawerTop(symbol);
+          // Solscan link — proves it's the real on-chain mint
+          var solEl = document.getElementById('drawerSolscan');
+          var liqEl = document.getElementById('drawerLiquidity');
+          if (solEl && s.asset && s.asset.address) {
+            solEl.href = 'https://solscan.io/token/' + s.asset.address;
+            solEl.style.display = 'inline-flex';
+            if (window.lucide) window.lucide.createIcons();
+          }
+          if (liqEl) {
+            // Liquidity from OKX market (if available in summary, else keep —)
+            var liq = s.asset && s.asset.liquidity ? '$' + Number(s.asset.liquidity).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+            liqEl.textContent = liq;
+          }
+          if (!price) {
+            // Keep skeleton, don't flash the scary timeout message — price will arrive via Jupiter/last-good on retry
+            drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
+            drawerNoteEl.style.display = 'none';
+          }
+        } catch (e) {
+          clearTimeout(timeout);
+          // Keep skeletons, don't flash scary timeout — will retry on next open
+          drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
+          drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
+          drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
+          document.getElementById('drawerTop').innerHTML = '<span class="skeleton" style="width:48px; height:8px;"></span>';
+          drawerNoteEl.style.display = 'none';
+        }
+      }
+
+      // ---- Bridge (same card, cross-chain) ----
+      (function () {
+        var fromChain = null;
+        var bridgeAsset = null;
+        var bridgeRoutesCache = null;
+        var bridgeFromBtn = document.getElementById('bridgeFromChainBtn') || document.getElementById('bridgeFromChainBtn2');
+        var bridgeFromName = document.getElementById('bridgeFromChainName') || document.getElementById('bridgeFromChainName2');
+        var bridgeFromIcon = document.getElementById('bridgeFromChainIcon') || document.getElementById('bridgeFromChainIcon2');
+        var bridgeAssetBtn = document.getElementById('bridgeAssetBtn') || document.getElementById('bridgeAssetBtn2');
+        var bridgeAssetCoin = document.getElementById('bridgeAssetCoin') || document.getElementById('bridgeAssetCoin2');
+        var bridgeAssetSymbol = document.getElementById('bridgeAssetSymbol') || document.getElementById('bridgeAssetSymbol2');
+        var bridgeAmount = document.getElementById('bridgeAmount') || document.getElementById('bridgeAmount2');
+        var bridgeUsd = document.getElementById('bridgeUsd');
+        var bridgeReceiver = document.getElementById('bridgeReceiver') || document.getElementById('bridgeReceiver2');
+        var bridgeLines = document.getElementById('bridgeLines') || document.getElementById('bridgeLines2');
+        var bridgeActionBtn = document.getElementById('bridgeActionBtn') || document.getElementById('bridgeActionBtn2');
+        if (!bridgeFromBtn) return;
+
+        function chainIcon(name) {
+          var file = (name||'').replace(/\s+/g,'');
+          var src = './assets/chains/' + file + '.png';
+          // Fallback to colored letter if image fails
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+        }
+        function chainIconImg(name) {
+          var file = (name||'').replace(/\s+/g,'');
+          return './assets/chains/' + file + '.png';
+        }
+        function updateBridgeAction() {
+          var ok = fromChain && bridgeAsset && bridgeAmount && bridgeAmount.value && Number(bridgeAmount.value) > 0 && bridgeReceiver && bridgeReceiver.value.trim().length >= 32;
+          if (!bridgeActionBtn) return;
+          bridgeActionBtn.disabled = !ok;
+          bridgeActionBtn.textContent = ok ? 'Bridge '+bridgeAsset+' → Solana' : 'Bridge to Solana';
+        }
+        async function loadBridgeRoutes() {
+          try {
+            var r = await fetch(API_BASE + '/api/bridge/routes');
+            if (!r.ok) return;
+            var j = await r.json();
+            bridgeRoutesCache = j;
+            var routes = j.routes || [];
+            // Build chain selector modal on first click
+            bridgeFromBtn.addEventListener('click', function () {
+              var chains = [];
+              routes.forEach(function (rt) { if (chains.indexOf(rt.sourceNetwork) === -1) chains.push(rt.sourceNetwork); });
+              var html = chains.map(function (ch) { return '<button class="token-opt" data-chain="'+ch+'">'+chainIcon(ch)+'<span class="meta"><b>'+ch+'</b><span>→ Solana via CCIP</span></span></button>'; }).join('');
+              tokenListEl.innerHTML = html;
+              tokenSearchEl.value = '';
+              tokenSearchEl.placeholder = 'Search chains…';
+              modalSide = 'bridgeChain';
+              tokenModalEl.classList.add('open');
+              tokenSearchEl.focus();
+              Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain]'), function (el) {
+                el.addEventListener('click', function () {
+                  fromChain = el.getAttribute('data-chain');
+                  if (bridgeFromName) bridgeFromName.textContent = fromChain;
+                  var _ci = document.getElementById('bridgeChainImg2');
+                  if (_ci) { _ci.src = chainIconImg(fromChain); _ci.style.display = 'block'; }
+                  else if (bridgeFromIcon) bridgeFromIcon.outerHTML = chainIcon(fromChain);
+                  closeModal();
+                  updateBridgeAction();
+                });
+              });
+            });
+          } catch (_) {}
+        }
+        function openBridgeAssetPicker() {
+          var assets = (bridgeRoutesCache && bridgeRoutesCache.routes) ? bridgeRoutesCache.routes : [];
+          var list = [];
+          assets.forEach(function (rt) {
+            if (fromChain && rt.sourceNetwork !== fromChain) return;
+            (rt.supportedAssets || []).forEach(function (sym) {
+              if (list.indexOf(sym) === -1) list.push(sym);
+            });
+          });
+          list.sort();
+          var html = list.slice(0, 80).map(function (sym) {
+            var d = directory.find(function (x) { return x.symbol === sym; });
+            return '<button class="token-opt" data-symbol="'+sym+'">'+coinHtml28(sym)+'<span class="meta"><b>'+sym+'</b><span>'+(d ? d.name : sym)+'</span></span></button>';
+          }).join('') || '<div style="padding:16px; color:var(--umbra-muted); text-align:center;">Pick a From chain first</div>';
+          tokenListEl.innerHTML = html;
+          tokenSearchEl.value = '';
+          tokenSearchEl.placeholder = 'Search assets…';
+          modalSide = 'bridgeAsset';
+          tokenModalEl.classList.add('open');
+          tokenSearchEl.focus();
+          Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-symbol]'), function (el) {
+            el.addEventListener('click', function () {
+              bridgeAsset = el.getAttribute('data-symbol');
+              bridgeAssetSymbol.textContent = bridgeAsset;
+              bridgeAssetCoin.innerHTML = coinHtml28(bridgeAsset);
+              closeModal();
+              updateBridgeAction();
+              refreshBridgeQuote();
+            });
+          });
+        }
+        if (bridgeAssetBtn) bridgeAssetBtn.addEventListener('click', openBridgeAssetPicker);
+        // patch closeModal to handle bridge pickers
+        var _origClose = window.closeModal || closeModal;
+        // keep existing closeModal behaviour, just ensure search works for bridge
+        tokenSearchEl.addEventListener('input', function () {
+          var q = (tokenSearchEl.value || '').trim().toUpperCase();
+          if (modalSide === 'bridgeChain' || modalSide === 'bridgeAsset') {
+            Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain],[data-symbol]'), function (row) {
+              var txt = (row.textContent || '').toUpperCase();
+              row.style.display = txt.indexOf(q) !== -1 ? '' : 'none';
+            });
+          }
+        });
+        async function refreshBridgeQuote() {
+          var amt = ((bridgeAmount && bridgeAmount.value) || '').trim();
+          var recv = ((bridgeReceiver && bridgeReceiver.value) || '').trim();
+          if (!fromChain || !bridgeAsset || !amt || Number(amt) <= 0 || !recv) {
+            bridgeLines.hidden = true;
+            bridgeLines.innerHTML = '';
+            var bl2 = document.getElementById('bridgeLines2');
+            if (bl2) { bl2.hidden = true; bl2.innerHTML = ''; }
+            return;
+          }
+          bridgeLines.hidden = false;
+          bridgeLines.innerHTML = '<div class="row"><span style="color:var(--umbra-muted);">Fetching bridge quote…</span></div>';
+          var bl2a = document.getElementById('bridgeLines2');
+          if (bl2a) { bl2a.hidden = false; bl2a.innerHTML = '<div class="row"><span style="color:var(--umbra-muted);">Fetching bridge quote…</span></div>'; }
+          try {
+            var r = await fetch(API_BASE + '/api/bridge/quote', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sourceNetwork: fromChain, asset: bridgeAsset, amount: amt, destinationNetwork: 'Solana', destinationAddress: bridgeReceiver.value.trim() })
+            });
+            var j = await r.json();
+            if (!r.ok) throw new Error((j.error && j.error.message) || 'Quote failed');
+            var q = j;
+            bridgeLines.innerHTML = '<div class="row"><span>Estimated receive</span><span class="good">'+(q.estimatedReceived||'—')+' '+bridgeAsset+'</span></div>' +
+              '<div class="row"><span>Fee</span><span>'+(q.fee||'—')+'</span></div>' +
+              '<div class="row"><span>Time</span><span>'+(q.estimatedTime||'—')+'</span></div>' +
+              '<div class="row"><span>Route</span><span>'+fromChain+' → Solana</span></div>';
+            var bl2b = document.getElementById('bridgeLines2');
+            if (bl2b) bl2b.innerHTML = bridgeLines.innerHTML;
+            var bf2 = document.getElementById('bridgeFee2');
+            if (bf2) bf2.textContent = q.fee ? q.fee + ' USDC' : '—';
+          } catch (e) {
+            bridgeLines.innerHTML = '<div class="row"><span class="error">'+((e && e.message) || 'Quote failed')+'</span></div>';
+            var bl2c = document.getElementById('bridgeLines2');
+            if (bl2c) bl2c.innerHTML = bridgeLines.innerHTML;
+          }
+        }
+        if (bridgeAmount) bridgeAmount.addEventListener('input', function () { updateBridgeAction(); refreshBridgeQuote(); });
+        if (bridgeReceiver) bridgeReceiver.addEventListener('input', function () { updateBridgeAction(); refreshBridgeQuote(); });
+        // Wire the flip-card bridge view (inside swap card) to the same state
+        var bFrom2 = document.getElementById('bridgeFromChainBtn2');
+        var bFromName2 = document.getElementById('bridgeFromChainName2');
+        var bChainImg2 = document.getElementById('bridgeChainImg2');
+        var bAsset2 = document.getElementById('bridgeAssetBtn2');
+        var bAssetSym2 = document.getElementById('bridgeAssetSymbol2');
+        var bAssetCoin2 = document.getElementById('bridgeAssetCoin2');
+        var bAmt2 = document.getElementById('bridgeAmount2');
+        var bRecv2 = document.getElementById('bridgeReceiver2');
+        var bFee2 = document.getElementById('bridgeFee2');
+        var bToSym = document.getElementById('bridgeToAssetSymbol');
+        var bToIcon = document.getElementById('bridgeToAssetIcon');
+        if (bFrom2 && bFrom2 !== bridgeFromBtn) bFrom2.addEventListener('click', function () { if (bridgeFromBtn) bridgeFromBtn.click(); });
+        if (bAsset2 && bAsset2 !== bridgeAssetBtn) bAsset2.addEventListener('click', function () { if (bridgeAssetBtn) bridgeAssetBtn.click(); });
+        // Sync displays when fromChain/bridgeAsset change
+        var _origUpdate = updateBridgeAction;
+        updateBridgeAction = function () {
+          _origUpdate();
+          if (bFromName2) bFromName2.textContent = fromChain || 'Select chain';
+          if (bChainImg2 && fromChain) { bChainImg2.src = chainIconImg(fromChain); bChainImg2.style.display = 'block'; }
+          if (bAssetSym2) bAssetSym2.textContent = bridgeAsset || 'USDC';
+          if (bAssetCoin2) bAssetCoin2.innerHTML = bridgeAsset ? coinHtml28(bridgeAsset) : '';
+          if (bToSym) bToSym.textContent = bridgeAsset || 'USDC';
+          if (bToIcon) bToIcon.innerHTML = bridgeAsset ? coinHtml28(bridgeAsset) : '';
+          var bAction2 = document.getElementById('bridgeActionBtn2');
+          if (bAction2) { bAction2.disabled = bridgeActionBtn ? bridgeActionBtn.disabled : true; bAction2.textContent = bridgeActionBtn ? bridgeActionBtn.textContent : 'Bridge to Solana'; }
+        };
+        if (bAmt2) bAmt2.addEventListener('input', function () { if (bridgeAmount) bridgeAmount.value = bAmt2.value; updateBridgeAction(); refreshBridgeQuote(); });
+        if (bRecv2) bRecv2.addEventListener('input', function () { if (bridgeReceiver) bridgeReceiver.value = bRecv2.value; updateBridgeAction(); refreshBridgeQuote(); });
+        var bAddRecv = document.getElementById('bridgeAddReceiverBtn');
+        if (bAddRecv && bRecv2) bAddRecv.addEventListener('click', function () { bRecv2.hidden = false; bRecv2.focus(); bAddRecv.style.display = 'none'; });
+        var bAction2El = document.getElementById('bridgeActionBtn2');
+        if (bAction2El && bAction2El !== bridgeActionBtn) bAction2El.addEventListener('click', function () { if (bridgeActionBtn) bridgeActionBtn.click(); });
+        if (bridgeActionBtn) bridgeActionBtn.addEventListener('click', async function () {
+          if (bridgeActionBtn.disabled) return;
+          bridgeActionBtn.disabled = true;
+          bridgeActionBtn.textContent = 'Building…';
+          try {
+            // 1) quote
+            var qr = await fetch(API_BASE + '/api/bridge/quote', {
+              method: 'POST', headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ sourceNetwork: fromChain, asset: bridgeAsset, amount: bridgeAmount.value.trim(), destinationNetwork: 'Solana', destinationAddress: bridgeReceiver.value.trim() })
+            });
+            var qj = await qr.json();
+            if (!qr.ok) throw new Error((qj.error && qj.error.message) || 'Quote failed');
+            // 2) transaction (source = EVM wallet when connected, else Solana wallet / manual)
+            var srcWallet = window.umbraEvmWallet || window.umbraWallet || bridgeReceiver.value.trim();
+            var tr = await fetch(API_BASE + '/api/bridge/transaction', {
+              method: 'POST', headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ bridgeQuoteId: qj.bridgeQuoteId || qj.quoteId || qj.id, sourceWalletAddress: srcWallet, destinationSolanaAddress: bridgeReceiver.value.trim() })
+            });
+            var tj = await tr.json();
+            if (!tr.ok) throw new Error((tj.error && tj.error.message) || 'Bridge build failed');
+            bridgeLines.hidden = false;
+            bridgeLines.innerHTML = '<div class="row"><span class="good">Bridge ready — tracking '+ (tj.trackingId || '') +'</span></div><div class="row"><span>Next: send source chain tx, then POST /api/bridge/transactions/'+(tj.trackingId||'')+'/source with hash</span></div>';
+            bridgeActionBtn.textContent = 'Tracking '+ (tj.trackingId || '');
+            if (typeof refreshActivity === 'function') refreshActivity();
+          } catch (e) {
+            bridgeLines.hidden = false;
+            bridgeLines.innerHTML = '<div class="row"><span class="error">'+((e && e.message)||'Bridge failed')+'</span></div>';
+            bridgeActionBtn.textContent = 'Bridge to Solana';
+            bridgeActionBtn.disabled = false;
+          }
+        });
+        loadBridgeRoutes();
+        // keep amount USD live like swap
+        if (bridgeAmount) bridgeAmount.addEventListener('input', async function () {
+          var v = bridgeAmount.value.trim();
+          if (!v || Number(v) <= 0 || !bridgeAsset) { if (bridgeUsd) bridgeUsd.textContent = '$0.00'; return; }
+          try { var pr = await fetch(API_BASE + '/api/assets/'+bridgeAsset+'/price'); if (pr.ok) { var pj = await pr.json(); if (bridgeUsd) bridgeUsd.textContent = '$'+(Number(pj.price)*Number(v)).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); } } catch (_) {}
+        });
+      })();
+
+      // Info tooltip handler — click the ⓘ to toggle, click outside to close
+      // Single shared element: reuse the static #infoTip in HTML (never create a duplicate id)
+      function ensureInfoTip() {
+        var el = document.getElementById('infoTip');
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'info-tip';
+          el.id = 'infoTip';
+          document.body.appendChild(el);
+        }
+        return el;
+      }
+      var _infoAnchor = null;
+      function showInfoTip(icon) {
+        var tip = ensureInfoTip();
+        tip.textContent = icon.getAttribute('data-tip') || '';
+        _infoAnchor = icon;
+        var rect = icon.getBoundingClientRect();
+        tip.classList.add('open');
+        // Force layout so offsetWidth/Height are correct
+        void tip.offsetWidth;
+        var top = rect.top - tip.offsetHeight - 8;
+        var left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
+        if (top < 8) top = rect.bottom + 8;
+        if (left < 8) left = 8;
+        if (left + tip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - tip.offsetWidth - 8;
+        tip.style.top = top + 'px';
+        tip.style.left = left + 'px';
+      }
+      function hideInfoTip() {
+        var t = document.getElementById('infoTip');
+        if (t) t.classList.remove('open');
+        _infoAnchor = null;
+      }
+      // One click handler only (the old code had two and they fought each other)
+      document.addEventListener('click', function (e) {
+        var target = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (target) {
+          e.stopPropagation();
+          var tip = ensureInfoTip();
+          var msg = target.getAttribute('data-tip') || '';
+          if (tip.textContent === msg && tip.classList.contains('open')) {
+            hideInfoTip();
+            return;
+          }
+          showInfoTip(target);
+        } else {
+          hideInfoTip();
+        }
+      });
+      // scroll never bubbles — capture at document catches window + every inner scroller
+      // (stocksList, drawerBody, activityList, tokenList, main) in one listener.
+      document.addEventListener('scroll', hideInfoTip, { capture: true, passive: true });
+      document.addEventListener('wheel', hideInfoTip, { capture: true, passive: true });
+      document.addEventListener('touchmove', hideInfoTip, { capture: true, passive: true });
+      window.addEventListener('hashchange', hideInfoTip);
+      window.addEventListener('resize', hideInfoTip);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideInfoTip(); });
+      // Drawer close / tab switch must also dismiss (fixed tooltip would otherwise float)
+      try {
+        var _sd = document.getElementById('stockDrawer');
+        if (_sd) new MutationObserver(hideInfoTip).observe(_sd, { attributes: true, attributeFilter: ['aria-hidden', 'class', 'style'] });
+      } catch (_) {}
+
+      loadDirectory().then(function () {
+        refreshSellUsd();
+        refreshStocksCards();
+        refreshActivity();
+      });
+      // Also refresh cards when returning to those tabs
+      var origSetActive = setActive;
+      setActive = function (hash) {
+        origSetActive(hash);
+        if (hash === '#stocks') refreshStocksCards();
+        if (hash === '#transactions') refreshActivity();
+      };
+    })();
+  </script>
+  <div id="infoTip" class="info-tip"></div>
+  <!-- Reown AppKit via ESM CDN (no npm, no build step).
+       Wallets-only modal -> address chip -> Account view. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@reown/appkit": "https://esm.sh/@reown/appkit@1.8.24",
+      "@reown/appkit-adapter-solana": "https://esm.sh/@reown/appkit-adapter-solana@1.8.24",
+      "@reown/appkit/networks": "https://esm.sh/@reown/appkit@1.8.24/networks",
+      "@solana/web3.js": "https://esm.sh/@solana/web3.js@1.98.0"
+    }
+  }
+  </script>
+  <script type="module">
+    import { createAppKit } from '@reown/appkit';
+    import { SolanaAdapter } from '@reown/appkit-adapter-solana';
+    import { solana } from '@reown/appkit/networks';
+    import { VersionedTransaction, Connection } from '@solana/web3.js';
+
+    window.umbraReown = { ready: false };
+    window.umbraReownSigner = null;
+    try {
+      var metadata = {
+        name: 'Umbra',
+        description: 'Dex aggregator for tokenized stocks on Solana',
+        url: window.location.origin,
+        icons: [window.location.origin + '/assets/logo-white.png']
+      };
+      var modal = createAppKit({
+        adapters: [new SolanaAdapter()],
+        networks: [solana],
+        metadata: metadata,
+        projectId: '99d43dc670342b0063917d5178d86816',
+        features: { email: false, socials: [] },
+        themeMode: 'dark',
+        themeVariables: { '--w3m-accent': '#55B98A' }
+      });
+      var solProvider = null;
+      try {
+        modal.subscribeProviders(function (state) {
+          try { solProvider = (state && state.solana) || null; } catch (_) { solProvider = null; }
+        });
+      } catch (_) {}
+      var readAddress = function (s) {
+        try {
+          if (!s) return null;
+          if (typeof s.address === 'string' && s.address) return s.address;
+          var all = s.allAccounts || s.accounts || [];
+          if (all && all.length) {
+            var a0 = all[0];
+            if (typeof a0 === 'string' && a0) return a0;
+            if (a0 && typeof a0.address === 'string' && a0.address) return a0.address;
+          }
+        } catch (_) {}
+        return null;
+      };
+      var normalizeSigned = function (out) {
+        if (out && out.signatures) return out;
+        var raw = null;
+        if (out instanceof Uint8Array) raw = out;
+        else if (out && out.signedTransaction instanceof Uint8Array) raw = out.signedTransaction;
+        else if (Array.isArray(out) && out.length) {
+          var f = out[0];
+          raw = f instanceof Uint8Array ? f : (f && f.signedTransaction instanceof Uint8Array ? f.signedTransaction : null);
+        }
+        if (raw && raw.length) return VersionedTransaction.deserialize(raw);
+        throw new Error('Wallet returned an unusable signature.');
+      };
+      var injectedCandidates = function () {
+        var c = [];
+        try {
+          if (window.phantom && window.phantom.solana) c.push({ name: 'Phantom', p: window.phantom.solana });
+          if (window.solflare && window.solflare.isSolflare) c.push({ name: 'Solflare', p: window.solflare });
+          if (window.backpack) c.push({ name: 'Backpack', p: window.backpack });
+          if (window.braveSolana) c.push({ name: 'Brave', p: window.braveSolana });
+          if (window.glow) c.push({ name: 'Glow', p: window.glow });
+          if (window.solana) c.push({ name: 'injected', p: window.solana });
+        } catch (_) {}
+        return c;
+      };
+      var shortErr = function (e) { return String((e && e.message) || e).slice(0, 140); };
+      var rejected = function (e) {
+        return /rejected|denied|closed|cancelled|user rejected/i.test(String((e && e.message) || e));
+      };
+      window.umbraReownSigner = {
+        signTransaction: async function (vtx) {
+          var bytes = null;
+          try { bytes = vtx.serialize(); } catch (_) {}
+          if (!bytes) throw new Error('Cannot serialize transaction.');
+          var notes = [];
+          var hasReownSign = !!(solProvider && typeof solProvider.signTransaction === 'function');
+          // 1) Reown-connected provider, sign-only (backend broadcasts, as before)
+          if (hasReownSign) {
+            try { return normalizeSigned(await solProvider.signTransaction(bytes)); }
+            catch (e) {
+              if (rejected(e)) throw e;
+              notes.push('reown-sign: ' + shortErr(e));
+              try { return normalizeSigned(await solProvider.signTransaction({ transaction: bytes })); }
+              catch (e2) {
+                if (rejected(e2)) throw e2;
+                notes.push('reown-sign(obj): ' + shortErr(e2));
+              }
+            }
+          } else {
+            notes.push('reown provider has no signTransaction');
+          }
+          // 1b) Reown provider sign+BROADCAST (mobile / WalletConnect wallets with
+          // nothing injected). Returns the signature; backend confirms it as usual.
+          if (!hasReownSign && solProvider && typeof solProvider.sendTransaction === 'function') {
+            try {
+              var rpcUrl = null;
+              try {
+                var chain = solProvider.getActiveChain ? solProvider.getActiveChain() : null;
+                rpcUrl = chain && chain.rpcUrls && chain.rpcUrls.default && chain.rpcUrls.default.http && chain.rpcUrls.default.http[0];
+              } catch (_) {}
+              if (!rpcUrl) throw new Error('no RPC on provider');
+              var conn = new Connection(rpcUrl, 'confirmed');
+              var sig = await solProvider.sendTransaction(vtx, conn);
+              if (typeof sig === 'string' && sig) return { __sig: sig };
+              if (sig && sig.signature) return { __sig: sig.signature };
+              notes.push('reown-send: unusable return');
+            } catch (e) {
+              if (rejected(e)) throw e;
+              notes.push('reown-send: ' + shortErr(e));
+            }
+          }
+          // 2) Same-address injected provider (proven legacy path, silent when trusted)
+          var addr = window.umbraWallet;
+          var cands = injectedCandidates();
+          if (!cands.length) notes.push('no injected wallet found');
+          for (var i = 0; i < cands.length; i++) {
+            var entry = cands[i];
+            try {
+              var c = entry.p;
+              if (!c.publicKey) {
+                try { await c.connect({ onlyIfTrusted: true }); }
+                catch (_) { await c.connect(); }
+              }
+              var pk = c.publicKey ? c.publicKey.toString() : '';
+              if (addr && pk && pk !== addr) continue;
+              var signed = await c.signTransaction(vtx);
+              if (signed && signed.signatures) return signed;
+              notes.push(entry.name + ': empty result');
+            } catch (e) {
+              if (rejected(e)) throw e;
+              notes.push(entry.name + ': ' + shortErr(e));
+            }
+          }
+          try { console.warn('[umbra] sign failed | ' + notes.join(' | ')); } catch (_) {}
+          throw new Error('Connected wallet cannot sign (' + (notes.join('; ') || 'unknown') + ').');
+        }
+      };
+      try {
+        modal.subscribeAccount(function (s) {
+          var addr = readAddress(s);
+          var h = window.umbraWalletHooks || {};
+          if (addr) {
+            window.umbraWallet = addr;
+            if (h.connected) { try { h.connected(addr); } catch (_) {} }
+          } else {
+            window.umbraWallet = null;
+            /* keep umbraReownSigner wrapper (reads solProvider live) for next connect */
+            if (h.disconnected) { try { h.disconnected(); } catch (_) {} }
+          }
+        });
+      } catch (_) {}
+      window.umbraReown = {
+        ready: true,
+        open: function () { try { modal.open(); } catch (_) {} },
+        openAccount: function () {
+          try { modal.open({ view: 'Account' }); }
+          catch (_) { try { modal.open(); } catch (_) {} }
+        },
+        disconnect: async function () {
+          try { if (typeof modal.disconnect === 'function') await modal.disconnect(); } catch (_) {}
+          try { if (solProvider && typeof solProvider.disconnect === 'function') await solProvider.disconnect(); } catch (_) {}
+          window.umbraWallet = null;
+          var h = window.umbraWalletHooks || {};
+          if (h.disconnected) { try { h.disconnected(); } catch (_) {} }
+        }
+      };
+    } catch (e) {
+      console.warn('[umbra] Reown failed to initialise', e);
+      window.umbraReown = { ready: false };
+    }
+  </script>
+</body>
+</html>
