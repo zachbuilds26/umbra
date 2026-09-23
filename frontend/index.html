@@ -738,32 +738,6 @@
     #buyChange.up { color: var(--umbra-accent); }
     #buyChange.down { color: #f6465d; }
 
-    .ox-meta {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 14px;
-      font-size: 13px;
-      color: var(--umbra-muted);
-    }
-
-    .ox-meta-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .ox-meta-item .slip-val {
-      color: var(--umbra-accent);
-      font-weight: 700;
-    }
-
-    .ox-meta-sep {
-      width: 1px;
-      height: 14px;
-      background: var(--umbra-border);
-    }
-
     .details-toggle {
       display: flex;
       align-items: center;
@@ -2024,12 +1998,6 @@
             </div>
           </div>
 
-          <div class="ox-meta" id="quoteMeta" hidden>
-            <span class="ox-meta-item"><i data-lucide="sliders-horizontal" width="14" height="14"></i><span id="metaSlip">0.5%</span></span>
-            <span class="ox-meta-sep"></span>
-            <span class="ox-meta-item"><i data-lucide="scale" width="14" height="14"></i><span id="metaFair">—</span></span>
-          </div>
-
           <button class="details-toggle" id="detailToggle" aria-expanded="false" disabled>
             <span>Show details</span>
             <i data-lucide="chevron-down" width="14" height="14"></i>
@@ -2813,8 +2781,6 @@
         slippageBps = Math.max(0, Math.min(10000, Math.round(bps)));
         var label = fmtSlip(slippageBps);
         slipValEl.textContent = label;
-        var ms = document.getElementById('metaSlip');
-        if (ms) ms.textContent = label;
         paintSlipModal();
         scheduleQuote();
       }
@@ -2966,9 +2932,6 @@
       }
 
       function resetQuoteSummary() {
-        /* metaFee chip removed — no fee display pre-sign */
-        document.getElementById('quoteMeta').hidden = true;
-        document.getElementById('metaFair').textContent = '—';
         setBuyChange(null);
       }
 
@@ -3091,9 +3054,6 @@
           quoteLinesEl.hidden = !wasOpen;
           paintDetailToggle();
           if (window.lucide) window.lucide.createIcons();
-          // Summary strip: meta (slip/fair) — no fee chip
-          document.getElementById('quoteMeta').hidden = false;
-          document.getElementById('metaSlip').textContent = (slippageBps / 100).toFixed(1) + '%';
           setBuyChange(null);
           // Pyth deal line (best effort — absent on limited keys).
           try {
@@ -3108,8 +3068,6 @@
                 quoteLinesEl.innerHTML +=
                   '<div class="row"><span>Fair value (Pyth)</span><span class="' + cls + '">$' + fair.equity.price + ' (' + sign + bps + ' bps)</span></div>';
                 if (lastQuote) lastQuote.fairLine = '$' + fair.equity.price + ' (' + sign + bps + ' bps)';
-                var mf = document.getElementById('metaFair');
-                if (mf) mf.textContent = sign + bps + ' bps';
               }
               // Receive-side 24h badge doubles as the deal pulse: fetch change
               try {
