@@ -1092,30 +1092,7 @@
       20%, 60% { transform: translateX(-5px); }
       40%, 80% { transform: translateX(5px); }
     }
-    /* Boot splash: opaque cover until first data is ready, then fades */
-    #bootLoader {
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: var(--umbra-bg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 18px;
-      transition: opacity 0.4s ease;
-    }
-    #bootLoader.done { opacity: 0; pointer-events: none; }
-    #bootLoader img { width: 56px; height: 56px; }
-    #bootLoader .boot-spin {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 3px solid var(--umbra-secondary);
-      border-top-color: var(--umbra-accent);
-      animation: spin 0.9s linear infinite;
-    }
-    #bootLoader p { margin: 0; font-size: 13px; color: var(--umbra-muted); }
+
     /* Hairline between detail rows */
     .quote-lines .row + .row { border-top: 1px solid var(--umbra-border); padding-top: 8px; }
     .swap-explorer-btn {
@@ -1886,11 +1863,6 @@
   </style>
 </head>
 <body>
-  <div id="bootLoader" aria-hidden="true">
-    <img src="./assets/logo-white.png" alt="" onerror="this.style.display='none'" />
-    <div class="boot-spin"></div>
-    <p>Loading Umbra…</p>
-  </div>
   <header class="site-header">
     <div class="nav-left">
       <a class="brand" href="#swap" aria-label="Umbra home">
@@ -2624,11 +2596,8 @@
         return API_BASE + '/api/assets/ticker?symbols=' + TAPE_SYMBOLS.join(',');
       }
 
-      var tapeDone = false;
-      function markTapeDone() { tapeDone = true; tryDismissBoot(); }
-      loadTape().then(markTapeDone, function () {
+      loadTape().catch(function () {
         showNote('Prices unavailable — is the Umbra backend running on :3002?');
-        markTapeDone();
       });
       setInterval(function () {
         if (!track.hidden) loadTape().catch(function () {});
@@ -4206,35 +4175,10 @@
         if (_sd) new MutationObserver(hideInfoTip).observe(_sd, { attributes: true, attributeFilter: ['aria-hidden', 'class', 'style'] });
       } catch (_) {}
 
-      // Boot gate: splash stays until directory + tape + first rows are in
-      // (or 25s failsafe — never trap anyone on a dead backend).
-      var dirDone = false;
-      var bootDone = false;
-      var bootTimer = null;
-      function tryDismissBoot() {
-        if (bootDone) return;
-        if (!(dirDone && tapeDone && stocksCache.length)) return;
-        dismissBoot();
-      }
-      function dismissBoot() {
-        if (bootDone) return;
-        bootDone = true;
-        if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; }
-        var el = document.getElementById('bootLoader');
-        if (!el) return;
-        el.classList.add('done');
-        setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
-      }
-      bootTimer = setTimeout(dismissBoot, 25000);
       loadDirectory().then(function () {
-        dirDone = true;
         refreshSellUsd();
         refreshStocksCards();
         refreshActivity();
-        tryDismissBoot();
-      }, function () {
-        dirDone = true;
-        tryDismissBoot();
       });
       // Also refresh cards when returning to those tabs
       var origSetActive = setActive;
