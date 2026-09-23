@@ -20,6 +20,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     logger: {
       level: env.isProd ? 'info' : 'debug',
     },
+    // Behind Render's proxy (and any CDN), the socket IP is the proxy's.
+    // Without this, req.ip is identical for every visitor and the per-IP
+    // rate-limit bucket is shared globally — one page load can 429 everyone.
+    trustProxy: true,
     requestIdHeader: 'x-request-id',
     genReqId: () => newRequestId(),
   });
