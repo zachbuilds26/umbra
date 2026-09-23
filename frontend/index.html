@@ -6,6 +6,15 @@
   <title>Umbra - Dex aggregator for tokenized stocks on solana</title>
   <meta name="description" content="Umbra - Dex aggregator for tokenized stocks on solana." />
   <link rel="icon" type="image/png" href="./assets/logo-white.png" />
+  <!-- Above-fold images first: header, network pill, default pair, tape head -->
+  <link rel="preload" as="image" href="./assets/logo-white.png" />
+  <link rel="preload" as="image" href="./assets/solana-mark.png" />
+  <link rel="preload" as="image" href="./assets/tokens/NVDAx.png" />
+  <link rel="preload" as="image" href="./assets/tokens/USDC.png" />
+  <link rel="preload" as="image" href="./assets/tokens/AAPLx.png" />
+  <link rel="preload" as="image" href="./assets/tokens/TSLAx.png" />
+  <link rel="preload" as="image" href="./assets/tokens/MSFTx.png" />
+  <link rel="preload" as="image" href="./assets/tokens/SPYx.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -27,7 +36,8 @@
       visibility: visible;
     }
   </style>
-  <script src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
+  <!-- Deferred: only needed at swap-sign time, must not block first paint -->
+  <script defer src="https://unpkg.com/@solana/web3.js@1.98.0/lib/index.iife.min.js"></script>
   <style>
     /*
      * Umbra header:
