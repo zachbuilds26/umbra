@@ -2900,12 +2900,14 @@
       }
 
       var quoteSeq = 0; // race guard: only the latest request may paint
+      var quote429s = 0; // consecutive 429s: capped, otherwise retries DDoS Jupiter
       function setBuyDots(on) {
         var d = document.getElementById('buyDots');
         if (d) d.classList.toggle('on', !!on);
       }
       function scheduleQuote() {
         if (quoteTimer) clearTimeout(quoteTimer);
+        quote429s = 0; // fresh user intent — allow the retry budget again
         var amt = (sellAmountEl.value || '').trim();
         if (amt && Number(amt) > 0) {
           buyAmountEl.value = '';
@@ -3027,10 +3029,19 @@
             lastQuote = null;
             var is429 = res.status === 429 || (data.error && String(data.error.message).indexOf('429') !== -1);
             if (is429) {
+              quote429s++;
+              if (quote429s >= 3) {
+                // Stop hammering: tell the user to wait instead of silent-looping
+                if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+                setBuyDots(false);
+                quoteError('Quoting is busy right now — wait a moment and try again.');
+                return;
+              }
               // Silent retry — don't flash the scary message, just try again
               setTimeout(function () { if (quoteSeq === mySeq) runQuote(); }, 1200);
               return;
             }
+            quote429s = 0;
             if (buyLoadingEl) buyLoadingEl.style.display = 'none';
             var thinSym = THIN.indexOf(buySym) !== -1 || THIN.indexOf(sellSym) !== -1;
             var errCode = data.error && data.error.code;
@@ -3250,6 +3261,8 @@
 
       function swapFail(msg, retry) {
         executing = false;
+        // 429 is always rate-limiting (Jupiter free tier) — never show the raw code.
+        if (/429/.test(msg || '')) msg = 'Quoting is busy right now — wait a moment and try again.';
         paintSwapTitle('Swap failed', 'bad');
         swapErrorEl.style.display = 'flex';
         swapErrorEl.textContent = msg;
