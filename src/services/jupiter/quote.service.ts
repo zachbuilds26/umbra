@@ -1,5 +1,20 @@
 import Decimal from 'decimal.js';
-import { VersionedTransaction } from '@solana/web3.js';
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
+} from '@solana/web3.js';
+import {
+  TOKEN_PROGRAM_ID,
+  createCloseAccountInstruction,
+  createInitializeAccountInstruction,
+  createSyncNativeInstruction,
+  getAssociatedTokenAddressSync,
+} from '@solana/spl-token';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
 import { getConnection } from '../solana/connection.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
@@ -15,6 +30,17 @@ Decimal.set({ precision: 40 });
 const QUOTE_TTL_S = 60;
 const DEFAULT_SLIPPAGE_BPS = 50;
 
+/** Wrapped SOL is the mint Jupiter routes SOL through; native SOL itself is not
+ *  an SPL token. 9 decimals on both sides of a wrap. */
+export const SOL_MINT = 'So11111111111111111111111111111111111111112';
+export const SOL_DECIMALS = 9;
+
+/** The "base" side of a swap: what you pay in or receive out. */
+export function isBaseSymbol(symbol: string): boolean {
+  const s = canonicalSymbol(symbol).toUpperCase();
+  return s === 'SOL' || isStableSymbol(s);
+}
+
 interface ResolvedSide {
   symbol: string;
   mint: string;
@@ -28,7 +54,7 @@ async function resolveSide(symbol: string, extraStocks: Set<string> = new Set())
   let canonical = canonicalSymbol(symbol);
   if (extraStocks.has(canonical.toUpperCase())) canonical = canonical.toUpperCase();
   if (canonical === 'SOL') {
-    throw badRequest('UNSUPPORTED_ASSET', 'SOL is not part of the Umbra swap MVP. Use stables (USDC/USDT) and stocks (xStocks / Pre-IPO).');
+    return { symbol: 'SOL', mint: SOL_MINT, decimals: SOL_DECIMALS };
   }
   if (!isStableSymbol(canonical) && !/^[A-Z0-9]+x$/.test(canonical) && !/^[A-Z]{2,12}$/.test(canonical)) {
     throw badRequest('UNSUPPORTED_ASSET', `Asset ${symbol} is not supported for swap.`);
@@ -41,9 +67,8 @@ async function resolveSide(symbol: string, extraStocks: Set<string> = new Set())
 }
 
 /**
- * Umbra swaps are stock↔stable only, on Solana only: one side must be a supported
- * stable (USDC/USDT), the other a supported stock (xStock or PreStocks pre-IPO).
- * No stock→stock, no stable→stable. Pure (no network) so bad pairs fail fast and
+ * Umbra swaps one stock against one base asset (USDC, USDT or SOL) on Solana.
+ * No stock→stock, no base→base. Pure (no network) so bad pairs fail fast and
  * offline-testably; the caller supplies the live PreStocks set.
  */
 export function assertStockStablePair(
@@ -55,20 +80,24 @@ export function assertStockStablePair(
   const b = canonicalSymbol(buy);
   const isStock = (sym: string) => /^[A-Z0-9]+x$/.test(sym) || extraStocks.has(sym.toUpperCase());
   const normStock = (sym: string) => (extraStocks.has(sym.toUpperCase()) ? sym.toUpperCase() : sym);
-  const sStable = isStableSymbol(s);
-  const bStable = isStableSymbol(b);
-  if (sStable && isStock(b)) return { stock: normStock(b), stable: s };
-  if (bStable && isStock(s)) return { stock: normStock(s), stable: b };
+  const sBase = isBaseSymbol(s);
+  const bBase = isBaseSymbol(b);
+  if (sBase && isStock(b)) return { stock: normStock(b), stable: s.toUpperCase() };
+  if (bBase && isStock(s)) return { stock: normStock(s), stable: b.toUpperCase() };
   throw badRequest(
     'UNSUPPORTED_ASSET',
-    `Swaps are only supported between a tokenized stock and a stable (USDC/USDT). Got ${sell} → ${buy}.`,
+    `Swaps are only supported between a tokenized stock and USDC, USDT or SOL. Got ${sell} → ${buy}.`,
   );
 }
 
-/** Display amount -> base units. Stables use 6dp; PreStocks plain 9dp; xStocks apply the live multiplier (plan §10). */
+/** Display amount -> base units. Base assets 6dp (USDC/USDT) or 9dp (SOL);
+ *  PreStocks plain 9dp; xStocks apply the live multiplier (plan §10). */
 async function toBaseUnits(symbol: string, displayAmount: string): Promise<string> {
   if (isStableSymbol(symbol)) {
     return new Decimal(displayAmount).mul(new Decimal(10).pow(6)).floor().toFixed(0);
+  }
+  if (canonicalSymbol(symbol).toUpperCase() === 'SOL') {
+    return new Decimal(displayAmount).mul(new Decimal(10).pow(SOL_DECIMALS)).floor().toFixed(0);
   }
   const { getPrestocksSymbols, PRESTOCKS_DECIMALS } = await import('../prestocks/assets.js');
   const pre = await getPrestocksSymbols().catch(() => new Set<string>());
@@ -88,10 +117,13 @@ async function toBaseUnits(symbol: string, displayAmount: string): Promise<strin
   return displayToBaseUnits(displayAmount, multiplier, 8);
 }
 
-/** Base units -> display amount (applies multiplier for xStocks; plain for stables/PreStocks). */
+/** Base units -> display amount (applies multiplier for xStocks; plain for base assets/PreStocks). */
 async function fromBaseUnits(symbol: string, baseUnits: string): Promise<string> {
   if (isStableSymbol(symbol)) {
     return new Decimal(baseUnits).div(new Decimal(10).pow(6)).toString();
+  }
+  if (canonicalSymbol(symbol).toUpperCase() === 'SOL') {
+    return new Decimal(baseUnits).div(new Decimal(10).pow(SOL_DECIMALS)).toString();
   }
   const { getPrestocksSymbols, PRESTOCKS_DECIMALS } = await import('../prestocks/assets.js');
   const pre = await getPrestocksSymbols().catch(() => new Set<string>());
@@ -195,8 +227,8 @@ function normalizeQuote(args: {
 
 function buildRate(sell: string, buy: string, sellAmount: string, receiveAmount: string): string {
   try {
-    if (isStableSymbol(buy)) {
-      // Stables ≈ USD: price per unit sold.
+    if (isBaseSymbol(buy)) {
+      // Receiving USDC/USDT/SOL: price per unit sold, quoted in dollars.
       const perSell = new Decimal(receiveAmount).div(new Decimal(sellAmount));
       return `1 ${sell} = $${perSell.toString()}`;
     }
@@ -223,10 +255,8 @@ export async function buildSwapQuote(params: {
   if (params.sell.toUpperCase() === params.buy.toUpperCase()) {
     throw badRequest('VALIDATION_ERROR', 'Sell and buy assets must differ.');
   }
-  if (['SOL'].includes(params.sell.toUpperCase()) || ['SOL'].includes(params.buy.toUpperCase())) {
-    throw badRequest('UNSUPPORTED_ASSET', 'SOL is not part of the Umbra swap MVP. Use stables (USDC/USDT) and stocks (xStocks / Pre-IPO).');
-  }
-  // Stock↔stable only (offline check — fails fast before any provider call).
+  // Stock↔base only (offline check — fails fast before any provider call), where
+  // the base side is USDC, USDT or SOL.
   // PreStocks symbols come from the live directory (cached 5 min).
   const { getPrestocksSymbols } = await import('../prestocks/assets.js');
   const extraStocks = await getPrestocksSymbols().catch(() => new Set<string>());
@@ -306,6 +336,7 @@ export async function buildSwapQuote(params: {
     if (isStableSymbol(buySide.symbol)) {
       usdValue = receiveDisplay;
     } else {
+      // SOL and stocks are quoted in dollars via their own reference price.
       const price = await getPrice(buySide.symbol).catch(() => null);
       if (price) {
         usdValue = new Decimal(receiveDisplay).mul(new Decimal(price.value)).toString();
@@ -330,6 +361,22 @@ export async function buildSwapQuote(params: {
 
   const quoteId = newQuoteId('umbra_q');
   const expiresAtMs = Date.now() + QUOTE_TTL_S * 1000;
+  // A taker was supplied, so the transaction can be finished now. Native SOL has
+  // no mint: Jupiter routes through wrapped SOL, so paying in SOL needs a wrap in
+  // the same transaction and receiving SOL needs the empty wSOL account closed
+  // afterwards, otherwise the user gets a wrapped balance instead of native SOL.
+  const nativeSolIn = sellSide.mint === SOL_MINT;
+  const nativeSolOut = buySide.mint === SOL_MINT;
+  let storedTransaction = order.transaction ?? null;
+  if (storedTransaction && taker && (nativeSolIn || nativeSolOut)) {
+    storedTransaction = await withNativeSol(
+      storedTransaction,
+      taker,
+      BigInt(amountBaseUnits),
+      nativeSolIn,
+      nativeSolOut,
+    );
+  }
   quoteStore.putSwap({
     quoteId,
     sellSymbol: sellSide.symbol,
@@ -341,7 +388,7 @@ export async function buildSwapQuote(params: {
     taker: taker ?? null,
     slippageBps,
     jupiterRequestId: order.requestId ?? null,
-    transaction: order.transaction ?? null,
+    transaction: storedTransaction,
     receiveAmountDisplay: receiveDisplay,
     signature: null,
     expiresAt: expiresAtMs,
@@ -393,16 +440,139 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
   if (!order.transaction) {
     throw upstream('SWAP_UNAVAILABLE', order.errorMessage || 'Jupiter could not build this swap transaction.');
   }
+  // Native SOL has no mint, so Jupiter routes through wrapped SOL. Paying in SOL
+  // needs a wrap in the same transaction; receiving SOL needs the wSOL account
+  // closed afterwards or the user gets a wrapped balance, not native SOL.
+  const nativeSolIn = stored.inputMint === SOL_MINT;
+  const nativeSolOut = stored.outputMint === SOL_MINT;
+  let transaction = order.transaction;
+  if (nativeSolIn || nativeSolOut) {
+    transaction = await withNativeSol(
+      order.transaction,
+      userPublicKey,
+      BigInt(stored.amountBaseUnits),
+      nativeSolIn,
+      nativeSolOut,
+    );
+  }
   quoteStore.updateSwap(quoteId, {
     taker: userPublicKey,
-    transaction: order.transaction,
+    transaction,
     jupiterRequestId: order.requestId ?? stored.jupiterRequestId,
   });
   return {
-    transaction: order.transaction,
+    transaction,
     requestId: order.requestId,
     expiresAt: new Date(stored.expiresAt).toISOString(),
   };
+}
+
+/**
+ * Wrap native SOL in (pay side) and/or unwrap to native (receive side) around
+ * Jupiter's own instructions. Closing the wSOL account is only safe when it held
+ * nothing before this swap — otherwise we would sweep the user's own wSOL.
+ */
+export async function withNativeSol(
+  jupiterTxB64: string,
+  userPublicKey: string,
+  amountBaseUnits: bigint,
+  wrapIn: boolean,
+  unwrapOut: boolean,
+  connection?: Connection,
+): Promise<string> {
+  const owner = new PublicKey(userPublicKey);
+  const wsolMint = new PublicKey(SOL_MINT);
+  const wsolAta = getAssociatedTokenAddressSync(wsolMint, owner, true);
+  const conn = connection ?? getConnection();
+  const pre = await conn.getAccountInfo(wsolAta).catch(() => null);
+  // Only a real token balance matters: an existing but empty wSOL account is safe
+  // to close, and closing it is what turns the swap output back into native SOL.
+  const wsolBalanceBefore = await conn
+    .getTokenAccountBalance(wsolAta)
+    .then((r) => BigInt(r.value.amount))
+    .catch(() => 0n);
+  // web3.js 1.x takes lamports as a number; SOL amounts stay far below 2^53.
+  const lamports = Number(amountBaseUnits);
+  if (!Number.isSafeInteger(lamports)) {
+    throw badRequest('VALIDATION_ERROR', 'SOL amount is out of range.');
+  }
+
+  // Jupiter returns a versioned transaction whose message points at address
+  // lookup tables, so the accounts have to be fetched and resolved before we can
+  // read its instructions. Whatever shape it arrives in, we rebuild an unsigned
+  // transaction with the wrap/unwrap instructions spliced in and always hand the
+  // wallet the versioned shape.
+  const raw = Buffer.from(jupiterTxB64, 'base64');
+  let inner: TransactionInstruction[];
+  let recentBlockhash: string;
+  let versionedError: unknown;
+  try {
+    const vtx = VersionedTransaction.deserialize(new Uint8Array(raw));
+    const tables = await Promise.all(
+      vtx.message.addressTableLookups.map(async (lookup) => {
+        const res = await getConnection().getAddressLookupTable(new PublicKey(lookup.accountKey));
+        if (!res.value) {
+          throw badRequest('SWAP_UNAVAILABLE', 'Jupiter returned an unusable transaction. Try again.');
+        }
+        return res.value;
+      }),
+    );
+    // decompile is web3.js's own inverse of compile: it restores every account's
+    // signer/writable flag for us instead of us re-deriving them.
+    const decompiled = TransactionMessage.decompile(
+      vtx.message,
+      tables.length > 0 ? { addressLookupTableAccounts: tables } : undefined,
+    );
+    inner = decompiled.instructions;
+    recentBlockhash = decompiled.recentBlockhash;
+  } catch (e) {
+    versionedError = e;
+    try {
+      const legacy = Transaction.from(raw);
+      inner = legacy.instructions;
+      recentBlockhash = legacy.recentBlockhash || (await conn.getLatestBlockhash('confirmed')).blockhash;
+    } catch {
+      throw versionedError;
+    }
+  }
+
+  const lead: TransactionInstruction[] = [];
+  if (wrapIn) {
+    if (!pre) {
+      const rentExempt = await conn.getMinimumBalanceForRentExemption(165);
+      lead.push(
+        SystemProgram.createAccount({
+          fromPubkey: owner,
+          newAccountPubkey: wsolAta,
+          space: 165,
+          lamports: lamports + rentExempt,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+      );
+      lead.push(createInitializeAccountInstruction(wsolAta, wsolMint, owner));
+    } else {
+      lead.push(
+        SystemProgram.transfer({
+          fromPubkey: owner,
+          toPubkey: wsolAta,
+          lamports,
+        }),
+      );
+    }
+    lead.push(createSyncNativeInstruction(wsolAta));
+  }
+  const tail: TransactionInstruction[] = [];
+  if (unwrapOut && wsolBalanceBefore === 0n) {
+    // Only close when the account was empty before: a pre-existing wSOL balance
+    // belongs to the user and must not be swept by our close.
+    tail.push(createCloseAccountInstruction(wsolAta, owner, owner));
+  }
+  const message = new TransactionMessage({
+    payerKey: owner,
+    recentBlockhash,
+    instructions: [...lead, ...inner, ...tail],
+  }).compileToLegacyMessage();
+  return Buffer.from(new VersionedTransaction(message).serialize()).toString('base64');
 }
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

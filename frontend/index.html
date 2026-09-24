@@ -2537,11 +2537,14 @@
       // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
       function tkIcon(symbol, size) {
         symbol = String(symbol || '');
-        var file = manifest[symbol];
+        // SOL is native and has no token logo file — use the chain mark we ship.
+        var isSol = symbol === 'SOL';
+        var file = isSol ? './assets/solana-mark.png' : (manifest[symbol] ? './assets/tokens/' + encodeURIComponent(manifest[symbol]) : '');
         var main = file
-          ? '<img class="tk-main" src="./assets/tokens/' + encodeURIComponent(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
+          ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
-        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
+        var chain = isSol ? '' : '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" />';
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + chain + '</span>';
       }
       function iconHtml(symbol) {
         return tkIcon(symbol, 'tk-20');
@@ -2698,6 +2701,19 @@
               var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
               return { symbol: a.symbol, name: a.name, kind: kind };
             });
+          // SOL is native, not an SPL token, so it is not in the asset list —
+          // but it is a supported swap side. Add it with its real price.
+          directory.unshift({ symbol: 'SOL', name: 'Solana', kind: 'MAJOR' });
+          try {
+            var solRes = await fetch(API_BASE + '/api/assets/SOL/price');
+            if (solRes.ok) {
+              var solJson = await solRes.json();
+              var solPx = Number(solJson.price);
+              if (isFinite(solPx) && solPx > 0) {
+                directory[0].price = { value: String(solPx), currency: 'USD', timestamp: solJson.timestamp };
+              }
+            }
+          } catch (_) { /* price optional; the swap quote is authoritative */ }
         } catch (e) {
           directory = [];
         }
@@ -2770,13 +2786,13 @@
         // stock↔stock. Offering a pair the router cannot execute only produces
         // "not available for swap" after the user has already chosen, so the
         // picker itself only lists the side that keeps the pair valid.
-        var stables = { USDC: 1, USDT: 1 };
+        var bases = { USDC: 1, USDT: 1, SOL: 1 };
         var other = modalSide === 'sell' ? buySym : sellSym;
-        var wantStable = !!stables[String(other || '').toUpperCase()];
+        var wantBase = !!bases[String(other || '').toUpperCase()];
         var rows = directory
           .filter(function (t) {
-            var isStable = !!stables[t.symbol.toUpperCase()];
-            if (isStable !== wantStable) return false;
+            var isBase = !!bases[t.symbol.toUpperCase()];
+            if (isBase !== wantBase) return false;
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
@@ -2994,9 +3010,9 @@
       // The stock side of the pair. A Pyth line on a USDC leg would print a
       // stablecoin peg next to a stock rate, which reads as nonsense.
       function pythSubject() {
-        var stables = { USDC: 1, USDT: 1 };
-        if (!stables[String(buySym || '').toUpperCase()]) return buySym;
-        if (!stables[String(sellSym || '').toUpperCase()]) return sellSym;
+        var bases = { USDC: 1, USDT: 1, SOL: 1 };
+        if (!bases[String(buySym || '').toUpperCase()]) return buySym;
+        if (!bases[String(sellSym || '').toUpperCase()]) return sellSym;
         return buySym;
       }
       // Pyth feed names say what they benchmark: "TSLA equity" for stocks,

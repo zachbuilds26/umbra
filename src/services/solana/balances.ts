@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
 import { getConnection } from './connection.js';
 import { getMultiplier, SOLANA_USDC_MINT, SOLANA_USDT_MINT } from '../xstocks/assets.service.js';
 import { listPrestocks } from '../prestocks/assets.js';
@@ -101,6 +101,24 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
       };
     })
     .filter((r) => r.mint && r.amount !== undefined && r.decimals !== undefined && dir.has(r.mint as string));
+  // Native SOL is not an SPL token, so it never appears in the account lists —
+  // read it directly or the balance line would claim you hold none.
+  let nativeSol: WalletBalance | null = null;
+  try {
+    const lamports = await conn.getBalance(owner, 'confirmed');
+    if (lamports > 0) {
+      nativeSol = {
+        symbol: 'SOL',
+        // Native SOL has no mint; the system program address is the honest label.
+        mint: SystemProgram.programId.toBase58(),
+        raw: String(lamports),
+        display: new Decimal(lamports).div(new Decimal(10).pow(9)).toString(),
+        decimals: 9,
+      };
+    }
+  } catch {
+    // RPC hiccup: omit SOL rather than claim a zero balance.
+  }
   // Multipliers resolve in parallel but bounded: a wallet holding many xStocks
   // otherwise fans out one unreliable upstream call per holding at once.
   const xstockIndexes = rows
@@ -142,6 +160,7 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
       decimals: r.decimals as number,
     });
   });
+  if (nativeSol) out.push(nativeSol);
   out.sort((a, b) => a.symbol.localeCompare(b.symbol));
   return out;
 }
