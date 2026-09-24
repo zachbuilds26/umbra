@@ -169,6 +169,17 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // GET /api/pyth/coverage?symbols=… — which of these symbols this Pyth key
+  // actually has a reference feed for. The UI uses it to say "covered" or
+  // "not on our feed" instead of rendering an empty panel.
+  app.get('/api/pyth/coverage', async (req) => {
+    const q = z.object({ symbols: z.string().min(1).max(600) }).parse(req.query);
+    const symbols = q.symbols.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 60);
+    const { getCoverage } = await import('../services/pyth/fair-price.service.js');
+    const covered = await getCoverage(symbols).catch(() => [] as never[]);
+    return { covered };
+  });
+
   app.get('/api/assets/:symbol', async (req) => {
     const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
     const asset = await enrichAsset(params.symbol.toUpperCase());

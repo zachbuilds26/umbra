@@ -1621,6 +1621,18 @@
       .monitor-row { flex-direction: column; }
       .pool-grid { grid-template-columns: 1fr; }
     }
+    .stock-row .stock-meta b { display: inline-flex; align-items: center; gap: 7px; }
+    .pyth-tag {
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--umbra-muted);
+      border: 1px solid var(--umbra-border);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-weight: 500;
+    }
+    .pyth-note { font-size: 12px; color: var(--umbra-muted); line-height: 1.5; }
     .stocks-list {
       min-height: 320px;
       max-height: 520px;
@@ -2443,6 +2455,10 @@
             <span style="color:var(--umbra-muted); font-size:13px;">Liquidity</span>
             <span id="drawerLiquidity" style="font-size:13px;">—</span>
           </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <span style="color:var(--umbra-muted); font-size:13px;">Pyth reference<span class="info-icon" data-tip="Pyth's feed for this underlying (equity, gold, FX) and how far the token trades from it."><i data-lucide="info" width="14" height="14"></i></span></span>
+            <span id="drawerPyth" style="font-size:13px;">—</span>
+          </div>
           <div style="text-align:center; margin-top:8px;">
             <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Explorer <i data-lucide="external-link" width="14" height="14"></i></a>
           </div>
@@ -3178,6 +3194,17 @@
         return parts[0] + '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
+      // Pyth feed names say what they benchmark: "Equity" for stocks, "Metal"
+      // for gold, "FX"/"Crypto" for the rest. Judges should never have to guess
+      // which asset class a reference price belongs to.
+      function pythLabel(feed) {
+        var f = String(feed || '');
+        if (f.indexOf('Equity.') === 0) return 'Equity (Pyth)';
+        if (f.indexOf('Metal.') === 0) return 'Gold spot (Pyth)';
+        if (f.indexOf('FX.') === 0) return 'FX (Pyth)';
+        if (f.indexOf('Crypto.') === 0) return 'Token feed (Pyth)';
+        return 'Reference (Pyth)';
+      }
       // Every failure the user can see, in language a trader can act on. Raw
       // provider text (timeouts, aborts, upstream payloads) is never shown.
       function friendlyQuoteError(code, msg, sym) {
@@ -3350,7 +3377,9 @@
           applyDetails(detailsUserChoice === null ? true : detailsUserChoice);
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
-          // Pyth deal line (best effort — absent on limited keys).
+          // Pyth comparison: the equity (or gold/FX) feed for this ticker versus
+          // what the token actually trades at. Only feeds our key is entitled to
+          // are ever returned, so "no leg" means not covered, not broken.
           try {
             var fairRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(buySym) + '/fair-price');
             if (mySeq !== quoteSeq) return;
@@ -3359,11 +3388,19 @@
               // Re-check after the await: a superseded quote must not append.
               if (mySeq !== quoteSeq) return;
               var bps = fair.tokenVsEquityBps !== null && fair.tokenVsEquityBps !== undefined ? fair.tokenVsEquityBps : fair.equityVsReferenceBps;
-              if (bps !== null && bps !== undefined && fair.equity) {
+              var leg = fair.equity || fair.token;
+              if (leg) {
                 var cls = Math.abs(bps) <= 50 ? 'good' : 'bad';
                 var sign = bps > 0 ? '+' : '';
+                var stale = leg.stalenessSeconds;
                 quoteLinesEl.innerHTML +=
-                  '<div class="row"><span>Fair value (Pyth)</span><span class="' + cls + '">$' + esc(fair.equity.price) + ' (' + sign + bps + ' bps)</span></div>';
+                  '<div class="row"><span>' + esc(pythLabel(leg.feed)) + '</span><span class="' + (bps === null || bps === undefined ? '' : cls) + '">$' + esc(leg.price) +
+                  (bps === null || bps === undefined ? '' : ' (' + sign + bps + ' bps)') + '</span></div>' +
+                  (fair.note
+                    ? '<div class="row"><span class="pyth-note">' + esc(fair.note) + '</span></div>'
+                    : (stale !== null && stale !== undefined
+                        ? '<div class="row"><span>Feed age</span><span>' + esc(stale < 90 ? 'live' : Math.round(stale / 60) + ' min old') + '</span></div>'
+                        : ''));
               }
               // Receive-side 24h badge doubles as the deal pulse: fetch change
               try {
@@ -3719,12 +3756,30 @@
           : a._mcapChecked
             ? '—'
             : '<span class="skeleton"></span>';
+        // "Pyth" marks the names our Pyth key actually has a reference feed for
+        // (equity or gold). It is a coverage fact from the API, not a claim about
+        // every ticker, so uncovered rows stay unmarked.
+        var pythTag = pythCovered[a.symbol.toUpperCase()]
+          ? ' <span class="pyth-tag" title="Pyth has a reference feed for this underlying">Pyth</span>'
+          : '';
         return (
           '<a class="stock-row" href="#swap" data-symbol="' + esc(a.symbol) + '">' +
-          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + '</b><span>' + esc(a.name || '') + '</span></span></span>' +
+          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + pythTag + '</b><span>' + esc(a.name || '') + '</span></span></span>' +
           '<span class="stock-right"><span class="stock-price">' + price + '</span><span class="stock-mcap">' + mcap + '</span></span>' +
           '</a>'
         );
+      }
+      var pythCovered = {};
+      function loadPythCoverage(symbols) {
+        if (!symbols.length) return;
+        fetch(API_BASE + '/api/pyth/coverage?symbols=' + encodeURIComponent(symbols.join(',')))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) {
+            if (!j || !j.covered) return;
+            j.covered.forEach(function (c) { pythCovered[c.symbol] = c.feed; });
+            renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+          })
+          .catch(function () { /* coverage is an annotation, never a blocker */ });
       }
       // Every symbol here was live quote-verified (USDC pair). 37 deep + 11 thin + 8 Pre-IPO = 56.
       // Removed as unquotable: 26 junk entries (bad tickers like "T", "KO", "MCHP", "BRK.Bx")
@@ -3811,6 +3866,8 @@
               // Only update if fresh is not empty — keep cached if fetch is slow
               if (fresh.length) {
                 stocksCache = fresh;
+                // Which of these our Pyth key covers — an annotation, fetched once.
+                loadPythCoverage(ALLOWLIST.concat(PREIPO));
                 // Don't render yet — fetch first 20 prices so the first paint already has data like the drawer
                 var first20 = fresh.slice(0, 20).map(function (a) { return a.symbol; }).join(',');
                 if (first20) {
@@ -4171,6 +4228,42 @@
           if (typeof data.top10Pct === 'number') el.textContent = 'hold ' + data.top10Pct.toFixed(1) + '%';
         } catch (e) { /* concentration is a bonus */ }
       }
+      // Pyth reference in the drawer: the feed price plus the live gap to the
+      // token's own price. A ticker with no entitled feed says so outright.
+      async function paintDrawerPyth(symbol, myReq) {
+        var el = document.getElementById('drawerPyth');
+        if (!el) return;
+        el.innerHTML = '<span class="skeleton" style="width:88px; height:10px;"></span>';
+        try {
+          var res = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(symbol) + '/fair-price');
+          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
+          if (!res.ok) throw new Error('fair-price');
+          var j = await res.json();
+          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
+          var leg = j.equity || j.token;
+          var bps = j.tokenVsEquityBps !== null && j.tokenVsEquityBps !== undefined ? j.tokenVsEquityBps : j.equityVsReferenceBps;
+          if (!leg) {
+            el.textContent = 'not on our Pyth feed';
+            return;
+          }
+          var txt = '$' + Number(leg.price).toLocaleString('en-US', { maximumFractionDigits: 2 });
+          if (j.note) {
+            el.textContent = txt + ' (context only)';
+            el.title = j.note;
+          } else if (bps !== null && bps !== undefined) {
+            txt += '  (' + (bps > 0 ? '+' : '') + bps.toFixed(1) + ' bps)';
+            el.style.color = Math.abs(bps) <= 50 ? 'var(--umbra-accent)' : '#f6465d';
+            el.textContent = txt;
+            el.title = leg.feed + (leg.stalenessSeconds !== null ? ' · ' + leg.stalenessSeconds + 's old' : '');
+          } else {
+            el.textContent = txt;
+            el.title = leg.feed;
+          }
+        } catch (e) {
+          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
+          el.textContent = '—';
+        }
+      }
       // Cached ticker-row liquidity for the drawer fallback (same shape as summary).
       function cachedLiq(symbol) {
         try {
@@ -4195,6 +4288,7 @@
         document.getElementById('drawerHoldRow').style.display = 'none';
         document.getElementById('drawerHold').innerHTML = '<span class="skeleton short" style="width:40px; height:12px;"></span>';
         document.getElementById('drawerLiquidity').innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
+        document.getElementById('drawerPyth').innerHTML = '<span class="skeleton" style="width:88px; height:10px;"></span>';
         var _sol0 = document.getElementById('drawerSolscan');
         if (_sol0) _sol0.style.display = 'none';
         drawerChartEl.textContent = 'Loading…';
@@ -4242,6 +4336,7 @@
           renderSparkline(s.sparkline || []);
           paintDrawerHoldings(symbol);
           paintDrawerTop(symbol);
+          paintDrawerPyth(symbol, myReq);
           // Solscan link — proves it's the real on-chain mint
           var solEl = document.getElementById('drawerSolscan');
           var liqEl = document.getElementById('drawerLiquidity');
