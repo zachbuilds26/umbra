@@ -717,9 +717,23 @@
       transition: transform 0.35s ease;
     }
 
-    .ox-div .flip-btn:hover svg,
-    .ox-div .flip-btn:hover i {
-      transform: rotate(180deg);
+    /* The arrow turns only when the swap is actually flipped — hovering must
+       not move it. A full turn lands back on the original orientation. */
+    .ox-div .flip-btn.spin svg,
+    .ox-div .flip-btn.spin i {
+      animation: flipSpin 0.4s ease;
+    }
+
+    @keyframes flipSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ox-div .flip-btn.spin svg,
+      .ox-div .flip-btn.spin i {
+        animation: none;
+      }
     }
 
     #buyChange {
@@ -2782,20 +2796,21 @@
 
       function renderTokenList(filter) {
         var f = (filter || '').trim().toUpperCase();
-        // Umbra swaps one stock against one stable (USDC/USDT) — never
-        // stock↔stock. Offering a pair the router cannot execute only produces
-        // "not available for swap" after the user has already chosen, so the
-        // picker itself only lists the side that keeps the pair valid.
+        // Umbra swaps one stock for one base asset, never stock↔stock and never
+        // base↔base. The two boxes are therefore fixed: the receive box offers
+        // the cash-out side (USDC, USDT, SOL) and the sell box offers every
+        // stock. To pay with a base asset instead, flip the card — the chosen
+        // stock travels to the receive side. Offering a pair the router cannot
+        // execute only produces "not available for swap" after the user chose.
         var bases = { USDC: 1, USDT: 1, SOL: 1 };
-        var other = modalSide === 'sell' ? buySym : sellSym;
-        var wantBase = !!bases[String(other || '').toUpperCase()];
         var rows = directory
           .filter(function (t) {
             var isBase = !!bases[t.symbol.toUpperCase()];
-            if (isBase !== wantBase) return false;
+            if (modalSide === 'sell' ? isBase : !isBase) return false;
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
+        var emptyCopy = modalSide === 'sell' ? 'No stocks match that search.' : 'No matches found.';
         var html = rows
           .map(function (t) {
             return (
@@ -2807,7 +2822,7 @@
             );
           })
           .join('');
-        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (f ? 'No matches found.' : 'Loading stocks…') + '</div>';
+        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (f ? emptyCopy : 'Loading assets…') + '</div>';
         Array.prototype.forEach.call(tokenListEl.querySelectorAll('.token-opt'), function (btn) {
           btn.addEventListener('click', function () {
             var sym = btn.getAttribute('data-symbol');
@@ -2843,6 +2858,10 @@
         var s = sellSym;
         sellSym = buySym;
         buySym = s;
+        this.classList.add('spin');
+        // Clear the class so the next flip turns the arrow again.
+        var btn = this;
+        window.setTimeout(function () { btn.classList.remove('spin'); }, 450);
         window.umbraLastReceive = null;
         refreshSelectors();
         refreshSellUsd();
