@@ -3080,7 +3080,7 @@
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b) return;
+        if (!b) { hintNoBalance(); return; }
         var half = (Number(b.display) / 2).toString();
         sellAmountEl.value = half;
         scheduleQuote();
@@ -3090,10 +3090,16 @@
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b) return;
+        if (!b) { hintNoBalance(); return; }
         sellAmountEl.value = b.display;
         scheduleQuote();
       });
+      // Clicking Max with nothing held used to do nothing at all, which reads as
+      // a broken button. Say why in one line.
+      function hintNoBalance() {
+        var el = document.getElementById('sellBalance');
+        if (el) el.textContent = 'No ' + sellSym + ' in this wallet';
+      }
 
       // Swap/Bridge tabs in the card switch views just like the header pills.
       function setCardTab(which) {
