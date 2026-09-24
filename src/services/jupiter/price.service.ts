@@ -77,8 +77,13 @@ export async function refreshJupiterPrices(mints: string[]): Promise<Map<string,
           }
         }
       }
-      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])];
+      // Merge into the live cache only after the fetch, and only the mints this
+      // request actually returned. Seeding from a snapshot taken before the
+      // await meant two concurrent batches each wrote back the whole map they
+      // started with, so whichever finished last silently discarded the other's
+      // newly fetched prices.
       priceCache.set(CACHE_KEY, out);
+      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])];
       return out;
     } finally {
       inflights.delete(key);

@@ -10,12 +10,18 @@ Decimal.set({ precision: 40 });
 // also records a point, so hovered assets self-populate.
 
 interface PricePoint {
+  /** When this price was FIRST observed — the event time, never rewritten. */
   t: number;
+  /** When we last saw this price — freshness only, never a history point. */
+  seen: number;
   p: string;
 }
 
 const MAX_POINTS = 1440; // 24h at 1/min
 const RETENTION_MS = 25 * 60 * 60 * 1000;
+/** Symbols with no fresh observation for this long are dropped entirely. */
+const SYMBOL_TTL_MS = 60 * 60 * 1000;
+const MAX_SYMBOLS = 500;
 
 // Curated sampler set: majors people put on a tape + full pre-IPO shelf + stables.
 // Which names the background sampler prices. Order mirrors the tape (pre-IPO
@@ -28,8 +34,29 @@ const SAMPLE_SYMBOLS = [
 
 const rings = new Map<string, PricePoint[]>();
 
+/** Drop symbols nothing has refreshed recently, so the map cannot grow forever. */
+function sweepRings(now: number): void {
+  for (const [symbol, ring] of rings) {
+    const last = ring[ring.length - 1];
+    if (!last || now - last.seen > SYMBOL_TTL_MS) {
+      rings.delete(symbol);
+      continue;
+    }
+    if (ring[0] && now - ring[0].t > RETENTION_MS) {
+      const cutoff = now - RETENTION_MS;
+      while (ring.length > 0 && (ring[0]?.t ?? 0) < cutoff) ring.shift();
+    }
+  }
+  while (rings.size > MAX_SYMBOLS) {
+    const oldest = rings.keys().next();
+    if (oldest.done) break;
+    rings.delete(oldest.value);
+  }
+}
+
 export function recordPrice(symbol: string, price: string, at = Date.now()): void {
   const upper = symbol.toUpperCase();
+  sweepRings(at);
   let ring = rings.get(upper);
   if (!ring) {
     ring = [];
@@ -37,21 +64,28 @@ export function recordPrice(symbol: string, price: string, at = Date.now()): voi
   }
   const last = ring[ring.length - 1];
   if (last && last.p === price) {
-    last.t = at; // same price: extend freshness without growing the ring
+    // Same price, so no new history point — but the event time must stay put.
+    // Rewriting it made the 24h baseline slide forward with every poll, so a
+    // move that happened seconds ago was reported as a 24-hour change.
+    last.seen = at;
     return;
   }
   // No synthetic 24h-old point: a price we never observed is not history, and
   // seeding one made the first real move read as a 24-hour change.
-  ring.push({ t: at, p: price });
+  ring.push({ t: at, seen: at, p: price });
   const cutoff = at - RETENTION_MS;
   while (ring.length > 0 && (ring[0]?.t ?? 0) < cutoff) ring.shift();
   while (ring.length > MAX_POINTS) ring.shift();
 }
 
-/** % change between now (or latest point) and the oldest point within windowMs.
- * null until we hold two real observations inside the window — a single sample
- * proves no movement happened, it does not prove a 0.00% 24h change. Points
- * older than the window are never used as the baseline. */
+/**
+ * % change over the window, from the oldest observation inside it to the newest.
+ *
+ * The baseline is always a point inside the window: a price we last saw before
+ * the window opened is not evidence about this window. With only one observation
+ * inside it we cannot prove any movement, so the answer is null rather than a
+ * fabricated 0.00%.
+ */
 export function changePct(symbol: string, windowMs = 24 * 60 * 60 * 1000, now = Date.now()): number | null {
   const ring = rings.get(symbol.toUpperCase()) ?? [];
   if (ring.length === 0) return null;
@@ -60,7 +94,8 @@ export function changePct(symbol: string, windowMs = 24 * 60 * 60 * 1000, now = 
   if (inWindow.length < 2) return null;
   const first = inWindow[0];
   const last = inWindow[inWindow.length - 1];
-  if (!first || !last || first === last) return 0;
+  if (!first || !last) return null;
+  if (first.t === last.t) return 0;
   try {
     const base = new Decimal(first.p);
     if (base.isZero()) return null;

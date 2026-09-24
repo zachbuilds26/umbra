@@ -28,10 +28,16 @@ export async function fetchJson<T>(
     const res = await fetch(url, { ...init, headers, signal: controller.signal });
     const rawText = await res.text();
     let data: T | undefined;
-    try {
-      data = rawText ? (JSON.parse(rawText) as T) : undefined;
-    } catch {
-      data = undefined;
+    // Only a successful response may produce data. Providers routinely answer
+    // errors with a JSON body ({"error": ...}, sometimes with HTTP 200), and
+    // several callers cache whatever arrives when `data` is set. Parsing error
+    // bodies as payloads is how a failed lookup becomes a cached "price".
+    if (res.ok && rawText) {
+      try {
+        data = JSON.parse(rawText) as T;
+      } catch {
+        data = undefined;
+      }
     }
     return { ok: res.ok, status: res.status, data };
   } catch (err) {

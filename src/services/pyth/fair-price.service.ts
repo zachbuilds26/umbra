@@ -75,7 +75,11 @@ export async function resolveFeeds(symbol: string): Promise<{ equity: ProSymbol 
   const pick = (feedSymbol: string): ProSymbol | null =>
     catalog.find((f) => f.symbol === feedSymbol && f.state === 'stable') ?? null;
   const token = pick(`Crypto.${upper}/USD`);
-  const equity = pick(`Equity.US.${base}/USD`) ?? pick(CROSS_ASSET_FEEDS[upper] ?? '');
+  // An explicit cross-asset mapping wins over a same-ticker equity feed. GLDx
+  // tracks gold per ounce, while Equity.US.GLD is the per-share ETF: preferring
+  // the ETF produced a spread between two different units.
+  const cross = CROSS_ASSET_FEEDS[upper];
+  const equity = cross ? pick(cross) : pick(`Equity.US.${base}/USD`);
   return { equity, token };
 }
 
@@ -92,10 +96,11 @@ export async function getCoverage(symbols: string[]): Promise<Array<{ symbol: st
     const upper = raw.toUpperCase();
     const base = upper.endsWith('X') ? upper.slice(0, -1) : upper;
     const tokenFeed = `Crypto.${upper}/USD`;
-    const equityFeed = `Equity.US.${base}/USD`;
     const crossFeed = CROSS_ASSET_FEEDS[upper];
+    // Same precedence as resolveFeeds: a mapped cross-asset feed is not an equity feed.
+    const equityFeed = crossFeed ? '' : `Equity.US.${base}/USD`;
     if (has(tokenFeed)) out.push({ symbol: upper, feed: tokenFeed, kind: 'token' });
-    if (has(equityFeed)) out.push({ symbol: upper, feed: equityFeed, kind: 'equity' });
+    if (equityFeed && has(equityFeed)) out.push({ symbol: upper, feed: equityFeed, kind: 'equity' });
     else if (crossFeed && has(crossFeed)) out.push({ symbol: upper, feed: crossFeed, kind: 'cross-asset' });
   }
   return out;

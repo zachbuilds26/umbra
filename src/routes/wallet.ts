@@ -12,7 +12,7 @@ export async function walletRoutes(app: FastifyInstance): Promise<void> {
     if (!isValidSolanaAddress(params.address)) {
       throw badRequest('INVALID_ADDRESS', 'Wallet address is not a valid Solana address.');
     }
-    const balances = await getWalletBalances(params.address);
-    return { address: params.address, balances };
+    const { balances, partial } = await getWalletBalances(params.address);
+    return { address: params.address, balances, partial };
   });
 }

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { recordPrice, changePct, sparkline } from '../src/services/prices/history.js';
-import { toDisplayBalance } from '../src/services/solana/balances.js';
+import { aggregateByMint, toDisplayBalance } from '../src/services/solana/balances.js';
 import { canonicalAssetSymbol, getPrice } from '../src/services/xstocks/assets.service.js';
 
 describe('price history ring', () => {
@@ -24,12 +24,32 @@ describe('price history ring', () => {
     assert.equal(changePct('NEVER_SEEN_XYZ', 86_400_000, Date.now()), null);
   });
 
-  it('same-price records extend freshness without inventing a point', () => {
+  it('same-price records extend freshness without moving the event time', () => {
     recordPrice('TESTC', '50', 1000);
     recordPrice('TESTC', '50', 2000);
-    assert.equal(sparkline('TESTC').length, 1); // one real point, timestamp moved
-    assert.equal(sparkline('TESTC')[0]?.t, 2000);
+    assert.equal(sparkline('TESTC').length, 1); // one real price, not two
+    // The event time must stay at the first observation. Sliding it forward with
+    // every poll is what made a move that happened seconds ago report as a 24h
+    // change; freshness is tracked separately.
+    assert.equal(sparkline('TESTC')[0]?.t, 1000);
     assert.equal(changePct('TESTC', 86_400_000, 2000), null);
+  });
+
+  it('measures 24h change from the oldest observation inside the window', () => {
+    // 100 observed a day ago, unchanged ever since, then 110 now: +10% against
+    // the oldest point still inside the 24h window.
+    recordPrice('TESTE', '100', 0);
+    recordPrice('TESTE', '100', 60_000);
+    recordPrice('TESTE', '100', 86_400_000);
+    recordPrice('TESTE', '110', 86_401_000);
+    assert.equal(changePct('TESTE', 86_400_000, 86_401_000), 10);
+  });
+
+  it('drops symbols nothing has refreshed, so the map cannot grow forever', () => {
+    recordPrice('TESTG', '10', 0);
+    // Two hours later the ring is older than the symbol TTL.
+    recordPrice('TESTH', '20', 7_200_000);
+    assert.equal(changePct('TESTG', 86_400_000, 7_200_000), null);
   });
 
   it('sparkline downsamples but always keeps the last point', () => {
@@ -47,6 +67,50 @@ describe('wallet display balances', () => {
     // stables/pre-IPO ignore multiplier
     assert.equal(toDisplayBalance('stable', '5000000', 6, '1.1'), '5');
     assert.equal(toDisplayBalance('pre', '1500000000', 9, null), '1.5');
+  });
+});
+
+describe('token accounts are summed per mint', () => {
+  const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+  it('adds several accounts of the same mint into one row', () => {
+    // Two USDC accounts: 204.6133 + 2839.940216. Returning both made the UI show
+    // only the first, reporting a fifth of the real holding.
+    const merged = aggregateByMint([
+      { mint: USDC, amount: '204613300', decimals: 6 },
+      { mint: USDC, amount: '2839940216', decimals: 6 },
+    ]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]?.amount, '3044553516');
+    assert.equal(toDisplayBalance('stable', merged[0]!.amount, 6, null), '3044.553516');
+  });
+
+  it('sums exactly, without float rounding, at large balances', () => {
+    const merged = aggregateByMint([
+      { mint: USDC, amount: '9007199254740993', decimals: 6 },
+      { mint: USDC, amount: '1', decimals: 6 },
+    ]);
+    assert.equal(merged[0]?.amount, '9007199254740994');
+  });
+
+  it('keeps different mints separate', () => {
+    const merged = aggregateByMint([
+      { mint: USDC, amount: '1', decimals: 6 },
+      { mint: 'XsDoVfqeBu', amount: '2', decimals: 8 },
+    ]);
+    assert.equal(merged.length, 2);
+  });
+
+  it('drops malformed rows rather than folding them into a total', () => {
+    const merged = aggregateByMint([
+      { mint: USDC, amount: '1000000', decimals: 6 },
+      { mint: USDC, amount: 'NaN', decimals: 6 },
+      { mint: USDC, amount: '-5', decimals: 6 },
+      { mint: USDC, amount: '5', decimals: 1.5 },
+      { mint: undefined, amount: '5', decimals: 6 },
+    ]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]?.amount, '1000000');
   });
 });
 

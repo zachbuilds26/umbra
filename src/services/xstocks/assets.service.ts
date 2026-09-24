@@ -327,13 +327,31 @@ export async function getJupiterChange24h(symbol: string): Promise<number | null
   return Math.round(jp.priceChange24h * 100) / 100;
 }
 
+/**
+ * How long a persisted multiplier may be trusted for money math.
+ *
+ * The multiplier converts a user's typed share amount into on-chain units, so a
+ * stale value does not merely show a wrong price — it signs a wrong trade. After
+ * a split the cached value is wrong by the split ratio, so trading falls back to
+ * refusing rather than using it.
+ */
+const MAX_MULTIPLIER_AGE_MS = 24 * 60 * 60 * 1000;
+
+function multiplierFromLastGood(key: string, now: number): string | null {
+  const last = lastGoodMult.get(key);
+  if (!last) return null;
+  const at = Date.parse(last.timestamp);
+  if (!Number.isFinite(at) || now - at > MAX_MULTIPLIER_AGE_MS) return null;
+  return last.value;
+}
+
 export async function getMultiplier(symbol: string, network = 'Solana'): Promise<string | null> {
   const canonical = canonicalSymbol(symbol);
   const key = `${canonical.toUpperCase()}:${network}`;
   const cached = multCache.get(key);
   if (cached) return cached;
   loadLastGoodMultipliers();
-  const last = lastGoodMult.get(key);
+  const last = multiplierFromLastGood(key, Date.now());
   let res: { currentMultiplier?: number } | null = null;
   try {
     // xStocks can stall for the full fetch timeout. A swap must not hang behind
@@ -346,9 +364,10 @@ export async function getMultiplier(symbol: string, network = 'Solana'): Promise
     res = null;
   }
   if (res?.currentMultiplier === undefined || !Number.isFinite(res.currentMultiplier) || res.currentMultiplier <= 0) {
-    // Upstream is down or has no value: the last known multiplier still converts
-    // raw units correctly (it barely moves), so trading continues.
-    return last ? last.value : null;
+    // Upstream is down. The persisted value is only usable while it is young
+    // enough to be trustworthy for a conversion; past that we return null so the
+    // quote fails closed instead of trading a stale ratio.
+    return last;
   }
   const value = String(res.currentMultiplier);
   multCache.set(key, value);

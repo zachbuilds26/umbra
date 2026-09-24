@@ -2430,11 +2430,17 @@
           if (!res.ok) throw new Error('balances ' + res.status);
           var data = await res.json();
           if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
-          var bal = (data.balances || []).find(function (b) {
+          // A partial response means the mint directory could not be loaded, so
+          // an absent row is "we could not check" — not a confirmed zero.
+          var rows = data.balances || [];
+          window.umbraBalances = rows;
+          window.umbraBalancesPartial = Boolean(data.partial);
+          var bal = rows.find(function (b) {
             return b.symbol === sellSym;
           });
-          paintSellBalance(bal ? fmtAmt(bal.display) + ' ' + bal.symbol : '0.00 ' + sellSym);
-          window.umbraBalances = data.balances || [];
+          if (bal) paintSellBalance(fmtAmt(bal.display) + ' ' + bal.symbol);
+          else if (data.partial) paintSellBalance('—');
+          else paintSellBalance('0.00 ' + sellSym);
         } catch (e) {
           if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
           // Unavailable, not zero: a dash says "we could not check".
@@ -3277,6 +3283,40 @@
         runQuote();
       }, 10000);
 
+      // Exact decimal-string helpers. Token amounts must never pass through
+      // binary floating point: Number('0.07') * 100 is 7.000000000000001, and
+      // (Number('8.7') / 2).toString() can render 4.35 as 4.349999999999999.
+      // Every operation here works digit by digit and truncates, so the 50%
+      // button can never propose more than half of what is actually held.
+      function decIsPositive(s) {
+        return /^\d*\.?\d+$/.test(String(s == null ? '' : s).trim()) && /[1-9]/.test(String(s));
+      }
+      function decHalf(s) {
+        var m = String(s == null ? '' : s).trim().match(/^(\d+)(?:\.(\d+))?$/);
+        if (!m) return null;
+        var intPart = m[1];
+        var frac = m[2] || '';
+        var outInt = '';
+        var rem = 0;
+        for (var i = 0; i < intPart.length; i++) {
+          var cur = rem * 10 + (intPart.charCodeAt(i) - 48);
+          outInt += String(Math.floor(cur / 2));
+          rem = cur % 2;
+        }
+        outInt = outInt.replace(/^0+(?=\d)/, '') || '0';
+        var outFrac = '';
+        if (frac) {
+          rem = 0;
+          for (var j = 0; j < frac.length; j++) {
+            var c = rem * 10 + (frac.charCodeAt(j) - 48);
+            outFrac += String(Math.floor(c / 2));
+            rem = c % 2;
+          }
+          outFrac = outFrac.replace(/0+$/, '');
+        }
+        return outFrac ? outInt + '.' + outFrac : outInt;
+      }
+
       // With nothing held, 50%/Max do nothing at all: a dead button is clearer
       // than a message, and the balance line already reads 0.00.
       on('halfBtn', 'click', function () {
@@ -3284,8 +3324,9 @@
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b || !(Number(b.display) > 0)) return;
-        var half = (Number(b.display) / 2).toString();
+        if (!b || !decIsPositive(b.display)) return;
+        var half = decHalf(b.display);
+        if (!half || !decIsPositive(half)) return;
         sellAmountEl.value = half;
         scheduleQuote();
       });
@@ -3294,7 +3335,7 @@
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b || !(Number(b.display) > 0)) return;
+        if (!b || !decIsPositive(b.display)) return;
         sellAmountEl.value = b.display;
         scheduleQuote();
       });

@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { getConnection } from './connection.js';
 import { getMultiplier, SOLANA_USDC_MINT, SOLANA_USDT_MINT } from '../xstocks/assets.service.js';
 import { listPrestocks } from '../prestocks/assets.js';
@@ -15,16 +15,29 @@ Decimal.set({ precision: 40 });
 // Mint directory: mint -> { symbol, kind }. Rebuilt every 10 min (new listings flow in).
 const dirCache = new TtlCache<Map<string, { symbol: string; kind: 'stable' | 'xstock' | 'pre' }>>(10 * 60 * 1000);
 
-async function getMintDirectory(): Promise<Map<string, { symbol: string; kind: 'stable' | 'xstock' | 'pre' }>> {
+async function getMintDirectory(): Promise<{
+  dir: Map<string, { symbol: string; kind: 'stable' | 'xstock' | 'pre' }>;
+  complete: boolean;
+}> {
   const cached = dirCache.get('dir');
-  if (cached) return cached;
+  if (cached) return { dir: cached, complete: true };
   // One cached bridge-config call yields every xStock Solana mint — no per-asset fan-out.
   const dir = new Map<string, { symbol: string; kind: 'stable' | 'xstock' | 'pre' }>();
   dir.set(SOLANA_USDC_MINT, { symbol: 'USDC', kind: 'stable' });
   dir.set(SOLANA_USDT_MINT, { symbol: 'USDT', kind: 'stable' });
+  // A partial directory is never cached, and its incompleteness is reported to
+  // the caller. Silently dropping the xStock leg would make every xStock holding
+  // look like a zero balance; hard-failing instead would take the whole wallet
+  // view down whenever this provider stalls, which it does.
   const [bridges, pre] = await Promise.all([
-    getBridgesToSolana().catch(() => []),
-    listPrestocks().catch(() => []),
+    Promise.race([
+      getBridgesToSolana().catch(() => [] as Awaited<ReturnType<typeof getBridgesToSolana>>),
+      new Promise<Awaited<ReturnType<typeof getBridgesToSolana>>>((resolve) => setTimeout(() => resolve([]), 4_000)),
+    ]),
+    Promise.race([
+      listPrestocks().catch(() => [] as Awaited<ReturnType<typeof listPrestocks>>),
+      new Promise<Awaited<ReturnType<typeof listPrestocks>>>((resolve) => setTimeout(() => resolve([]), 4_000)),
+    ]),
   ]);
   for (const b of bridges) {
     for (const p of b.products ?? []) {
@@ -37,13 +50,17 @@ async function getMintDirectory(): Promise<Map<string, { symbol: string; kind: '
       dir.set(p.contract_address, { symbol: p.symbol.toUpperCase(), kind: 'pre' });
     }
   }
-  dirCache.set('dir', dir);
-  return dir;
+  const complete = bridges.length > 0 && pre.length > 0;
+  // Only a complete directory is worth caching; a partial one would keep
+  // reporting missing assets for the whole TTL.
+  if (complete) dirCache.set('dir', dir);
+  return { dir, complete };
 }
 
 export interface WalletBalance {
   symbol: string;
-  mint: string;
+  /** Verified mint, or null for native SOL which has no token account. */
+  mint: string | null;
   /** Raw on-chain base units (what transactions use). */
   raw: string;
   /** Human display amount (multiplier applied for xStocks). */
@@ -57,18 +74,60 @@ export function toDisplayBalance(kind: 'stable' | 'xstock' | 'pre', rawBaseUnits
   return raw.toString();
 }
 
+interface RawTokenRow {
+  mint: string | undefined;
+  amount: string | undefined;
+  decimals: number | undefined;
+}
+
+/**
+ * Collapse the token accounts the chain returns into one row per mint.
+ *
+ * A wallet can legitimately hold several token accounts for the same mint. The
+ * UI reads the first row matching the symbol, so returning both accounts made
+ * one of them look like the whole holding — a live example showed 204 USDC
+ * instead of the real 3044 USDC. Amounts are summed as BigInt, so no precision
+ * is lost, and malformed rows are dropped instead of poisoning the total.
+ */
+export function aggregateByMint(rows: RawTokenRow[]): Array<{ mint: string; amount: string; decimals: number }> {
+  const byMint = new Map<string, { mint: string; amount: bigint; decimals: number }>();
+  for (const r of rows) {
+    const mint = r.mint;
+    const amountRaw = r.amount;
+    const decimals = r.decimals;
+    if (!mint || amountRaw === undefined || decimals === undefined) continue;
+    // Provider amounts must be exact non-negative integers; anything else is
+    // malformed input, not a balance.
+    if (!/^\d+$/.test(amountRaw)) continue;
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) continue;
+    const existing = byMint.get(mint);
+    const amount = BigInt(amountRaw);
+    if (existing) {
+      if (existing.decimals !== decimals) continue; // conflicting metadata: skip
+      existing.amount += amount;
+    } else {
+      byMint.set(mint, { mint, amount, decimals });
+    }
+  }
+  return [...byMint.values()].map((e) => ({
+    mint: e.mint,
+    amount: e.amount.toString(),
+    decimals: e.decimals,
+  }));
+}
+
 /**
  * GET /api/wallet/:address/balances — every known Umbra token the wallet holds.
  * xStocks use display amounts (raw × live multiplier); stables/pre-IPO are plain.
  * Unknown mints (random memecoins) are skipped — this is a stock shop, not an explorer.
  */
-export async function getWalletBalances(ownerAddress: string): Promise<WalletBalance[]> {
+export async function getWalletBalances(ownerAddress: string): Promise<{ balances: WalletBalance[]; partial: boolean }> {
   if (!isValidSolanaAddress(ownerAddress)) {
     throw badRequest('INVALID_ADDRESS', 'ownerAddress is not a valid Solana address.');
   }
   const conn = getConnection();
   const owner = new PublicKey(ownerAddress);
-  const dir = await getMintDirectory();
+  const { dir, complete: directoryComplete } = await getMintDirectory();
 
   let spl, t22;
   try {
@@ -109,8 +168,8 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
     if (lamports > 0) {
       nativeSol = {
         symbol: 'SOL',
-        // Native SOL has no mint; the system program address is the honest label.
-        mint: SystemProgram.programId.toBase58(),
+        // Native SOL has no token account, so it genuinely has no mint.
+        mint: null,
         raw: String(lamports),
         display: new Decimal(lamports).div(new Decimal(10).pow(9)).toString(),
         decimals: 9,
@@ -120,47 +179,53 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
     // RPC hiccup: omit SOL rather than claim a zero balance.
   }
   // Multipliers resolve in parallel but bounded: a wallet holding many xStocks
-  // otherwise fans out one unreliable upstream call per holding at once.
-  const xstockIndexes = rows
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => dir.get(r.mint as string)?.kind === 'xstock');
-  const mults: Array<string | null> = new Array(rows.length).fill(null);
-  for (let start = 0; start < xstockIndexes.length; start += 6) {
-    const slice = xstockIndexes.slice(start, start + 6);
+  // otherwise fans out one unreliable upstream call per holding at once. Keyed by
+  // mint and de-duplicated, so several accounts of one stock cost one lookup.
+  const xstockMints = [...new Set(rows.map((r) => r.mint as string))]
+    .filter((mint) => dir.get(mint)?.kind === 'xstock');
+  const multByMint = new Map<string, string>();
+  for (let start = 0; start < xstockMints.length; start += 6) {
+    const slice = xstockMints.slice(start, start + 6);
     const resolved = await Promise.all(
-      slice.map(({ r }) => {
-        const entry = dir.get(r.mint as string);
-        return getMultiplier(entry?.symbol ?? '', 'Solana').catch(() => null);
-      }),
+      slice.map((mint) => getMultiplier(dir.get(mint)?.symbol ?? '', 'Solana').catch(() => null)),
     );
-    slice.forEach(({ i }, k) => {
-      mults[i] = resolved[k] ?? null;
+    slice.forEach((mint, k) => {
+      const value = resolved[k];
+      if (value) multByMint.set(mint, value);
     });
   }
+  const rowsByMint = aggregateByMint(rows);
   const out: WalletBalance[] = [];
-  rows.forEach((r, i) => {
-    const entry = dir.get(r.mint as string);
+  rowsByMint.forEach((r) => {
+    const entry = dir.get(r.mint);
     if (!entry) return;
-    let raw: Decimal;
+    if (r.amount === '0') return;
+    let display: string;
     try {
-      raw = new Decimal(r.amount as string);
+      if (entry.kind === 'xstock') {
+        // An xStock without its live multiplier cannot be converted to display
+        // units. Showing the raw amount would overstate the holding by orders of
+        // magnitude, so omit it instead of guessing.
+        if (!multByMint.has(r.mint)) return;
+        display = toDisplayBalance(entry.kind, r.amount, r.decimals, multByMint.get(r.mint) ?? null);
+      } else {
+        display = toDisplayBalance(entry.kind, r.amount, r.decimals, null);
+      }
     } catch {
-      return; // malformed RPC amount — skip, never 500 the whole wallet
+      return; // unconvertible holding: skip rather than print NaN
     }
-    if (raw.isZero()) return;
-    // An xStock without its live multiplier cannot be converted to display
-    // units. Returning the raw amount here would overstate the holding by
-    // orders of magnitude, so omit it instead of guessing.
-    if (entry.kind === 'xstock' && !mults[i]) return;
     out.push({
       symbol: entry.symbol,
-      mint: r.mint as string,
-      raw: r.amount as string,
-      display: toDisplayBalance(entry.kind, r.amount as string, r.decimals as number, mults[i] ?? null),
-      decimals: r.decimals as number,
+      mint: r.mint,
+      raw: r.amount,
+      display,
+      decimals: r.decimals,
     });
   });
   if (nativeSol) out.push(nativeSol);
   out.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return out;
+  // `partial` tells the client that assets may be missing from this list because
+  // the mint directory could not be loaded, so an absent row means "unknown",
+  // not "you hold none".
+  return { balances: out, partial: !directoryComplete };
 }
