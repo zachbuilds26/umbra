@@ -4,6 +4,7 @@ import {
   Connection,
   PublicKey,
   SystemProgram,
+  Transaction,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
@@ -140,16 +141,10 @@ describe('native SOL wrapping around Jupiter transactions', () => {
   }
 
   function inspect(txB64: string): { programIds: PublicKey[]; touchesWsol: boolean } {
-    const vtx = VersionedTransaction.deserialize(Buffer.from(txB64, 'base64'));
-    const msg = vtx.message as unknown as {
-      staticAccountKeys: PublicKey[];
-      compiledInstructions: Array<{ programIdIndex: number; accountKeyIndexes: number[]; data: Uint8Array }>;
-    };
-    const keys = msg.staticAccountKeys;
-    const ixs = msg.compiledInstructions;
+    const t = Transaction.from(Buffer.from(txB64, 'base64'));
     return {
-      programIds: ixs.map((ix) => keys[ix.programIdIndex] as PublicKey),
-      touchesWsol: ixs.some((ix) => ix.accountKeyIndexes.some((a) => keys[a]?.equals(WSOL_ATA))),
+      programIds: t.instructions.map((ix) => ix.programId),
+      touchesWsol: t.instructions.some((ix) => ix.keys.some((k) => k.pubkey.equals(WSOL_ATA))),
     };
   }
 
@@ -172,28 +167,38 @@ describe('native SOL wrapping around Jupiter transactions', () => {
 
   it('closes an empty wSOL account so the output arrives as native SOL', async () => {
     const out = await withNativeSol(jupiterTxB64(), WALLET, 2_000_000n, false, true, fakeConnection('0', true));
-    const ix = inspect(out);
-    assert.ok(ix.touchesWsol);
-    const vtx = VersionedTransaction.deserialize(Buffer.from(out, 'base64'));
-    const msg = vtx.message as unknown as {
-      staticAccountKeys: PublicKey[];
-      compiledInstructions: Array<{ programIdIndex: number; data: Uint8Array }>;
-    };
-    const last = msg.compiledInstructions[msg.compiledInstructions.length - 1];
+    const t = Transaction.from(Buffer.from(out, 'base64'));
+    assert.ok(t.instructions.some((ix) => ix.keys.some((k) => k.pubkey.equals(WSOL_ATA))));
     // SPL CloseAccount (opcode 9) on the token program, after Jupiter's own work.
-    assert.equal(msg.staticAccountKeys[last?.programIdIndex ?? -1]?.toBase58(), TOKEN_PROGRAM_ID.toBase58());
+    const last = t.instructions[t.instructions.length - 1];
+    assert.equal(last?.programId.toBase58(), TOKEN_PROGRAM_ID.toBase58());
     assert.equal(last?.data[0], 9);
+  });
+
+  it('returns a transaction that survives a decode and re-encode round trip', async () => {
+    for (const wrapIn of [true, false]) {
+      const out = await withNativeSol(
+        jupiterTxB64(),
+        WALLET,
+        500_000_000n,
+        wrapIn,
+        !wrapIn,
+        fakeConnection('0', true),
+      );
+      // Re-wrapping the rebuilt message in VersionedTransaction failed later, at
+      // encode time, and took roughly one SOL quote in ten down with it.
+      const t = Transaction.from(Buffer.from(out, 'base64'));
+      assert.equal(t.feePayer?.toBase58(), WALLET);
+      assert.equal(t.recentBlockhash, BLOCKHASH);
+      assert.ok(Buffer.from(t.serialize({ requireAllSignatures: false })).length > 0);
+    }
   });
 
   it('never closes a wSOL account that already holds a balance', async () => {
     const out = await withNativeSol(jupiterTxB64(), WALLET, 2_000_000n, false, true, fakeConnection('1500000000', true));
-    const vtx = VersionedTransaction.deserialize(Buffer.from(out, 'base64'));
-    const msg = vtx.message as unknown as {
-      staticAccountKeys: PublicKey[];
-      compiledInstructions: Array<{ programIdIndex: number; data: Uint8Array }>;
-    };
-    const closes = msg.compiledInstructions.some(
-      (ix) => msg.staticAccountKeys[ix.programIdIndex]?.equals(TOKEN_PROGRAM_ID) && ix.data[0] === 9,
+    const t = Transaction.from(Buffer.from(out, 'base64'));
+    const closes = t.instructions.some(
+      (ix) => ix.programId.equals(TOKEN_PROGRAM_ID) && ix.data[0] === 9,
     );
     assert.equal(closes, false);
   });

@@ -567,12 +567,28 @@ export async function withNativeSol(
     // belongs to the user and must not be swept by our close.
     tail.push(createCloseAccountInstruction(wsolAta, owner, owner));
   }
-  const message = new TransactionMessage({
-    payerKey: owner,
-    recentBlockhash,
-    instructions: [...lead, ...inner, ...tail],
-  }).compileToLegacyMessage();
-  return Buffer.from(new VersionedTransaction(message).serialize()).toString('base64');
+  // Recompile as a plain legacy transaction, which is the shape wallets already
+  // parse. Jupiter keeps its own transactions under Solana's 1232-byte cap by
+  // referencing address lookup tables; resolving those tables to splice our wrap
+  // in puts every account back in the message, which can push it over the cap.
+  // That is a real, explainable limit rather than a fault, so say so.
+  const transaction = new Transaction({
+    feePayer: owner,
+    blockhash: recentBlockhash,
+    lastValidBlockHeight: 0,
+  }).add(...lead, ...inner, ...tail);
+  try {
+    return transaction.serialize({ requireAllSignatures: false }).toString('base64');
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    if (/too large/i.test(raw)) {
+      throw upstream(
+        'SWAP_UNAVAILABLE',
+        'This route is too large to complete in one transaction with native SOL. Try USDC or USDT, or a larger amount.',
+      );
+    }
+    throw upstream('SWAP_UNAVAILABLE', 'We could not assemble this swap transaction. Try again.');
+  }
 }
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
