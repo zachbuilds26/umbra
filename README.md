@@ -88,6 +88,23 @@ curl -X POST localhost:3002/api/bridge/quote -H "Content-Type: application/json"
   -d '{"sourceNetwork":"Ethereum","asset":"NVDAx","amount":"1.5","destinationNetwork":"Solana","destinationAddress":"<SOLANA_PUBKEY>"}'
 ```
 
+## Meteora DBC — devnet end-to-end (free)
+
+Launches a real bonding-curve pool **and trades it**, on devnet, for zero SOL. Same builders the API uses (`createConfig` → `createPool` → pool read → quote → buy), so it proves the mainnet path without funding anything.
+
+```bash
+# 1) build + inspect the createConfig instruction, sends nothing
+$env:SOLANA_RPC_URL="https://api.devnet.solana.com"
+npx tsx scripts/dbc-devnet-e2e.ts --dry-run
+
+# 2) run it for real (needs a funded devnet key; the public faucet is IP-limited)
+#    fund once, free: https://faucet.solana.com
+$env:DEVNET_PAYER_KEY="<base58 secret key>"
+npx tsx scripts/dbc-devnet-e2e.ts
+```
+
+The script hard-refuses to run against a mainnet RPC. Devnet has no canonical USDC, so it creates its own 6-decimal quote token and mints it to the payer; on mainnet the same code uses real USDC. Launch cost on mainnet is ~0.005 SOL (mostly rent), optional — nothing in the API requires a pool to exist.
+
 ## Tests
 
 ```bash

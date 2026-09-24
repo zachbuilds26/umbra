@@ -279,6 +279,7 @@ export async function buildDbcCreateConfigTransaction(
   feeClaimer: string,
   leftoverReceiver: string,
   payer: string,
+  quoteMint: string = DBC_QUOTE_MINT,
 ): Promise<{ transaction: string; config: string; quoteMint: string }> {
   if (!getEquityPreset(presetId)) {
     throw badRequest('VALIDATION_ERROR', `Unknown DBC preset: ${presetId}.`);
@@ -293,6 +294,9 @@ export async function buildDbcCreateConfigTransaction(
       throw badRequest('INVALID_ADDRESS', `${label} is not a valid Solana address.`);
     }
   }
+  if (!isValidSolanaPublicKey(quoteMint)) {
+    throw badRequest('INVALID_ADDRESS', 'quoteMint is not a valid Solana address.');
+  }
   const { config: params } = buildEquityConfig(presetId, leftoverReceiver);
   const dbc = getDbcClient();
   let tx;
@@ -304,13 +308,13 @@ export async function buildDbcCreateConfigTransaction(
       config: new PublicKey(config),
       feeClaimer: new PublicKey(feeClaimer),
       leftoverReceiver: new PublicKey(leftoverReceiver),
-      quoteMint: new PublicKey(DBC_QUOTE_MINT),
+      quoteMint: new PublicKey(quoteMint),
       payer: new PublicKey(payer),
     });
   } catch (e) {
     dbcError(e, 'DBC config transaction build failed');
   }
-  return { transaction: await finalizeUnsigned(tx, new PublicKey(payer)), config, quoteMint: DBC_QUOTE_MINT };
+  return { transaction: await finalizeUnsigned(tx, new PublicKey(payer)), config, quoteMint };
 }
 
 /**
