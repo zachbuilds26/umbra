@@ -266,7 +266,7 @@ export async function getPrice(symbol: string): Promise<{ value: string; currenc
   const res = await withTimeout(xstocksClient.getPrice(canonical).catch(() => null), 2500);
   const quoteOk = typeof res?.quote === 'number' && Number.isFinite(res.quote) && res.quote > 0;
   if (!res || !quoteOk) {
-    // Jupiter-only for price — OKX/Finnhub disabled per request to stick to Jupiter
+    // Jupiter-only for price: the fallback chain stays xStocks → Jupiter → last-good.
     const jup = await withTimeout(getJupiterPriceFor(canonical).catch(() => null), 3500);
     if (jup) {
       const entry = { value: jup, timestamp: new Date().toISOString() };

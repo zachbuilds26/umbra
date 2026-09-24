@@ -1024,7 +1024,7 @@
     /* Title takes state color: green confirmed, red failed */
     #swapModalTitle.tone-ok { color: var(--umbra-accent); }
     #swapModalTitle.tone-bad { color: #f6465d; }
-    .okx-amt-row {
+    .swap-hero-row {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -1033,21 +1033,21 @@
       font-variant-numeric: tabular-nums;
       line-height: 1.25;
     }
-    .okx-amt-row.recv { font-size: 23px; font-weight: 700; }
-    .okx-amt-row .sym { color: var(--umbra-muted); font-weight: 600; }
+    .swap-hero-row.recv { font-size: 23px; font-weight: 700; }
+    .swap-hero-row .sym { color: var(--umbra-muted); font-weight: 600; }
     /* Trade direction colors: red = leaving, green = arriving */
-    .okx-amt-row .neg { color: #f6465d; }
-    .okx-amt-row .pos { color: var(--umbra-accent); }
-    .okx-amt-row .usd { font-size: 14px; font-weight: 500; color: var(--umbra-muted); }
-    .okx-conn {
+    .swap-hero-row .neg { color: #f6465d; }
+    .swap-hero-row .pos { color: var(--umbra-accent); }
+    .swap-hero-row .usd { font-size: 14px; font-weight: 500; color: var(--umbra-muted); }
+    .swap-hero-conn {
       width: 2px;
       height: 22px;
       background: var(--umbra-border);
       margin: 6px 0 6px 17px;
       border-radius: 2px;
     }
-    .okx-hair { height: 1px; background: var(--umbra-border); margin: 16px 0; }
-    .okx-row {
+    .swap-hero-hair { height: 1px; background: var(--umbra-border); margin: 16px 0; }
+    .swap-hero-line {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1056,7 +1056,7 @@
       font-size: 14px;
       font-weight: 500;
     }
-    .okx-row .val {
+    .swap-hero-line .val {
       color: var(--umbra-muted);
       font-weight: 400;
       font-size: 14px;
@@ -1066,7 +1066,7 @@
       font-variant-numeric: tabular-nums;
       text-align: right;
     }
-    .okx-row .val img { width: 20px; height: 20px; border-radius: 50%; }
+    .swap-hero-line .val img { width: 20px; height: 20px; border-radius: 50%; }
     @keyframes shake-x {
       0%, 100% { transform: translateX(0); }
       20%, 60% { transform: translateX(-5px); }
@@ -1822,7 +1822,7 @@
       <div class="tape-track" id="tapeTrack" hidden></div>
       <div class="tape-note" id="tapeNote" hidden></div>
     </div>
-    <!-- Swap card (OKX layout, Umbra skin). -->
+    <!-- Swap card: confirm-sheet layout, Umbra skin. -->
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
         <div class="swap-card ox">
@@ -2106,7 +2106,7 @@
             <b id="drawerPrice" style="font-size:20px;">—</b>
           </div>
           <div style="display:flex; justify-content:space-between;">
-            <span style="color:var(--umbra-muted); font-size:13px;">Market cap<span class="info-icon" data-tip="Market cap is total value — price × supply. For xStocks it's the underlying equity cap from OKX/Finnhub, for Pre-IPO it's the implied valuation."><i data-lucide="info" width="14" height="14"></i></span></span>
+            <span style="color:var(--umbra-muted); font-size:13px;">Market cap<span class="info-icon" data-tip="Market cap is total value — price × supply. For xStocks we show the underlying equity's own market cap (Finnhub company data), for Pre-IPO names the implied valuation."><i data-lucide="info" width="14" height="14"></i></span></span>
             <span id="drawerMcap" style="font-size:13px; color:var(--umbra-muted);">—</span>
           </div>
           <div style="display:flex; justify-content:space-between;">
@@ -3215,15 +3215,15 @@
           : (typeof sellUsdPer === 'number' && sellUsdPer > 0 && isFinite(sellN))
             ? '<span class="usd">' + fmtMoney(sellN * sellUsdPer) + '</span>' : '';
         return (
-          '<div class="okx-amt-row">' + tkIcon(q.sell.symbol, 'tk-36') +
+          '<div class="swap-hero-row">' + tkIcon(q.sell.symbol, 'tk-36') +
           '<span class="neg">-' + esc(q.sell.amount) + '</span><span class="sym">' + esc(q.sell.symbol) + '</span>' + sellUsd + '</div>' +
-          '<div class="okx-conn"></div>' +
-          '<div class="okx-amt-row recv">' + tkIcon(q.receive.symbol, 'tk-36') +
+          '<div class="swap-hero-conn"></div>' +
+          '<div class="swap-hero-row recv">' + tkIcon(q.receive.symbol, 'tk-36') +
           '<span class="pos">+' + fmtAmt(recvN) + '</span><span class="sym">' + esc(q.receive.symbol) + '</span></div>' +
-          '<div class="okx-hair"></div>' +
-          '<div class="okx-row"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>' +
-          '<div class="okx-row"><span>Rate</span><span class="val">1 ' + esc(q.sell.symbol) + ' ≈ ' + per + ' ' + esc(q.receive.symbol) + '</span></div>' +
-          '<div class="okx-row"><span>Min to receive</span><span class="val">' + fmtAmt(Number(q.minimumReceived)) + ' ' + esc(q.receive.symbol) + '</span></div>'
+          '<div class="swap-hero-hair"></div>' +
+          '<div class="swap-hero-line"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>' +
+          '<div class="swap-hero-line"><span>Rate</span><span class="val">1 ' + esc(q.sell.symbol) + ' ≈ ' + per + ' ' + esc(q.receive.symbol) + '</span></div>' +
+          '<div class="swap-hero-line"><span>Min to receive</span><span class="val">' + fmtAmt(Number(q.minimumReceived)) + ' ' + esc(q.receive.symbol) + '</span></div>'
         );
       }
       function paintSwapHero(q) {
