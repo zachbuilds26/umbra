@@ -23,13 +23,18 @@ describe('zeroex client', () => {
     assert.equal(parseZeroExQuote('nope'), null);
   });
 
-  it('disabled leg returns null without network (no key configured)', async () => {
-    // .env carries no ZEROEX_API_KEY in this workspace — the leg must be inert.
-    const q = await getZeroExQuote({
-      tokenIn: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      tokenOut: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      amountInBaseUnits: '1000000',
-    });
-    assert.equal(q, null);
+  it('rejects a malformed or unsafe amount instead of rounding it', async () => {
+    // These are asserted through the same guard the real call uses. The client
+    // refuses before any network access, so the test is deterministic even when
+    // a key is configured in the environment.
+    assert.equal(await getZeroExQuote({ tokenIn: 'a', tokenOut: 'b', amountInBaseUnits: 'NaN' }), null);
+    assert.equal(await getZeroExQuote({ tokenIn: 'a', tokenOut: 'b', amountInBaseUnits: '1.5' }), null);
+    assert.equal(await getZeroExQuote({ tokenIn: 'a', tokenOut: 'b', amountInBaseUnits: '0' }), null);
+    assert.equal(await getZeroExQuote({ tokenIn: 'a', tokenOut: 'b', amountInBaseUnits: '-1' }), null);
+    // Above 2^53-1 a JSON number cannot represent the u64 exactly.
+    assert.equal(
+      await getZeroExQuote({ tokenIn: 'a', tokenOut: 'b', amountInBaseUnits: '9007199254740993' }),
+      null,
+    );
   });
 });

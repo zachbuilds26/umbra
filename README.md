@@ -64,10 +64,11 @@ Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "messa
 
 1. **No invented bridge addresses** — `bridge-config.service.ts` fetches + caches (3 min TTL) the public config; every route/quote revalidates against it.
 2. **No authenticated xStocks flows** — public endpoints only (`/public/assets*`, `/public/bridges`).
-3. **Jupiter is infrastructure** — quotes normalize to `{sell, receive, rate, route:[{symbol},{symbol}]}`; venue names never appear.
-4. **No custody** — unsigned txs out, wallet signatures in. The backend only relays a transaction the connected wallet signed (it verifies the signer matches the quote's wallet); no `execute-any-contract` endpoint exists.
-5. **Exact money math** — `decimal.js` everywhere; `display = raw × multiplier` on Solana Token-2022 xStocks. `Decimal('0').isPositive()` is `true`, so zero-guards use `.gt(0)`.
+3. **Jupiter is infrastructure** — quotes normalize to `{sell, receive, rate, route:[{symbol},{symbol}]}`. The routing venue is reported only as Jupiter's own `router` value (`routeVenue`), and is `null` when the provider names none; it is never guessed or hardcoded.
+4. **No custody** — unsigned txs out, wallet signatures in. The backend only relays a transaction whose message is byte-identical to the transaction it built for that quote, whose every required signature is present, and whose fee payer is the quote's bound wallet. A quote is claimed by one wallet and never rebound. No `execute-any-contract` endpoint exists.
+5. **Exact money math** — `decimal.js` everywhere; `display = raw × multiplier` on Solana Token-2022 xStocks. `Decimal('0').isPositive()` is `true`, so zero-guards use `.gt(0)`. The frontend halves balances with digit-by-digit decimal-string math, never `Number(x) / 2`.
 6. **xStocks symbols are case-sensitive** (`NVDAx` ≠ `NVDAX`) — `canonicalSymbol()` normalizes to `BASE + 'x'`.
+7. **No unavailable features in the API** — the bridge cannot build or verify a cross-chain transfer, so its write endpoints return `501 FEATURE_UNAVAILABLE` and create no ledger rows.
 
 ## Demo (small amounts, supported routes)
 

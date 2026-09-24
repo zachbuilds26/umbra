@@ -53,11 +53,16 @@ async function main(): Promise<void> {
   missing = assets.length - queue.length;
   for (let i = 0; i < queue.length; i += 5) {
     const batch = queue.slice(i, i + 5);
+    // One failed download must not abort the whole run: the symbol is recorded
+    // as failed and the script continues. Promise.all without a catch here
+    // rejected on the first network error and wrote no manifest at all.
     const results = await Promise.all(
       (batch as Asset[]).map(async (a) => {
         const asset = a as Asset;
-        const file = `${asset.symbol}${extOf(asset.logo as string)}`;
-        const good = await download(asset.logo as string, path.join(OUT, file));
+        // Symbol comes from the provider, so it is never trusted as a filename.
+        const safeSymbol = String(asset.symbol).replace(/[^A-Za-z0-9._-]/g, '_');
+        const file = `${safeSymbol}${extOf(asset.logo as string)}`;
+        const good = await download(asset.logo as string, path.join(OUT, file)).catch(() => false);
         return { symbol: asset.symbol, file, good };
       }),
     );
@@ -77,4 +82,9 @@ async function main(): Promise<void> {
   console.log('manifest.json written');
 }
 
-void main();
+// A rejection here means the assets endpoint was unreachable; say so with a
+// non-zero exit instead of an unhandled promise warning.
+void main().catch((err: unknown) => {
+  console.error('[logos] failed:', err instanceof Error ? err.message : err);
+  process.exit(1);
+});

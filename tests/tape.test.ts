@@ -115,6 +115,11 @@ describe('token accounts are summed per mint', () => {
 });
 
 describe('ticker symbol normalization', () => {
+  // These resolve against the live pre-IPO directory, so they are the two
+  // network-dependent tests in the suite. They assert the real normalization
+  // contract (ALL-CAPS pre-IPO vs case-sensitive xStocks), which is worth the
+  // dependency; the pure `canonicalSymbol` cases below cover the same rules
+  // without a provider.
   it('keeps pre-IPO ALL-CAPS (SPACEX, not SPACEx)', async () => {
     assert.equal(await canonicalAssetSymbol('spacex'), 'SPACEX');
     assert.equal(await canonicalAssetSymbol('SPACEX'), 'SPACEX');
