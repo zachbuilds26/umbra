@@ -1678,7 +1678,6 @@
       font-size: 14px;
       color: var(--umbra-muted);
     }
-
     .site-footer .foot-brand {
       font-family: "Syne", var(--umbra-font-body);
       font-weight: 700;
@@ -1687,21 +1686,8 @@
       color: var(--umbra-accent);
       text-decoration: none;
     }
-    /* Right cluster: even rhythm, build tag as a quiet pill */
-    .site-footer .foot-status {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .site-footer .build-tag {
-      font-size: 11px;
-      color: var(--umbra-muted);
-      background: var(--umbra-secondary);
-      border-radius: 999px;
-      padding: 3px 10px;
-      white-space: nowrap;
-    }
 
+    /* Right cluster: even rhythm, build tag as a quiet pill */
     .api-status {
       display: inline-flex;
       align-items: center;
@@ -2155,9 +2141,9 @@
 
   <footer class="site-footer">
     <span class="foot-brand">UMBRA</span>
-    <span class="foot-status">
+    <span style="display:flex; align-items:center; gap:6px;">
       <a class="api-status" id="apiStatus" href="/health" target="_blank" rel="noreferrer"><span class="dot"></span><span id="apiStatusText">API</span></a>
-      <span id="umbraBuild" class="build-tag">build 2026-09-23g</span>
+      <span id="umbraBuild" style="font-size:11px; color:var(--umbra-muted);"></span>
       <span class="info-icon" data-tip="API status — green is live. Check /health for xStocks, Jupiter, Solana, 0x."><i data-lucide="info" width="14" height="14"></i></span>
     </span>
   </footer>
@@ -2868,6 +2854,13 @@
       function setBuyDots(on) {
         var d = document.getElementById('buyDots');
         if (d) d.classList.toggle('on', !!on);
+        // While loading: no stale numbers beside the dots — hide amount, USD
+        // and change badge until the fresh paint lands.
+        try {
+          buyAmountEl.style.visibility = on ? 'hidden' : '';
+          buyUsdEl.style.visibility = on ? 'hidden' : '';
+          if (on) setBuyChange(null);
+        } catch (_) {}
       }
       function scheduleQuote() {
         if (quoteTimer) clearTimeout(quoteTimer);
@@ -3219,6 +3212,9 @@
         executing = false;
         // 429 is always rate-limiting (Jupiter free tier) — never show the raw code.
         if (/429/.test(msg || '')) msg = 'Quoting is busy right now — wait a moment and try again.';
+        // "Invalid request" from the wallet on a $0 balance means the network
+        // can't execute it (no SOL for gas) — say so instead of the raw code.
+        else if (/invalid request/i.test(msg || '')) msg = 'Wallet refused: with nothing in it, there is no SOL for gas. Fund a little SOL and try again.';
         paintSwapTitle('Swap failed', 'bad');
         swapErrorEl.style.display = 'flex';
         swapErrorEl.textContent = msg;
@@ -3511,6 +3507,7 @@
                           if (t) {
                             if (t.price) a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
                             if (t.marketCap) a.marketCap = t.marketCap;
+                            if (t.liquidity) a.liquidity = t.liquidity;
                             // Don't lock Pre-IPO rows to "—" on an mcap-less tick;
                             // their valuation arrives via ticker now or fetchMcaps.
                             if (t.marketCap || PREIPO.indexOf(a.symbol) === -1) a._mcapChecked = true;
@@ -3575,6 +3572,7 @@
                           if (t && t.price) {
                             a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
                             if (t.marketCap) a.marketCap = t.marketCap;
+                            if (t.liquidity) a.liquidity = t.liquidity;
                             patched = true;
                           }
                         });
@@ -3835,6 +3833,14 @@
           if (typeof data.top10Pct === 'number') el.textContent = 'hold ' + data.top10Pct.toFixed(1) + '%';
         } catch (e) { /* concentration is a bonus */ }
       }
+      // Cached ticker-row liquidity for the drawer fallback (same shape as summary).
+      function cachedLiq(symbol) {
+        try {
+          var hit = null;
+          stocksCache.forEach(function (a) { if (a.symbol === symbol && a.liquidity) hit = a.liquidity; });
+          return hit;
+        } catch (_) { return null; }
+      }
       async function openStockDrawer(symbol) {
         drawerCurrent = symbol;
         var myReq = ++drawerReq;
@@ -3907,8 +3913,10 @@
             if (window.lucide) window.lucide.createIcons();
           }
           if (liqEl) {
-            // Liquidity from OKX market (if available in summary, else keep —)
-            var liq = s.asset && s.asset.liquidity ? '$' + Number(s.asset.liquidity).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+            // Liquidity: live summary first, cached ticker row second, '—' when
+            // no venue indexes the pool (11 of 56) — never invented.
+            var liqVal = (s.asset && s.asset.liquidity) || cachedLiq(symbol);
+            var liq = liqVal ? '$' + Number(liqVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
             liqEl.textContent = liq;
           }
           if (!price) {
@@ -4316,16 +4324,18 @@
           if (!bytes) throw new Error('Cannot serialize transaction.');
           var notes = [];
           var hasReownSign = !!(solProvider && typeof solProvider.signTransaction === 'function');
-          // 1) Reown-connected provider, sign-only (backend broadcasts, as before)
+          // 1) Reown-connected provider, sign-only (backend broadcasts, as before).
+          // Object first: the provider serializes itself (bytes made it call
+          // t.serialize internally and fail).
           if (hasReownSign) {
-            try { return normalizeSigned(await solProvider.signTransaction(bytes)); }
+            try { return normalizeSigned(await solProvider.signTransaction(vtx)); }
             catch (e) {
               if (rejected(e)) throw e;
               notes.push('reown-sign: ' + shortErr(e));
-              try { return normalizeSigned(await solProvider.signTransaction({ transaction: bytes })); }
+              try { return normalizeSigned(await solProvider.signTransaction(bytes)); }
               catch (e2) {
                 if (rejected(e2)) throw e2;
-                notes.push('reown-sign(obj): ' + shortErr(e2));
+                notes.push('reown-sign(bytes): ' + shortErr(e2));
               }
             }
           } else {
