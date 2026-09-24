@@ -2766,8 +2766,17 @@
 
       function renderTokenList(filter) {
         var f = (filter || '').trim().toUpperCase();
+        // Umbra swaps one stock against one stable (USDC/USDT) — never
+        // stock↔stock. Offering a pair the router cannot execute only produces
+        // "not available for swap" after the user has already chosen, so the
+        // picker itself only lists the side that keeps the pair valid.
+        var stables = { USDC: 1, USDT: 1 };
+        var other = modalSide === 'sell' ? buySym : sellSym;
+        var wantStable = !!stables[String(other || '').toUpperCase()];
         var rows = directory
           .filter(function (t) {
+            var isStable = !!stables[t.symbol.toUpperCase()];
+            if (isStable !== wantStable) return false;
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
@@ -2782,7 +2791,7 @@
             );
           })
           .join('');
-        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (!f ? 'Loading stocks…' : 'No matches found.') + '</div>';
+        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (f ? 'No matches found.' : 'Loading stocks…') + '</div>';
         Array.prototype.forEach.call(tokenListEl.querySelectorAll('.token-opt'), function (btn) {
           btn.addEventListener('click', function () {
             var sym = btn.getAttribute('data-symbol');
@@ -3013,7 +3022,7 @@
         if (code === 'QUOTE_UNAVAILABLE') {
           return (sym ? sym + ' pricing is' : 'This pair\'s pricing is') + ' temporarily unavailable. Try again shortly, or pick another asset.';
         }
-        if (code === 'UNSUPPORTED_ASSET') return 'That asset is not available for swap yet.';
+        if (code === 'UNSUPPORTED_ASSET') return 'Umbra swaps one stock against USDC or USDT — pick the other side from the list.';
         if (code === 'VALIDATION_ERROR') return 'That amount is not valid — enter a different amount.';
         if (code === 'QUOTE_EXPIRED') return 'That quote went stale — we are fetching a fresh one.';
         if (code === 'SWAP_UNAVAILABLE' || code === 'PROVIDER_ERROR') {
