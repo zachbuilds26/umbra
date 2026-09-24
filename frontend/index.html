@@ -2683,8 +2683,8 @@
         tokenSearchEl.value = '';
         renderTokenList('');
         tokenModalEl.classList.add('open');
-        // Tower parity: no autofocus — list first, keyboard only when the user
-        // taps the search field (auto-focus pops the keyboard over the list).
+        // No autofocus — list first, keyboard only when the user taps the
+        // search field (auto-focus pops the keyboard over the list).
         // If the page loaded while the backend was down, directory is still
         // empty — refetch now instead of showing a blank list forever.
         if (!directory.length) {
@@ -3506,11 +3506,10 @@
                           var t = m[a.symbol];
                           if (t) {
                             if (t.price) a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
-                            if (t.marketCap) a.marketCap = t.marketCap;
+                            // Lock mcap ONLY when a value arrives — the ticker never
+                            // carries xStock mcaps, so locking here froze rows at "—".
+                            if (t.marketCap) { a.marketCap = t.marketCap; a._mcapChecked = true; }
                             if (t.liquidity) a.liquidity = t.liquidity;
-                            // Don't lock Pre-IPO rows to "—" on an mcap-less tick;
-                            // their valuation arrives via ticker now or fetchMcaps.
-                            if (t.marketCap || PREIPO.indexOf(a.symbol) === -1) a._mcapChecked = true;
                           }
                         });
                       }
@@ -3547,10 +3546,10 @@
                           .then(function (d) {
                             var mc = d && (d.marketCap || (d.asset && d.asset.marketCap));
                             if (mc) { a.marketCap = mc; a._mcapChecked = true; return true; }
-                            a._mcapChecked = true;
+                            // No value: stay skeleton (still loading), never "—".
                             return false;
                           })
-                          .catch(function () { a._mcapChecked = true; return false; });
+                          .catch(function () { return false; });
                       })).then(function (results) {
                         if (results.some(Boolean)) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
                         setTimeout(function () { fetchMcaps(j + 20); }, 1200);
