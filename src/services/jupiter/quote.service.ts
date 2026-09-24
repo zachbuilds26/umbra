@@ -1,5 +1,7 @@
 import Decimal from 'decimal.js';
+import { VersionedTransaction } from '@solana/web3.js';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
+import { getConnection } from '../solana/connection.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
 import { displayToBaseUnits, baseUnitsToDisplay } from '../solana/multiplier.js';
 import { isValidSolanaAddress } from '../../utils/addresses.js';
@@ -103,11 +105,15 @@ async function fetchOrder(args: {
   outputMint: string;
   amountBaseUnits: string;
   taker?: string;
+  slippageBps: number;
 }): Promise<JupiterOrderResponse> {
   let res;
   try {
     res = await getJupiterOrder(args);
   } catch (err) {
+    if (err instanceof HttpError && err.statusCode === 429) {
+      throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
+    }
     throw upstream('SWAP_UNAVAILABLE', `Swap quote unavailable: ${(err as Error).message}`);
   }
   if (!res.data) {
@@ -118,6 +124,9 @@ async function fetchOrder(args: {
         'INSUFFICIENT_LIQUIDITY',
         'No swap route for this pair and amount right now (thin liquidity). Try a smaller amount or the reverse direction.',
       );
+    }
+    if (res.status === 429) {
+      throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
     }
     throw upstream('SWAP_UNAVAILABLE', `Swap quote unavailable (upstream ${res.status}).`);
   }
@@ -152,7 +161,7 @@ function normalizeQuote(args: {
   amount: string;
   receiveDisplay: string;
   usdValue: string | null;
-  slippageBps: number;
+  minimumReceived: string;
   expiresAt: string;
   networkFee: { currency: 'SOL'; amount: string; estimated: boolean };
   platformFeeBps: number | null;
@@ -166,10 +175,7 @@ function normalizeQuote(args: {
     priceImpactBps: null,
     networkFee: args.networkFee,
     platformFeeBps: args.platformFeeBps,
-    minimumReceived: new Decimal(receiveDisplay)
-      .mul(new Decimal(10_000 - args.slippageBps))
-      .div(10_000)
-      .toString(),
+    minimumReceived: args.minimumReceived,
     // Provider-neutral route derived from the actual quote (plan §1.3). Never invented venues.
     route: [{ symbol: sellSide.symbol }, { symbol: buySide.symbol }],
     expiresAt: args.expiresAt,
@@ -243,7 +249,13 @@ export async function buildSwapQuote(params: {
     throw badRequest('VALIDATION_ERROR', 'Amount is too small to represent on-chain. Increase the amount.');
   }
 
-  const order = await fetchOrder({ inputMint: sellSide.mint, outputMint: buySide.mint, amountBaseUnits, taker });
+  const order = await fetchOrder({
+    inputMint: sellSide.mint,
+    outputMint: buySide.mint,
+    amountBaseUnits,
+    taker,
+    slippageBps,
+  });
 
   if (!order.outAmount) throw upstream('SWAP_UNAVAILABLE', 'Jupiter returned no output amount.');
   try {
@@ -260,6 +272,24 @@ export async function buildSwapQuote(params: {
 
   // Normalize with multiplier-aware conversion (xStocks) — never raw==display.
   const receiveDisplay = await fromBaseUnits(buySide.symbol, order.outAmount);
+
+  // Slippage floor = Jupiter's own on-chain threshold when it is real
+  // protection, else our ceil of (out × (1 − slippage)). Quote-only orders come
+  // back with threshold == outAmount (nothing is enforced yet), which would
+  // promise the full amount while the signed tx enforces less. Never floor it.
+  const jupThreshold = order.otherAmountThreshold && /^\d+$/.test(order.otherAmountThreshold)
+    ? new Decimal(order.otherAmountThreshold)
+    : null;
+  const outAmount = new Decimal(order.outAmount);
+  const thresholdBaseUnits =
+    jupThreshold && jupThreshold.lt(outAmount) && jupThreshold.gt(0)
+      ? order.otherAmountThreshold as string
+      : outAmount
+          .mul(new Decimal(10_000 - slippageBps))
+          .div(10_000)
+          .ceil()
+          .toFixed(0);
+  const minimumReceived = await fromBaseUnits(buySide.symbol, thresholdBaseUnits);
 
   let usdValue: string | null = null;
   try {
@@ -304,6 +334,7 @@ export async function buildSwapQuote(params: {
     transaction: order.transaction ?? null,
     outAmountBaseUnits: order.outAmount,
     receiveAmountDisplay: receiveDisplay,
+    signature: null,
     expiresAt: expiresAtMs,
   });
 
@@ -314,7 +345,7 @@ export async function buildSwapQuote(params: {
     amount: params.amount,
     receiveDisplay,
     usdValue,
-    slippageBps,
+    minimumReceived,
     expiresAt: new Date(expiresAtMs).toISOString(),
     networkFee: networkFeeFromOrder(order),
     platformFeeBps: order.platformFee?.feeBps ?? order.feeBps ?? null,
@@ -348,6 +379,7 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
     outputMint: stored.outputMint,
     amountBaseUnits: stored.amountBaseUnits,
     taker: userPublicKey,
+    slippageBps: stored.slippageBps,
   });
   if (!order.transaction) {
     throw upstream('SWAP_UNAVAILABLE', order.errorMessage || 'Jupiter could not build this swap transaction.');
@@ -362,4 +394,92 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
     requestId: order.requestId,
     expiresAt: new Date(stored.expiresAt).toISOString(),
   };
+}
+
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58(bytes: Uint8Array): string {
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+  const digits: number[] = [0];
+  for (let i = zeros; i < bytes.length; i++) {
+    let carry = bytes[i] as number;
+    for (let j = 0; j < digits.length; j++) {
+      carry += (digits[j] as number) * 256;
+      digits[j] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let out = '1'.repeat(zeros);
+  for (let i = digits.length - 1; i >= 0; i--) out += B58[digits[i] as number];
+  return out;
+}
+
+function isZeroSig(bytes: Uint8Array | null | undefined): boolean {
+  if (!bytes || bytes.length === 0) return true;
+  return bytes.every((b) => b === 0);
+}
+
+/**
+ * POST /api/swap/broadcast — submit the wallet-signed swap.
+ * The wallet signs; the backend broadcasts over our RPC and records the
+ * signature. Signed-but-unsent transactions can never confirm, so this step
+ * is mandatory before the ledger records anything.
+ */
+export async function broadcastSignedSwap(
+  quoteId: string,
+  signedTransactionB64: string,
+  userPublicKey: string,
+): Promise<{ signature: string }> {
+  if (!isValidSolanaAddress(userPublicKey)) {
+    throw badRequest('INVALID_ADDRESS', 'userPublicKey is not a valid Solana address.');
+  }
+  if (!/^[A-Za-z0-9+/]{80,}={0,2}$/.test(signedTransactionB64)) {
+    throw badRequest('VALIDATION_ERROR', 'signedTransaction must be base64.');
+  }
+  const stored = quoteStore.getSwap(quoteId);
+  if (!stored) {
+    throw badRequest('QUOTE_EXPIRED', 'Quote not found or expired. Request a fresh quote.', { quoteId });
+  }
+  if (stored.taker && stored.taker !== userPublicKey) {
+    throw badRequest('VALIDATION_ERROR', 'This quote belongs to a different wallet.');
+  }
+  if (stored.signature) return { signature: stored.signature };
+
+  let raw: Uint8Array;
+  let vtx: VersionedTransaction;
+  try {
+    raw = new Uint8Array(Buffer.from(signedTransactionB64, 'base64'));
+    vtx = VersionedTransaction.deserialize(raw);
+  } catch {
+    throw badRequest('VALIDATION_ERROR', 'signedTransaction could not be decoded.');
+  }
+  const first = vtx.signatures[0];
+  if (!first || isZeroSig(first)) {
+    throw badRequest('VALIDATION_ERROR', 'Transaction is not signed.');
+  }
+  // web3.js 1.x keeps signatures as raw bytes: the signer is the message's
+  // first required static account (the fee payer Jupiter built the tx around).
+  const required = vtx.message.header?.numRequiredSignatures ?? 0;
+  const signer = required > 0 ? vtx.message.staticAccountKeys[0] : undefined;
+  if (!signer || signer.toBase58() !== userPublicKey) {
+    throw badRequest('VALIDATION_ERROR', 'Transaction signer does not match userPublicKey.');
+  }
+  const signature = base58(first);
+  try {
+    await getConnection().sendRawTransaction(raw, { maxRetries: 3 });
+  } catch (err) {
+    const msg = String((err as Error)?.message ?? err);
+    // A wallet that broadcast itself (sign-and-send) races us here: the tx is
+    // already known, which is success, not failure.
+    if (!/already|processed|BlockhashNotFound/i.test(msg)) {
+      throw upstream('SWAP_UNAVAILABLE', `Could not submit the swap: ${msg.slice(0, 140)}`);
+    }
+  }
+  quoteStore.updateSwap(quoteId, { taker: userPublicKey, signature });
+  return { signature };
 }

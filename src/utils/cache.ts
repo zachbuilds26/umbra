@@ -7,15 +7,25 @@ interface Entry<T> {
 export class TtlCache<T> {
   private store = new Map<string, Entry<T>>();
   private readonly defaultTtlMs: number;
+  private readonly maxEntries: number;
 
-  constructor(defaultTtlMs: number) {
+  constructor(defaultTtlMs: number, maxEntries = 5_000) {
     this.defaultTtlMs = defaultTtlMs;
+    this.maxEntries = maxEntries;
+  }
+
+  /** Drop everything already past its deadline (random-key caches never re-read). */
+  private sweep(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.store) {
+      if (now >= entry.expiresAt) this.store.delete(key);
+    }
   }
 
   get(key: string): T | undefined {
     const entry = this.store.get(key);
     if (!entry) return undefined;
-    if (Date.now() > entry.expiresAt) {
+    if (Date.now() >= entry.expiresAt) {
       this.store.delete(key);
       return undefined;
     }
@@ -23,7 +33,14 @@ export class TtlCache<T> {
   }
 
   set(key: string, value: T, ttlMs?: number): void {
+    this.sweep();
+    this.store.delete(key);
     this.store.set(key, { value, expiresAt: Date.now() + (ttlMs ?? this.defaultTtlMs) });
+    while (this.store.size > this.maxEntries) {
+      const oldest = this.store.keys().next();
+      if (oldest.done) break;
+      this.store.delete(oldest.value);
+    }
   }
 
   delete(key: string): void {

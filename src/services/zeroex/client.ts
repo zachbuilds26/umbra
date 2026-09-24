@@ -22,11 +22,18 @@ const PRICE_TTL_MS = 60 * 1000;
 const priceCache = new TtlCache<string>(PRICE_TTL_MS);
 
 // Free tier is 5 RPS — light pacing so fallback fan-outs don't 429 themselves.
+// Serialized through a promise tail: concurrent callers computing the same wait
+// would otherwise all fire at the same instant.
 let lastCallAt = 0;
-async function pace(): Promise<void> {
-  const wait = 300 - (Date.now() - lastCallAt);
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastCallAt = Date.now();
+let paceTail: Promise<void> = Promise.resolve();
+function pace(): Promise<void> {
+  const run = paceTail.then(async () => {
+    const wait = 300 - (Date.now() - lastCallAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastCallAt = Date.now();
+  });
+  paceTail = run.catch(() => undefined);
+  return run;
 }
 
 /** Dummy taker for quote-only reads (quoting never checks funds). */

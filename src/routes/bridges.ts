@@ -11,13 +11,20 @@ export async function bridgeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/bridge/routes', async () => getBridgeRoutes());
 
   // POST /api/bridge/quote { sourceNetwork, asset, amount, destinationNetwork, destinationAddress }
-  app.post('/api/bridge/quote', async (req) => {
-    const body = bridgeQuoteBody.parse(req.body);
-    return buildBridgeQuote(body);
-  });
+  app.post(
+    '/api/bridge/quote',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const body = bridgeQuoteBody.parse(req.body);
+      return buildBridgeQuote(body);
+    },
+  );
 
   // POST /api/bridge/transaction { bridgeQuoteId, sourceWalletAddress, destinationSolanaAddress }
-  app.post('/api/bridge/transaction', async (req) => {
+  app.post(
+    '/api/bridge/transaction',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req) => {
     const body = bridgeTransactionBody.parse(req.body);
     const payload = await buildBridgeTransaction(body);
 
@@ -44,27 +51,32 @@ export async function bridgeRoutes(app: FastifyInstance): Promise<void> {
     return { ...payload, trackingId: tracking.id };
   });
 
-  // GET /api/bridge/transactions/:id — bridge status (source_pending → … → completed/failed)
+  // GET /api/bridge/transactions/:id?wallet=... — only the owning wallet.
   app.get('/api/bridge/transactions/:id', async (req) => {
     const params = z.object({ id: z.string().min(1) }).parse(req.params);
-    const tx = await getTransaction(params.id);
+    const q = z.object({ wallet: z.string().min(1).max(128) }).parse(req.query);
+    const tx = await getTransaction(params.id, q.wallet);
     if (!tx || tx.type !== 'bridge') throw notFound('NOT_FOUND', `Bridge transaction ${params.id} not found.`);
     return { transaction: tx };
   });
 
-  // POST /api/bridge/transactions/:id/source { sourceTxHash, ccipMessageId? } — record source confirmation
+  // POST /api/bridge/transactions/:id/source — record source confirmation (owner only)
   app.post('/api/bridge/transactions/:id/source', async (req) => {
     const params = z.object({ id: z.string().min(1) }).parse(req.params);
     const body = z
-      .object({ sourceTxHash: z.string().min(1), ccipMessageId: z.string().optional() })
+      .object({
+        sourceTxHash: z.string().min(1).max(128),
+        ccipMessageId: z.string().max(128).optional(),
+        wallet: z.string().min(1).max(128),
+      })
       .parse(req.body);
-    const tx = await getTransaction(params.id);
+    const tx = await getTransaction(params.id, body.wallet);
     if (!tx || tx.type !== 'bridge') throw notFound('NOT_FOUND', `Bridge transaction ${params.id} not found.`);
     const updated = await updateTransaction(params.id, {
       sourceTxHash: body.sourceTxHash,
       ccipMessageId: body.ccipMessageId ?? null,
       status: body.ccipMessageId ? 'ccip_in_flight' : 'source_confirmed',
-    });
+    }, body.wallet);
     if (!updated) throw badRequest('TRANSACTION_FAILED', 'Could not update bridge transaction.');
     return { transaction: updated };
   });

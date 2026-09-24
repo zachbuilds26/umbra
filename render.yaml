@@ -6,7 +6,7 @@ services:
     name: umbra
     runtime: node
     plan: free
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -31,4 +31,4 @@ services:
 
 databases:
   - name: umbra-db
-    plan: free # 1GB, expires after 90 days — export/upgrade before then
+    plan: free # 1GB, no backups; expires ~30 days after creation (+14-day grace) — export or upgrade before then

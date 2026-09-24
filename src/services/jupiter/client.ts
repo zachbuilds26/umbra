@@ -28,6 +28,8 @@ export interface JupiterOrderResponse {
   errorMessage?: string;
   priceImpactPct?: string | number;
   slippageBps?: number;
+  /** Exact on-chain minimum output in base units — the real slippage floor. */
+  otherAmountThreshold?: string;
   [key: string]: unknown;
 }
 

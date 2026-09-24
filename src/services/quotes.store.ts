@@ -18,6 +18,7 @@ export interface StoredSwapQuote {
   transaction: string | null;
   outAmountBaseUnits: string;
   receiveAmountDisplay: string;
+  signature: string | null;
   expiresAt: number;
 }
 
@@ -39,7 +40,9 @@ const bridgeQuotes = new TtlCache<StoredBridgeQuote>(BRIDGE_QUOTE_TTL_MS);
 
 export const quoteStore = {
   putSwap(q: StoredSwapQuote): void {
-    swapQuotes.set(q.quoteId, q, Math.max(1000, q.expiresAt - Date.now()));
+    const ttl = q.expiresAt - Date.now();
+    if (ttl <= 0) return;
+    swapQuotes.set(q.quoteId, q, ttl);
   },
   getSwap(quoteId: string): StoredSwapQuote | undefined {
     return swapQuotes.get(quoteId);
@@ -48,11 +51,18 @@ export const quoteStore = {
     const existing = swapQuotes.get(quoteId);
     if (!existing) return undefined;
     const updated = { ...existing, ...patch, quoteId };
-    swapQuotes.set(quoteId, updated, Math.max(1000, updated.expiresAt - Date.now()));
+    const ttl = updated.expiresAt - Date.now();
+    if (ttl <= 0) {
+      swapQuotes.delete(quoteId);
+      return undefined;
+    }
+    swapQuotes.set(quoteId, updated, ttl);
     return updated;
   },
   putBridge(q: StoredBridgeQuote): void {
-    bridgeQuotes.set(q.bridgeQuoteId, q, Math.max(1000, q.expiresAt - Date.now()));
+    const ttl = q.expiresAt - Date.now();
+    if (ttl <= 0) return;
+    bridgeQuotes.set(q.bridgeQuoteId, q, ttl);
   },
   getBridge(quoteId: string): StoredBridgeQuote | undefined {
     return bridgeQuotes.get(quoteId);

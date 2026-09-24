@@ -1,10 +1,21 @@
 import { PublicKey } from '@solana/web3.js';
 
-// Solana base58 public key validation (plan §30).
+// Solana base58 public key validation (plan §30). Wallets only: a signer must be on-curve.
 export function isValidSolanaAddress(value: string): boolean {
   try {
     const pk = new PublicKey(value);
     return PublicKey.isOnCurve(pk.toBytes());
+  } catch {
+    return false;
+  }
+}
+
+// Any 32-byte base58 account — includes program-derived addresses (DBC pools,
+// mints, vaults), which are off-curve by construction and must not be rejected.
+export function isValidSolanaPublicKey(value: string): boolean {
+  try {
+    new PublicKey(value);
+    return true;
   } catch {
     return false;
   }

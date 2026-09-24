@@ -1,13 +1,15 @@
 import { env } from './config/env.js';
 import { buildApp } from './app.js';
-import { migrate } from './db/pg.js';
+import { migrate, disablePg, closePool } from './db/pg.js';
 import { startSampler } from './services/prices/history.js';
 
 async function main(): Promise<void> {
   const app = await buildApp();
   // Postgres ledger when DATABASE_URL is set (Render); warns and continues on
-  // memory otherwise. A failed migrate must not kill boot (quotes still serve).
+  // memory otherwise. A failed migrate must not kill boot (quotes still serve)
+  // but must genuinely disable Postgres, or every ledger call hits a dead pool.
   await migrate().catch((err: unknown) => {
+    disablePg(err instanceof Error ? err.message : String(err));
     app.log.warn({ err }, 'db migrate skipped/failed — using in-memory ledger');
   });
   startSampler(); // tape history ring (harmless background task, never throws)
@@ -17,6 +19,17 @@ async function main(): Promise<void> {
   } catch (err) {
     app.log.error(err, 'failed to start');
     process.exit(1);
+  }
+  // Render redeploys and free-tier evictions send SIGTERM: drain in-flight
+  // requests and close the pool instead of dropping sockets mid-request.
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      void (async () => {
+        await app.close();
+        await closePool();
+        process.exit(0);
+      })().catch(() => process.exit(1));
+    });
   }
   // Self-prime on boot (fire-and-forget): fill directory + tape caches so the
   // first visitor after a sleep/wake or deploy doesn't pay the full cold cost

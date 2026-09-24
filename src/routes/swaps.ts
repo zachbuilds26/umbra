@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { swapQuoteQuery, swapTransactionBody, swapSubmitBody } from '../schemas/index.js';
-import { buildSwapQuote, getSwapTransaction } from '../services/jupiter/quote.service.js';
+import { swapQuoteQuery, swapTransactionBody, swapSubmitBody, swapBroadcastBody, transactionsQuery } from '../schemas/index.js';
+import { buildSwapQuote, getSwapTransaction, broadcastSignedSwap } from '../services/jupiter/quote.service.js';
 import { quoteStore } from '../services/quotes.store.js';
 import { createTransaction, getTransaction, updateTransaction, listTransactions } from '../db/transactions.store.js';
 import { confirmSignature } from '../services/solana/connection.js';
@@ -41,7 +41,19 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // POST /api/transactions/swap { quoteId, signature } -> record + confirm + normalized status
+  // POST /api/swap/broadcast { quoteId, userPublicKey, signedTransaction } -> send it
+  // The wallet signs; we broadcast over our own RPC. A signed-but-unsent swap can
+  // never confirm, so this runs before anything is written to the ledger.
+  app.post(
+    '/api/swap/broadcast',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const body = swapBroadcastBody.parse(req.body);
+      return broadcastSignedSwap(body.quoteId, body.signedTransaction, body.userPublicKey);
+    },
+  );
+
+  // POST /api/transactions/swap { quoteId, signature, wallet } -> record + confirm
   app.post(
     '/api/transactions/swap',
     { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
@@ -56,6 +68,9 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
     if (!SIGNATURE_RE.test(body.signature)) {
       throw badRequest('VALIDATION_ERROR', 'Signature is not a valid Solana transaction signature.');
     }
+    if (stored.signature && stored.signature !== body.signature) {
+      throw badRequest('VALIDATION_ERROR', 'That is not the signature broadcast for this quote.');
+    }
 
     const tx = await createTransaction({
       type: 'swap',
@@ -66,7 +81,8 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
       destinationAsset: stored.buySymbol,
       sourceAmount: stored.sellAmountDisplay,
       destinationAmount: stored.receiveAmountDisplay,
-      destinationWallet: stored.taker ?? undefined,
+      sourceWallet: body.wallet,
+      destinationWallet: stored.taker ?? body.wallet,
       providerReference: stored.jupiterRequestId ?? undefined,
       sourceTxHash: null,
       destinationTxHash: null,
@@ -90,18 +106,30 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
     return { id: tx.id, signature: body.signature, status: 'submitted', type: 'swap' };
   });
 
-  // GET /api/transactions — list recent transactions (for Activity tab)
+  // GET /api/transactions?wallet=...&limit=20 — the caller's own ledger only.
   app.get('/api/transactions', async (req) => {
-    const q = (req.query as { limit?: string }) || {};
-    const limit = Math.min(Math.max(parseInt(q.limit || '20', 10) || 20, 1), 50);
-    return { transactions: await listTransactions(limit) };
+    const q = transactionsQuery.parse(req.query);
+    return { transactions: await listTransactions(q.limit, q.wallet) };
   });
 
-  // GET /api/transactions/:id — status for any tracked swap
+  // GET /api/transactions/:id?wallet=... — status for the caller's own swap.
   app.get('/api/transactions/:id', async (req) => {
-    const params = (req.params as { id: string });
-    const tx = await getTransaction(params.id);
+    const params = req.params as { id: string };
+    const q = transactionsQuery.pick({ wallet: true }).parse(req.query);
+    const tx = await getTransaction(params.id, q.wallet);
     if (!tx) throw notFound('NOT_FOUND', `Transaction ${params.id} not found.`);
+    // A row stuck in "submitted" (restart, killed worker) gets reconciled here
+    // instead of waiting for a confirmation loop that no longer exists.
+    if (tx.status === 'submitted' && tx.signature) {
+      const result = await confirmSignature(tx.signature, 0);
+      if (result === 'confirmed' || result === 'failed') {
+        return {
+          transaction: (await updateTransaction(tx.id, {
+            status: result,
+          }, q.wallet)) ?? tx,
+        };
+      }
+    }
     return { transaction: tx };
   });
 }

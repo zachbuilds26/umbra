@@ -73,8 +73,15 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
   let spl, t22;
   try {
     [spl, t22] = await Promise.all([
-      conn.getParsedTokenAccountsByOwner(owner, { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }),
-      conn.getParsedTokenAccountsByOwner(owner, { programId: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') }),
+      // Hard deadline per call: a stalled RPC must not hold the wallet route.
+      Promise.race([
+        conn.getParsedTokenAccountsByOwner(owner, { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('rpc timeout')), 12_000)),
+      ]),
+      Promise.race([
+        conn.getParsedTokenAccountsByOwner(owner, { programId: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb') }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('rpc timeout')), 12_000)),
+      ]),
     ]);
   } catch (err) {
     throw new HttpError(
@@ -94,14 +101,24 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
       };
     })
     .filter((r) => r.mint && r.amount !== undefined && r.decimals !== undefined && dir.has(r.mint as string));
-  // Multipliers resolve in parallel (was sequential: N holdings x up-to-6s stalls).
-  const mults = await Promise.all(
-    rows.map((r) => {
-      const entry = dir.get(r.mint as string);
-      if (entry?.kind !== 'xstock') return Promise.resolve(null);
-      return getMultiplier(entry.symbol, 'Solana').catch(() => null);
-    }),
-  );
+  // Multipliers resolve in parallel but bounded: a wallet holding many xStocks
+  // otherwise fans out one unreliable upstream call per holding at once.
+  const xstockIndexes = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => dir.get(r.mint as string)?.kind === 'xstock');
+  const mults: Array<string | null> = new Array(rows.length).fill(null);
+  for (let start = 0; start < xstockIndexes.length; start += 6) {
+    const slice = xstockIndexes.slice(start, start + 6);
+    const resolved = await Promise.all(
+      slice.map(({ r }) => {
+        const entry = dir.get(r.mint as string);
+        return getMultiplier(entry?.symbol ?? '', 'Solana').catch(() => null);
+      }),
+    );
+    slice.forEach(({ i }, k) => {
+      mults[i] = resolved[k] ?? null;
+    });
+  }
   const out: WalletBalance[] = [];
   rows.forEach((r, i) => {
     const entry = dir.get(r.mint as string);
@@ -113,6 +130,10 @@ export async function getWalletBalances(ownerAddress: string): Promise<WalletBal
       return; // malformed RPC amount — skip, never 500 the whole wallet
     }
     if (raw.isZero()) return;
+    // An xStock without its live multiplier cannot be converted to display
+    // units. Returning the raw amount here would overstate the holding by
+    // orders of magnitude, so omit it instead of guessing.
+    if (entry.kind === 'xstock' && !mults[i]) return;
     out.push({
       symbol: entry.symbol,
       mint: r.mint as string,

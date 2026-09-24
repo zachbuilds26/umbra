@@ -20,13 +20,20 @@ import {
   solanaAddress,
 } from '../schemas/index.js';
 import { badRequest } from '../utils/errors.js';
-import { isValidSolanaAddress } from '../utils/addresses.js';
+import { isValidSolanaAddress, isValidSolanaPublicKey } from '../utils/addresses.js';
 
 // solanaAddress (schemas) constrains length only — base58/curve-invalid values
 // would otherwise throw raw Errors inside `new PublicKey()` (-> 500). Reject
-// them here as 400 before any service call.
+// them here as 400 before any service call. Pool addresses are program-derived
+// and off-curve, so they get format validation, not signer validation.
 function requireAddress(value: string, field: string): void {
   if (!isValidSolanaAddress(value)) {
+    throw badRequest('INVALID_ADDRESS', `${field} is not a valid Solana address.`);
+  }
+}
+
+function requireAccount(value: string, field: string): void {
+  if (!isValidSolanaPublicKey(value)) {
     throw badRequest('INVALID_ADDRESS', `${field} is not a valid Solana address.`);
   }
 }
@@ -58,7 +65,7 @@ export async function dbcRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 40, timeWindow: '1 minute' } } },
     async (req) => {
       const q = dbcQuoteQuery.parse(req.query);
-      requireAddress(q.pool, 'pool');
+      requireAccount(q.pool, 'pool');
       return { quote: await getDbcQuote(q.pool, q.side, q.amount, q.slippageBps) };
     },
   );
@@ -69,7 +76,7 @@ export async function dbcRoutes(app: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (req) => {
       const b = dbcSwapBody.parse(req.body);
-      requireAddress(b.pool, 'pool');
+      requireAccount(b.pool, 'pool');
       requireAddress(b.userPublicKey, 'userPublicKey');
       const { transaction, quote } = await buildDbcSwapTransaction(b.pool, b.side, b.amount, b.userPublicKey, b.slippageBps);
       return { transaction, quote };

@@ -38,13 +38,8 @@ export function recordPrice(symbol: string, price: string, at = Date.now()): voi
     last.t = at; // same price: extend freshness without growing the ring
     return;
   }
-  // Seed the ring so the first-ever point still yields a 0.00% change
-  // immediately (instead of a blank chip for 60s until the second sample).
-  // Place the seed just inside the 24h window so it survives the cutoff on the
-  // next poll (exact -24h would be evicted 1ms later and revert to blank).
-  if (ring.length === 0) {
-    ring.push({ t: at - 24 * 60 * 60 * 1000 + 5000, p: price });
-  }
+  // No synthetic 24h-old point: a price we never observed is not history, and
+  // seeding one made the first real move read as a 24-hour change.
   ring.push({ t: at, p: price });
   const cutoff = at - RETENTION_MS;
   while (ring.length > 0 && (ring[0]?.t ?? 0) < cutoff) ring.shift();
@@ -56,14 +51,17 @@ export function getHistory(symbol: string): PricePoint[] {
 }
 
 /** % change between now (or latest point) and the oldest point within windowMs.
- * Flat/observed-once prices honestly read 0.00% (no movement seen); null only
- * when we have never recorded the symbol at all. */
+ * null until we hold two real observations inside the window — a single sample
+ * proves no movement happened, it does not prove a 0.00% 24h change. Points
+ * older than the window are never used as the baseline. */
 export function changePct(symbol: string, windowMs = 24 * 60 * 60 * 1000, now = Date.now()): number | null {
   const ring = rings.get(symbol.toUpperCase()) ?? [];
   if (ring.length === 0) return null;
   const cutoff = now - windowMs;
-  const first = ring.find((pt) => pt.t >= cutoff) ?? ring[0];
-  const last = ring[ring.length - 1];
+  const inWindow = ring.filter((pt) => pt.t >= cutoff);
+  if (inWindow.length < 2) return null;
+  const first = inWindow[0];
+  const last = inWindow[inWindow.length - 1];
   if (!first || !last || first === last) return 0;
   try {
     const base = new Decimal(first.p);

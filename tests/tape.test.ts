@@ -5,30 +5,31 @@ import { toDisplayBalance } from '../src/services/solana/balances.js';
 import { canonicalAssetSymbol, getPrice } from '../src/services/xstocks/assets.service.js';
 
 describe('price history ring', () => {
-  it('first point seeds 0% immediately, then tracks real moves', () => {
+  it('reports no change until two real observations exist in-window', () => {
     recordPrice('TESTA', '100', 1000);
-    assert.equal(changePct('TESTA', 86_400_000, 2000), 0);
+    // One sample cannot prove a 24h change — it stays blank, not invented 0%.
+    assert.equal(changePct('TESTA', 86_400_000, 2000), null);
     recordPrice('TESTA', '110', 2000);
     assert.equal(changePct('TESTA', 86_400_000, 2000), 10);
   });
 
-  it('flat history reads 0, never blank', () => {
+  it('never uses a point older than the window as the baseline', () => {
     recordPrice('TESTB', '100', 0);
     recordPrice('TESTB', '200', 100_000);
-    // window of 50s ending at t=100000 -> only the 200 point qualifies -> 0, not null
-    assert.equal(changePct('TESTB', 50_000, 100_000), 0);
+    // 50s window ending at t=100000 contains one point only -> null, not 0.
+    assert.equal(changePct('TESTB', 50_000, 100_000), null);
   });
 
   it('unknown symbols stay null (never seen a price)', () => {
     assert.equal(changePct('NEVER_SEEN_XYZ', 86_400_000, Date.now()), null);
   });
 
-  it('same-price records extend freshness (seed + live point)', () => {
+  it('same-price records extend freshness without inventing a point', () => {
     recordPrice('TESTC', '50', 1000);
     recordPrice('TESTC', '50', 2000);
-    assert.equal(getHistory('TESTC').length, 2); // seed + live point
-    assert.equal(getHistory('TESTC')[1]?.t, 2000);
-    assert.equal(changePct('TESTC', 86_400_000, 2000), 0);
+    assert.equal(getHistory('TESTC').length, 1); // one real point, timestamp moved
+    assert.equal(getHistory('TESTC')[0]?.t, 2000);
+    assert.equal(changePct('TESTC', 86_400_000, 2000), null);
   });
 
   it('sparkline downsamples but always keeps the last point', () => {

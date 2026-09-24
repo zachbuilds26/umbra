@@ -20,7 +20,6 @@ export interface JupiterPrice {
 const PRICE_TTL_MS = 60 * 1000;
 const priceCache = new TtlCache<Map<string, JupiterPrice>>(PRICE_TTL_MS);
 const CACHE_KEY = 'v3';
-let inflight: Promise<Map<string, JupiterPrice>> | null = null;
 let wantedMints: string[] | null = null;
 
 function headers(): Record<string, string> {
@@ -30,14 +29,23 @@ function headers(): Record<string, string> {
 }
 
 // Free tier is ~1 RPS: pace keyed calls so cold-boot fan-outs don't 429 themselves.
+// Serialized through a promise tail — a plain "lastCallAt" check lets every
+// concurrent caller compute the same wait and then fire together.
 let lastCallAt = 0;
-async function pace(): Promise<void> {
-  const wait = 1100 - (Date.now() - lastCallAt);
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastCallAt = Date.now();
+let paceTail: Promise<void> = Promise.resolve();
+function pace(): Promise<void> {
+  const run = paceTail.then(async () => {
+    const wait = 1100 - (Date.now() - lastCallAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastCallAt = Date.now();
+  });
+  paceTail = run.catch(() => undefined);
+  return run;
 }
 
-/** Refresh the cached price map for exactly these mints (batched, single-flight). */
+const inflights = new Map<string, Promise<Map<string, JupiterPrice>>>();
+
+/** Refresh the cached price map for exactly these mints (batched, single-flight per mint set). */
 export async function refreshJupiterPrices(mints: string[]): Promise<Map<string, JupiterPrice>> {
   const cached = priceCache.get(CACHE_KEY);
   if (cached && wantedMints && mints.every((m) => wantedMints?.includes(m))) {
@@ -48,11 +56,16 @@ export async function refreshJupiterPrices(mints: string[]): Promise<Map<string,
     }
     if (subset.size > 0) return subset;
   }
-  if (inflight) return inflight;
-  inflight = (async () => {
+  // Keyed by the requested set: a shared global promise handed an NVDAx caller
+  // whatever AAPLx request happened to be in flight.
+  const key = [...new Set(mints)].sort().join(',');
+  const existing = inflights.get(key);
+  if (existing) return existing;
+  const unique = [...new Set(mints)];
+  const promise = (async () => {
     try {
-      const out = new Map<string, JupiterPrice>();
-      const unique = [...new Set(mints)];
+      // Start from the cached map so a partial batch never drops known prices.
+      const out = new Map<string, JupiterPrice>(priceCache.get(CACHE_KEY) ?? []);
       for (let i = 0; i < unique.length; i += 50) {
         const batch = unique.slice(i, i + 50);
         await pace();
@@ -64,14 +77,15 @@ export async function refreshJupiterPrices(mints: string[]): Promise<Map<string,
           }
         }
       }
-      wantedMints = unique;
+      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])];
       priceCache.set(CACHE_KEY, out);
       return out;
     } finally {
-      inflight = null;
+      inflights.delete(key);
     }
   })();
-  return inflight;
+  inflights.set(key, promise);
+  return promise;
 }
 
 /** Single-mint convenience (goes through the same cache). */
@@ -99,7 +113,9 @@ export async function getJupiterMint(symbol: string): Promise<{ mint: string; de
   const res = await fetchJsonWithRetry<JupiterTokenEntry[]>(url, { headers: headers(), timeoutMs: 10_000 }, 0).catch(
     () => null,
   );
-  const hit = res?.data?.find((t) => t.symbol?.toUpperCase() === key);
+  // A 200 can still carry an error object; .find on it would throw a 500.
+  const entries = Array.isArray(res?.data) ? res.data : [];
+  const hit = entries.find((t) => typeof t?.symbol === 'string' && t.symbol.toUpperCase() === key);
   if (!hit?.id) return null;
   const out = { mint: hit.id, decimals: hit.decimals ?? 8 };
   mintCache.set(key, out);

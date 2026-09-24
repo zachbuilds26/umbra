@@ -3,7 +3,19 @@ import { z } from 'zod';
 export const solanaAddress = z.string().min(32).max(48);
 export const evmAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'invalid EVM address');
 export const symbolSchema = z.string().min(1).max(16);
-export const positiveDecimal = z.string().regex(/^(?!0+(\.0+)?$)\d+(\.\d+)?$/, 'must be a positive decimal');
+export const positiveDecimal = z
+  .string()
+  .max(40, 'amount is too long')
+  .regex(/^(?!0+(\.0+)?$)\d+(\.\d+)?$/, 'must be a positive decimal')
+  .refine((v) => {
+    const parts = v.split('.');
+    const whole = parts[0] ?? '';
+    const fraction = parts[1] ?? '';
+    return whole.replace(/^0+/, '').length <= 12 && fraction.length <= 9;
+  }, 'amount is too large or too precise');
+
+// 5% ceiling: 10000 bps made minimumReceived zero (no slippage protection at all).
+const slippageBpsSchema = z.coerce.number().int().min(0).max(500).default(50);
 
 export const swapQuoteQuery = z.object({
   // Domain-level (preferred): ?sell=USDC&buy=NVDAx&amount=500&userPublicKey=...
@@ -11,30 +23,42 @@ export const swapQuoteQuery = z.object({
   buy: symbolSchema.optional(),
   amount: positiveDecimal.optional(),
   userPublicKey: solanaAddress.optional(),
-  slippageBps: z.coerce.number().int().min(0).max(10_000).default(50),
+  slippageBps: slippageBpsSchema,
 });
 
 export const swapTransactionBody = z.object({
-  quoteId: z.string().min(1),
+  quoteId: z.string().min(1).max(64),
   userPublicKey: solanaAddress,
 });
 
+export const swapBroadcastBody = z.object({
+  quoteId: z.string().min(1).max(64),
+  userPublicKey: solanaAddress,
+  signedTransaction: z.string().min(80).max(20_000),
+});
+
 export const swapSubmitBody = z.object({
-  quoteId: z.string().min(1),
+  quoteId: z.string().min(1).max(64),
   signature: z.string().min(80).max(96),
+  wallet: solanaAddress,
+});
+
+export const transactionsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  wallet: solanaAddress,
 });
 
 export const bridgeQuoteBody = z.object({
-  sourceNetwork: z.string().min(1),
+  sourceNetwork: z.string().min(1).max(32),
   asset: symbolSchema,
   amount: positiveDecimal,
-  destinationNetwork: z.string().min(1),
-  destinationAddress: z.string().min(1),
+  destinationNetwork: z.string().min(1).max(32),
+  destinationAddress: z.string().min(1).max(128),
 });
 
 export const bridgeTransactionBody = z.object({
-  bridgeQuoteId: z.string().min(1),
-  sourceWalletAddress: z.string().min(1),
+  bridgeQuoteId: z.string().min(1).max(64),
+  sourceWalletAddress: z.string().min(1).max(128),
   destinationSolanaAddress: solanaAddress,
 });
 
@@ -45,7 +69,7 @@ export const dbcQuoteQuery = z.object({
   pool: solanaAddress,
   side: z.enum(['buy', 'sell']),
   amount: positiveDecimal,
-  slippageBps: z.coerce.number().int().min(0).max(10_000).default(50),
+  slippageBps: slippageBpsSchema,
 });
 
 export const dbcSwapBody = z.object({
@@ -53,7 +77,7 @@ export const dbcSwapBody = z.object({
   side: z.enum(['buy', 'sell']),
   amount: positiveDecimal,
   userPublicKey: solanaAddress,
-  slippageBps: z.coerce.number().int().min(0).max(10_000).default(50),
+  slippageBps: slippageBpsSchema,
 });
 
 export const dbcCreateConfigBody = z.object({

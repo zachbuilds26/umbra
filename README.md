@@ -18,7 +18,7 @@ Node 20+ · TypeScript · Fastify · Zod · `@solana/web3.js` · `decimal.js` (e
 ```bash
 cp .env.example .env   # Windows: copy .env.example .env
 npm install
-npm run dev            # watch mode on :3001
+npm run dev            # watch mode on :3002
 ```
 
 Key env vars:
@@ -48,14 +48,19 @@ Key env vars:
 | GET | `/api/wallet/:address/balances` | Umbra-token balances, display amounts (powers MAX) |
 | GET | `/api/swap/quote?sell=USDC&buy=NVDAx&amount=500[&userPublicKey=…][&slippageBps=50]` | Executable quote, provider-neutral route |
 | POST | `/api/swap/transaction` `{quoteId, userPublicKey}` | Unsigned base64 tx for the wallet to sign |
-| POST | `/api/transactions/swap` `{quoteId, signature}` | Record + confirm, normalized status |
-| GET | `/api/transactions?limit=20` | Recent transactions (Activity tab) |
-| GET | `/api/transactions/:id` | Swap status (`submitted → confirmed/failed/expired`) |
+| POST | `/api/swap/broadcast` `{quoteId, userPublicKey, signedTransaction}` | Broadcast the wallet-signed swap (a signed-but-unsent tx can never confirm) |
+| POST | `/api/transactions/swap` `{quoteId, signature, wallet}` | Record + confirm, normalized status |
+| GET | `/api/transactions?limit=20&wallet=…` | That wallet's transactions (Activity tab) |
+| GET | `/api/transactions/:id?wallet=…` | Swap status (`submitted → confirmed/failed/expired`) |
 | GET | `/api/bridge/routes` | Sources → Solana only, from live config |
 | POST | `/api/bridge/quote` `{sourceNetwork, asset, amount, destinationNetwork:"Solana", destinationAddress}` | Validated 1:1 intent (fees/times `null` unless the config provides them) |
 | POST | `/api/bridge/transaction` `{bridgeQuoteId, sourceWalletAddress, destinationSolanaAddress}` | Verified bridge contract + token data + `trackingId` |
-| GET | `/api/bridge/transactions/:id` | Bridge status (`source_pending → source_confirmed → ccip_in_flight → …`) |
-| POST | `/api/bridge/transactions/:id/source` `{sourceTxHash, ccipMessageId?}` | Record source confirmation |
+| GET | `/api/bridge/transactions/:id?wallet=…` | Bridge status (`source_pending → source_confirmed → ccip_in_flight → …`) |
+| POST | `/api/bridge/transactions/:id/source` `{sourceTxHash, ccipMessageId?, wallet}` | Record source confirmation (owning wallet only) |
+| GET | `/api/dbc/presets` | Equity launch presets with real curve economics |
+| GET | `/api/dbc/pools?baseMint=…` | DBC pool state, or `pool:null` for unlaunched names |
+| GET | `/api/dbc/quote?pool=…&side=buy\|sell&amount=…&slippageBps=50` | Live curve quote (max 5% slippage) |
+| POST | `/api/dbc/transaction` `{pool, side, amount, userPublicKey, slippageBps}` | Unsigned exact-in swap against a pool |
 
 Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "message": "…", "details": {} } }`. Secrets are never logged or returned.
 
@@ -64,7 +69,7 @@ Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "messa
 1. **No invented bridge addresses** — `bridge-config.service.ts` fetches + caches (3 min TTL) the public config; every route/quote revalidates against it.
 2. **No authenticated xStocks flows** — public endpoints only (`/public/assets*`, `/public/bridges`).
 3. **Jupiter is infrastructure** — quotes normalize to `{sell, receive, rate, route:[{symbol},{symbol}]}`; venue names never appear.
-4. **No custody** — unsigned txs out, wallet signatures in. No `execute-any-contract` endpoint exists.
+4. **No custody** — unsigned txs out, wallet signatures in. The backend only relays a transaction the connected wallet signed (it verifies the signer matches the quote's wallet); no `execute-any-contract` endpoint exists.
 5. **Exact money math** — `decimal.js` everywhere; `display = raw × multiplier` on Solana Token-2022 xStocks. `Decimal('0').isPositive()` is `true`, so zero-guards use `.gt(0)`.
 6. **xStocks symbols are case-sensitive** (`NVDAx` ≠ `NVDAX`) — `canonicalSymbol()` normalizes to `BASE + 'x'`.
 
@@ -72,14 +77,14 @@ Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "messa
 
 ```bash
 # Health
-curl localhost:3001/health/providers
+curl localhost:3002/health/providers
 # Assets + price
-curl localhost:3001/api/assets/NVDAx
+curl localhost:3002/api/assets/NVDAx
 # Swap quote USDC -> NVDAx, then NVDAx -> USDC
-curl "localhost:3001/api/swap/quote?sell=USDC&buy=NVDAx&amount=500"
+curl "localhost:3002/api/swap/quote?sell=USDC&buy=NVDAx&amount=500"
 # Bridge discovery + quote Ethereum NVDAx -> Solana
-curl localhost:3001/api/bridge/routes
-curl -X POST localhost:3001/api/bridge/quote -H "Content-Type: application/json" \
+curl localhost:3002/api/bridge/routes
+curl -X POST localhost:3002/api/bridge/quote -H "Content-Type: application/json" \
   -d '{"sourceNetwork":"Ethereum","asset":"NVDAx","amount":"1.5","destinationNetwork":"Solana","destinationAddress":"<SOLANA_PUBKEY>"}'
 ```
 

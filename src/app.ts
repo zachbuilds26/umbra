@@ -60,11 +60,33 @@ export async function buildApp(): Promise<FastifyInstance> {
         .status(400)
         .send(apiError('VALIDATION_ERROR', 'Invalid request.', { issues: err.issues.slice(0, 8) }));
     }
-    if (typeof err === 'object' && err !== null && 'statusCode' in err && 'validation' in err) {
-      return reply.status(400).send(apiError('VALIDATION_ERROR', 'Invalid request.'));
+    // Fastify's own client errors (malformed JSON, unsupported media type,
+    // body over the limit) arrive with only a statusCode. Without this they
+    // became 500s, hiding a bad request from the user as a server fault.
+    if (typeof err === 'object' && err !== null && 'statusCode' in err && typeof err.statusCode === 'number') {
+      const status = err.statusCode;
+      if (status === 413) {
+        return reply.status(413).send(apiError('VALIDATION_ERROR', 'Request body is too large.'));
+      }
+      if (status === 415) {
+        return reply.status(415).send(apiError('VALIDATION_ERROR', 'Unsupported content type.'));
+      }
+      if (status >= 400 && status < 500) {
+        return reply.status(status).send(apiError('VALIDATION_ERROR', 'Invalid request.'));
+      }
     }
     req.log.error({ err, requestId }, 'unhandled error');
     return reply.status(500).send(apiError('INTERNAL', 'Something went wrong.'));
+  });
+
+  // Baseline hardening. The app must keep loading its inline scripts and the
+  // ESM CDN, so CSP stays permissive on script/style; the rest costs nothing.
+  app.addHook('onSend', async (_req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    if (env.isProd) reply.header('Strict-Transport-Security', 'max-age=31536000');
   });
 
   // Uniform 404 envelope (default Fastify shape leaks the path and breaks the
@@ -107,11 +129,18 @@ export async function buildApp(): Promise<FastifyInstance> {
       root: frontendDir,
       prefix: '/',
       index: ['index.html'],
-      // Logos/bundle never change content without a deploy: cache a year.
-      // index.html + JSON stay revalidating (default etag behavior).
+      // Never publish dotfiles: a .env or editor backup dropped in frontend/
+      // is downloadable by URL regardless of .gitignore.
+      dotfiles: 'deny',
+      // Asset filenames are stable, not fingerprinted, so a year-long
+      // immutable cache would pin visitors to last deploy's logo/script.
+      // One day is a real win and still revalidates on every deploy after.
       setHeaders: (reply, pathName) => {
-        if (/\/assets\//.test(pathName)) {
-          reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+        const normalized = pathName.replace(/\\/g, '/');
+        if (normalized.includes('/assets/')) {
+          reply.header('Cache-Control', 'public, max-age=86400');
+        } else {
+          reply.header('Cache-Control', 'public, max-age=0, must-revalidate');
         }
       },
     });

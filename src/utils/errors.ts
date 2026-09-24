@@ -57,7 +57,11 @@ export const serviceUnavailable = (code: ErrorCode, message: string, details?: R
 export function sanitizeProviderMessage(msg: string): string {
   return msg
     .replace(/x-api-key[^,}\s]*/gi, 'x-api-key=[redacted]')
-    .replace(/(api[_-]?key\s*[:=]\s*)[^\s&,}"']+/gi, '$1[redacted]')
+    // JSON-quoted form too: {"apiKey":"secret"} leaked past the bare regex.
+    .replace(
+      /((?:x-)?api[_-]?key|access[_-]?token|authorization|secret|password)\s*["']?\s*[:=]\s*["']?[^"',}\s]+/gi,
+      '$1=[redacted]',
+    )
     .replace(/(Bearer\s+)[A-Za-z0-9._~-]+/g, '$1[redacted]')
     .slice(0, 500);
 }

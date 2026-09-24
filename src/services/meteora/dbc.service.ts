@@ -15,7 +15,7 @@ import { getDbcClient } from './dbc-client.js';
 import { DBC_QUOTE_DECIMALS, DBC_QUOTE_MINT, buildEquityConfig, getEquityPreset } from './dbc-presets.js';
 import { TtlCache } from '../../utils/cache.js';
 import { badRequest, notFound, upstream, sanitizeProviderMessage } from '../../utils/errors.js';
-import { isValidSolanaAddress } from '../../utils/addresses.js';
+import { isValidSolanaAddress, isValidSolanaPublicKey } from '../../utils/addresses.js';
 
 Decimal.set({ precision: 40 });
 
@@ -96,17 +96,19 @@ async function resolvePoolContext(poolAddress: string): Promise<PoolContext> {
   if (!config) throw notFound('NOT_FOUND', `DBC config for pool ${poolAddress} is unreadable.`);
   const configFields = config as unknown as Record<string, unknown>;
   const baseMint = asB58(poolFields.baseMint);
-  const quoteMint = asB58(configFields.quoteMint) || DBC_QUOTE_MINT;
+  const quoteMint = asB58(configFields.quoteMint);
+  // Token units are never guessed. A pool whose quote mint or decimals we
+  // cannot read must fail closed: assuming 8 decimals/USDC would build a
+  // signable transaction whose amounts are off by orders of magnitude.
+  if (!baseMint || !quoteMint) {
+    throw dbcError(new Error('DBC pool metadata is incomplete'), 'DBC pool unreadable');
+  }
   const [baseDecimals, quoteDecimals] = await Promise.all([
-    // Built inside .then so a corrupt on-chain mint string falls back instead
-    // of throwing synchronously past the .catch (500).
-    Promise.resolve()
-      .then(() => getTokenDecimals(getConnection(), new PublicKey(baseMint)))
-      .catch(() => 8),
-    Promise.resolve()
-      .then(() => getTokenDecimals(getConnection(), new PublicKey(quoteMint)))
-      .catch(() => DBC_QUOTE_DECIMALS),
-  ]);
+    Promise.resolve().then(() => getTokenDecimals(getConnection(), new PublicKey(baseMint))),
+    Promise.resolve().then(() => getTokenDecimals(getConnection(), new PublicKey(quoteMint))),
+  ]).catch((err: unknown) => {
+    throw dbcError(err instanceof Error ? err : new Error(String(err)), 'DBC token decimals unreadable');
+  });
   return { poolAddress, pool, config, baseMint, quoteMint, baseDecimals, quoteDecimals };
 }
 
@@ -161,7 +163,7 @@ export async function getDbcQuote(
   amountDisplay: string,
   slippageBps: number,
 ): Promise<DbcQuote> {
-  if (!isValidSolanaAddress(poolAddress)) {
+  if (!isValidSolanaPublicKey(poolAddress)) {
     throw badRequest('INVALID_ADDRESS', 'pool is not a valid Solana address.');
   }
   const dbc = getDbcClient();
@@ -239,7 +241,7 @@ export async function buildDbcSwapTransaction(
   userPublicKey: string,
   slippageBps: number,
 ): Promise<{ transaction: string; quote: DbcQuote }> {
-  if (!isValidSolanaAddress(poolAddress)) {
+  if (!isValidSolanaPublicKey(poolAddress)) {
     throw badRequest('INVALID_ADDRESS', 'pool is not a valid Solana address.');
   }
   if (!isValidSolanaAddress(userPublicKey)) {

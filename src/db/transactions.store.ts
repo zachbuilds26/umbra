@@ -4,24 +4,55 @@ import { isPg, pgQuery } from './pg.js';
 
 // Transaction ledger (plan §26). Postgres when DATABASE_URL is set (Render),
 // in-memory otherwise (local dev needs no database). Never stores keys/seeds.
+//
+// Ownership: every record carries the wallet it belongs to. Reads through the
+// HTTP API are scoped to that wallet, so one visitor can never enumerate or
+// read another visitor's amounts, signatures, or statuses.
 
 const mem = new Map<string, UmbraTransaction>();
+const MAX_MEMORY_ROWS = 1_000;
 
 function now(): string {
   return new Date().toISOString();
 }
 
-type TxRow = Record<string, string | null>;
+type TxRow = Record<string, unknown>;
+
+/** Postgres hands back Date objects for TIMESTAMPTZ; the API contract is ISO 8601. */
+function iso(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  const raw = value === null || value === undefined ? '' : String(value);
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return new Date(0).toISOString();
+  return parsed.toISOString();
+}
+
+function str(v: unknown): string | undefined {
+  return v === null || v === undefined ? undefined : String(v);
+}
+function nul(v: unknown): string | null {
+  return v === null || v === undefined ? null : String(v);
+}
+
+const SWAP_STATUSES: ReadonlySet<string> = new Set(['pending', 'submitted', 'confirmed', 'failed', 'expired']);
+const BRIDGE_STATUSES: ReadonlySet<string> = new Set([
+  'source_pending', 'source_confirmed', 'ccip_in_flight',
+  'destination_pending', 'completed', 'failed',
+]);
+
+function normalizeStatus(type: string, value: unknown): SwapTxStatus | BridgeTxStatus {
+  const raw = String(value ?? '');
+  const allowed = type === 'bridge' ? BRIDGE_STATUSES : SWAP_STATUSES;
+  if (allowed.has(raw)) return raw as SwapTxStatus | BridgeTxStatus;
+  return type === 'bridge' ? 'source_pending' : 'pending';
+}
 
 function rowToTx(r: TxRow): UmbraTransaction {
-  const str = (v: string | null | undefined): string | undefined =>
-    v === null || v === undefined ? undefined : String(v);
-  const nul = (v: string | null | undefined): string | null =>
-    v === null || v === undefined ? null : String(v);
+  const type = r.type === 'bridge' ? 'bridge' : 'swap';
   return {
     id: String(r.id),
-    type: r.type === 'bridge' ? 'bridge' : 'swap',
-    status: String(r.status) as UmbraTransaction['status'],
+    type,
+    status: normalizeStatus(type, r.status),
     sourceNetwork: str(r.source_network),
     destinationNetwork: str(r.destination_network),
     sourceAsset: str(r.source_asset),
@@ -37,8 +68,8 @@ function rowToTx(r: TxRow): UmbraTransaction {
     signature: nul(r.signature),
     errorCode: nul(r.error_code),
     errorMessage: nul(r.error_message),
-    createdAt: String(r.created_at),
-    updatedAt: String(r.updated_at),
+    createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
   };
 }
 
@@ -60,22 +91,53 @@ const PATCH_COLS: Record<string, string> = {
   providerReference: 'provider_reference',
 };
 
+function owns(tx: UmbraTransaction, wallet: string): boolean {
+  return tx.sourceWallet === wallet || tx.destinationWallet === wallet;
+}
+
+function safeLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 20;
+  return Math.min(50, Math.max(1, Math.trunc(limit)));
+}
+
+function trimMemory(): void {
+  if (mem.size <= MAX_MEMORY_ROWS) return;
+  const byAge = [...mem.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const tx of byAge.slice(0, mem.size - MAX_MEMORY_ROWS)) mem.delete(tx.id);
+}
+
 export async function createTransaction(
   input: Omit<UmbraTransaction, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<UmbraTransaction> {
+  const owner = input.sourceWallet ?? input.destinationWallet;
+  // A swap with no wallet attached could never be shown to, or secured by, its
+  // owner — refuse rather than write an orphan row.
+  if (!owner) {
+    throw new Error('createTransaction requires sourceWallet or destinationWallet');
+  }
   const tx: UmbraTransaction = {
     ...input,
+    status: normalizeStatus(input.type, input.status),
     id: newTxId(),
     createdAt: now(),
     updatedAt: now(),
   };
   if (!isPg()) {
+    // Same signature twice = one ledger row, so a retried POST can't duplicate.
+    if (tx.signature) {
+      for (const existing of mem.values()) {
+        if (existing.signature && existing.signature === tx.signature) return { ...existing };
+      }
+    }
     mem.set(tx.id, tx);
-    return tx;
+    trimMemory();
+    return { ...tx };
   }
-  await pgQuery(
+  const rows = await pgQuery<TxRow>(
     `INSERT INTO transactions (${COLUMNS}) VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+     ON CONFLICT (signature) WHERE signature IS NOT NULL DO NOTHING
+     RETURNING *`,
     [
       tx.id, tx.type, tx.status, tx.sourceNetwork ?? null, tx.destinationNetwork ?? null,
       tx.sourceAsset ?? null, tx.destinationAsset ?? null, tx.sourceAmount ?? null,
@@ -85,12 +147,25 @@ export async function createTransaction(
       tx.errorMessage ?? null, tx.createdAt, tx.updatedAt,
     ],
   );
-  return tx;
+  const inserted = rows[0];
+  if (inserted) return rowToTx(inserted);
+  const existing = await pgQuery<TxRow>('SELECT * FROM transactions WHERE signature = $1', [tx.signature]);
+  return existing[0] ? rowToTx(existing[0]) : tx;
 }
 
-export async function getTransaction(id: string): Promise<UmbraTransaction | undefined> {
-  if (!isPg()) return mem.get(id);
-  const rows = await pgQuery<TxRow>('SELECT * FROM transactions WHERE id = $1', [id]);
+export async function getTransaction(id: string, ownerWallet?: string): Promise<UmbraTransaction | undefined> {
+  if (!isPg()) {
+    const found = mem.get(id);
+    if (!found) return undefined;
+    if (ownerWallet && !owns(found, ownerWallet)) return undefined;
+    return { ...found };
+  }
+  const rows = ownerWallet
+    ? await pgQuery<TxRow>(
+        'SELECT * FROM transactions WHERE id = $1 AND (source_wallet = $2 OR destination_wallet = $2)',
+        [id, ownerWallet],
+      )
+    : await pgQuery<TxRow>('SELECT * FROM transactions WHERE id = $1', [id]);
   const row = rows[0];
   return row ? rowToTx(row) : undefined;
 }
@@ -98,20 +173,23 @@ export async function getTransaction(id: string): Promise<UmbraTransaction | und
 export async function updateTransaction(
   id: string,
   patch: Partial<Pick<UmbraTransaction, 'status' | 'destinationTxHash' | 'destinationAmount' | 'ccipMessageId' | 'errorCode' | 'errorMessage' | 'sourceTxHash' | 'providerReference'>>,
+  ownerWallet?: string,
 ): Promise<UmbraTransaction | undefined> {
   if (!isPg()) {
     const existing = mem.get(id);
     if (!existing) return undefined;
+    if (ownerWallet && !owns(existing, ownerWallet)) return undefined;
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
     const updated: UmbraTransaction = {
       ...existing,
-      ...patch,
-      status: (patch.status ?? existing.status) as UmbraTransaction['status'],
+      ...defined,
+      status: normalizeStatus(existing.type, defined.status ?? existing.status),
       updatedAt: now(),
     };
     mem.set(id, updated);
-    return updated;
+    return { ...updated };
   }
-  const sets: string[] = ['updated_at = now()'];
+  const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [key, col] of Object.entries(PATCH_COLS)) {
     const v = (patch as Record<string, unknown>)[key];
@@ -120,26 +198,38 @@ export async function updateTransaction(
       sets.push(`${col} = $${vals.length}`);
     }
   }
-  if (sets.length === 1) {
-    return getTransaction(id);
+  if (sets.length === 0) return getTransaction(id, ownerWallet);
+  sets.push('updated_at = now()');
+  const filters = ['id = $' + (vals.length + 1)];
+  if (ownerWallet) {
+    vals.push(ownerWallet);
+    filters.push(`(source_wallet = $${vals.length} OR destination_wallet = $${vals.length})`);
   }
   vals.push(id);
   const rows = await pgQuery<TxRow>(
-    `UPDATE transactions SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`,
+    `UPDATE transactions SET ${sets.join(', ')} WHERE ${filters.join(' AND ')} RETURNING *`,
     vals,
   );
   const row = rows[0];
   return row ? rowToTx(row) : undefined;
 }
 
-export async function listTransactions(limit = 50): Promise<UmbraTransaction[]> {
+export async function listTransactions(limit = 20, ownerWallet?: string): Promise<UmbraTransaction[]> {
+  const capped = safeLimit(limit);
   if (!isPg()) {
-    return [...mem.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+    return [...mem.values()]
+      .filter((tx) => !ownerWallet || owns(tx, ownerWallet))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+      .slice(0, capped)
+      .map((tx) => ({ ...tx }));
   }
-  const rows = await pgQuery<TxRow>(
-    'SELECT * FROM transactions ORDER BY created_at DESC LIMIT $1',
-    [Math.min(Math.max(limit, 1), 50)],
-  );
+  const rows = ownerWallet
+    ? await pgQuery<TxRow>(
+        `SELECT * FROM transactions WHERE (source_wallet = $1 OR destination_wallet = $1)
+         ORDER BY created_at DESC, id DESC LIMIT $2`,
+        [ownerWallet, capped],
+      )
+    : await pgQuery<TxRow>('SELECT * FROM transactions ORDER BY created_at DESC, id DESC LIMIT $1', [capped]);
   return rows.map(rowToTx);
 }
 

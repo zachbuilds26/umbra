@@ -24,3 +24,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions (status);
 CREATE INDEX IF NOT EXISTS idx_transactions_source_tx ON transactions (source_tx_hash);
+CREATE INDEX IF NOT EXISTS idx_transactions_wallet ON transactions (source_wallet, created_at DESC);
+-- One row per on-chain signature: a retried POST must not duplicate the ledger.
+DELETE FROM transactions a USING transactions b
+  WHERE a.signature IS NOT NULL AND a.signature = b.signature AND a.id > b.id;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_signature ON transactions (signature);
