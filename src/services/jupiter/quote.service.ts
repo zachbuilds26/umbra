@@ -7,7 +7,7 @@ import { displayToBaseUnits, baseUnitsToDisplay } from '../solana/multiplier.js'
 import { isValidSolanaAddress } from '../../utils/addresses.js';
 import { newQuoteId } from '../../utils/ids.js';
 import { quoteStore } from '../quotes.store.js';
-import { badRequest, upstream, HttpError } from '../../utils/errors.js';
+import { badRequest, upstream, HttpError, type ErrorCode } from '../../utils/errors.js';
 import type { UmbraQuote } from '../../domain/models.js';
 
 Decimal.set({ precision: 40 });
@@ -66,16 +66,27 @@ export function assertStockStablePair(
   );
 }
 
+/**
+ * User-entered decimal string -> on-chain atomic units, exactly.
+ *
+ * Decimal arithmetic only, never `Number`: 1.005 at 6dp is 1005000 in decimal,
+ * but in binary floating point it is 1004999.9999999999, and flooring that sends
+ * one atomic unit less than the user asked for.
+ */
+export function displayToAtomicUnits(displayAmount: string, decimals: number): string {
+  return new Decimal(displayAmount).mul(new Decimal(10).pow(decimals)).floor().toFixed(0);
+}
+
 /** Display amount -> base units. Base assets 6dp (USDC/USDT);
  *  PreStocks plain 9dp; xStocks apply the live multiplier (plan §10). */
 async function toBaseUnits(symbol: string, displayAmount: string): Promise<string> {
   if (isStableSymbol(symbol)) {
-    return new Decimal(displayAmount).mul(new Decimal(10).pow(6)).floor().toFixed(0);
+    return displayToAtomicUnits(displayAmount, 6);
   }
   const { getPrestocksSymbols, PRESTOCKS_DECIMALS } = await import('../prestocks/assets.js');
   const pre = await getPrestocksSymbols().catch(() => new Set<string>());
   if (pre.has(symbol.toUpperCase())) {
-    return new Decimal(displayAmount).mul(new Decimal(10).pow(PRESTOCKS_DECIMALS)).floor().toFixed(0);
+    return displayToAtomicUnits(displayAmount, PRESTOCKS_DECIMALS);
   }
   // getMultiplier never throws (it degrades to last-known/null), so a failure
   // here is a genuine "we cannot convert units" — one clean message, no
@@ -110,6 +121,64 @@ async function fromBaseUnits(symbol: string, baseUnits: string): Promise<string>
   return baseUnitsToDisplay(baseUnits, multiplier, 8);
 }
 
+/**
+ * Turn a Jupiter order failure into the reason a trader can actually act on.
+ *
+ * Jupiter answers HTTP 200 with `errorCode`/`errorMessage` for most failures and
+ * uses HTTP 400 when it cannot build a route at all. The distinction that matters
+ * most: "Insufficient funds" is the TAKER's wallet (missing input tokens, or not
+ * enough SOL for the fee and the destination account rent), never pool liquidity.
+ * Reporting that as thin liquidity sent users off to shrink an amount that was
+ * never the problem.
+ */
+export function classifyJupiterFailure(input: {
+  status: number;
+  errorCode?: number;
+  errorMessage?: string;
+  hasTaker: boolean;
+}): { code: ErrorCode; message: string; reason: string } {
+  const raw = (input.errorMessage ?? '').trim();
+  const text = raw.toLowerCase();
+  const reason = raw || `upstream http ${input.status}`;
+
+  if (/insufficient (funds|balance)|not enough (funds|sol|lamports)|exceeds balance|balance too low/.test(text)) {
+    return {
+      code: 'INSUFFICIENT_BALANCE',
+      message:
+        'Your wallet cannot cover this swap yet. It needs the token you are selling plus a little SOL for the network fee and to open the destination account.',
+      reason,
+    };
+  }
+  if (/no route|route not found|could not find any route|failed to find any route|no path|invalid route|unsupported pair|token not supported/.test(text)) {
+    return {
+      code: 'NO_ROUTE',
+      message: 'No executable route is currently available for this pair.',
+      reason,
+    };
+  }
+  if (/insufficient liquidity|not enough liquidity|exceeds liquidity|slippage exceeded|price impact too high/.test(text)) {
+    return {
+      code: 'INSUFFICIENT_LIQUIDITY',
+      message: 'The pool for this pair is too thin for this size right now. Try a smaller amount or the reverse direction.',
+      reason,
+    };
+  }
+  // HTTP 400 from /order means Jupiter declined the pair/amount outright. That is
+  // a missing route unless Jupiter named a cause above — never call it "thin".
+  if (input.status === 400 || input.errorCode) {
+    return {
+      code: 'NO_ROUTE',
+      message: 'No executable route is currently available for this pair.',
+      reason,
+    };
+  }
+  return {
+    code: 'SWAP_UNAVAILABLE',
+    message: 'Our routing provider could not complete this request. Try again in a moment.',
+    reason,
+  };
+}
+
 async function fetchOrder(args: {
   inputMint: string;
   outputMint: string;
@@ -128,27 +197,26 @@ async function fetchOrder(args: {
     // user: it says nothing they can act on.
     throw upstream('SWAP_UNAVAILABLE', 'Our quote provider did not respond. Try again in a moment.');
   }
+  const hasTaker = Boolean(args.taker);
   if (!res.data) {
-    // Jupiter 400 = no route for this exact pair/amount (thin or missing pools),
-    // not a bug in the request. Say so plainly instead of leaking "upstream 400".
-    if (res.status === 400) {
-      throw upstream(
-        'INSUFFICIENT_LIQUIDITY',
-        'No swap route for this pair and amount right now (thin liquidity). Try a smaller amount or the reverse direction.',
-      );
-    }
     if (res.status === 429) {
       throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
     }
-    throw upstream('SWAP_UNAVAILABLE', `Swap quote unavailable (upstream ${res.status}).`);
+    const classified = classifyJupiterFailure({ status: res.status, hasTaker });
+    throw upstream(classified.code, classified.message, { reason: classified.reason });
   }
   const order = res.data;
-  if (order.transaction === '' || order.errorCode) {
-    const msg = order.errorMessage || 'Jupiter could not build this swap.';
-    if (/insufficient/i.test(msg)) {
-      throw upstream('INSUFFICIENT_LIQUIDITY', msg);
-    }
-    throw upstream('SWAP_UNAVAILABLE', msg);
+  // A quote-only order legitimately has no transaction. A taker order that comes
+  // back without one is a failure: either Jupiter flagged it, or it silently
+  // declined. Both must be classified, never passed on as a usable order.
+  if (order.errorCode || (hasTaker && !order.transaction)) {
+    const classified = classifyJupiterFailure({
+      status: res.status,
+      errorCode: order.errorCode,
+      errorMessage: order.errorMessage,
+      hasTaker,
+    });
+    throw upstream(classified.code, classified.message, { reason: classified.reason });
   }
   return order;
 }
@@ -177,6 +245,7 @@ function normalizeQuote(args: {
   expiresAt: string;
   networkFee: { currency: 'SOL'; amount: string; estimated: boolean };
   platformFeeBps: number | null;
+  routeVenue: string | null;
 }): UmbraQuote {
   const { sellSide, buySide, amount, receiveDisplay } = args;
   return {
@@ -190,6 +259,8 @@ function normalizeQuote(args: {
     minimumReceived: args.minimumReceived,
     // Provider-neutral route derived from the actual quote (plan §1.3). Never invented venues.
     route: [{ symbol: sellSide.symbol }, { symbol: buySide.symbol }],
+    // The venue is Jupiter's own word for it, or null when it named none.
+    routeVenue: args.routeVenue,
     expiresAt: args.expiresAt,
     transaction: null,
   };
@@ -266,18 +337,28 @@ export async function buildSwapQuote(params: {
     taker,
     slippageBps,
   });
+  logSwapAttempt({
+    stage: 'quote',
+    inputMint: sellSide.mint,
+    outputMint: buySide.mint,
+    inputBaseUnits: amountBaseUnits,
+    outBaseUnits: order.outAmount ?? null,
+    routeVenue: typeof order.router === 'string' ? order.router : null,
+    priceImpactPct: order.priceImpactPct ?? null,
+    slippageBps,
+    routeAvailable: Boolean(order.outAmount),
+  });
 
-  if (!order.outAmount) throw upstream('SWAP_UNAVAILABLE', 'Jupiter returned no output amount.');
+  if (!order.outAmount) throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
   try {
     if (!new Decimal(order.outAmount).gt(0)) {
-      throw upstream(
-        'INSUFFICIENT_LIQUIDITY',
-        'No swap route for this pair and amount right now (thin liquidity). Try a smaller amount or the reverse direction.',
-      );
+      // Jupiter priced the route at zero output: there is no executable route for
+      // this size. That is a missing route, not an invented "thin liquidity".
+      throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
     }
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    throw upstream('SWAP_UNAVAILABLE', 'Jupiter returned no output amount.');
+    throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
   }
 
   // Normalize with multiplier-aware conversion (xStocks) — never raw==display.
@@ -344,6 +425,12 @@ export async function buildSwapQuote(params: {
     jupiterRequestId: order.requestId ?? null,
     transaction: order.transaction ?? null,
     receiveAmountDisplay: receiveDisplay,
+    outBaseUnits: order.outAmount ?? null,
+    routeVenue: typeof order.router === 'string' && order.router ? order.router : null,
+    priceImpactPct:
+      order.priceImpactPct === undefined || order.priceImpactPct === null
+        ? null
+        : String(order.priceImpactPct),
     signature: null,
     expiresAt: expiresAtMs,
   });
@@ -359,15 +446,55 @@ export async function buildSwapQuote(params: {
     expiresAt: new Date(expiresAtMs).toISOString(),
     networkFee: networkFeeFromOrder(order),
     platformFeeBps: order.platformFee?.feeBps ?? order.feeBps ?? null,
+    routeVenue: typeof order.router === 'string' && order.router ? order.router : null,
   });
   quote.priceImpactBps = priceImpactBps;
   return quote;
 }
 
 /**
+ * Everything needed to explain a swap after the fact, logged before the wallet is
+ * asked to sign. Deliberately free of secrets: mints, atomic amounts and the
+ * provider's own route/impact figures only.
+ */
+function logSwapAttempt(args: {
+  stage: 'quote' | 'transaction';
+  inputMint: string;
+  outputMint: string;
+  inputBaseUnits: string;
+  outBaseUnits?: string | null;
+  routeVenue?: string | null;
+  priceImpactPct?: string | number | null;
+  slippageBps: number;
+  routeAvailable: boolean;
+  rejectReason?: string | null;
+  errorCode?: string | null;
+}): void {
+  console.log(
+    '[swap]',
+    JSON.stringify({
+      stage: args.stage,
+      inputMint: args.inputMint,
+      outputMint: args.outputMint,
+      inputBaseUnits: args.inputBaseUnits,
+      outBaseUnits: args.outBaseUnits ?? null,
+      routeVenue: args.routeVenue ?? null,
+      priceImpactPct: args.priceImpactPct ?? null,
+      slippageBps: args.slippageBps,
+      routeAvailable: args.routeAvailable,
+      rejectReason: args.rejectReason ?? null,
+      errorCode: args.errorCode ?? null,
+    }),
+  );
+}
+
+/**
  * POST /api/swap/transaction — return the wallet-signable unsigned transaction.
- * Reuses the stored tx when the taker matches, otherwise builds a fresh /order
- * with the caller's address (quote stays the pricing reference).
+ *
+ * One route, one order: when the quote already carried a transaction for this
+ * exact wallet it is returned untouched, so the numbers the user saw and the
+ * transaction they sign come from the same Jupiter order. Otherwise the order is
+ * built once here, stored, and reused for any later call on the same quote.
  */
 export async function getSwapTransaction(quoteId: string, userPublicKey: string) {
   if (!isValidSolanaAddress(userPublicKey)) {
@@ -378,6 +505,17 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
     throw badRequest('QUOTE_EXPIRED', 'Quote not found or expired. Request a fresh quote.', { quoteId });
   }
   if (stored.transaction && stored.taker === userPublicKey) {
+    logSwapAttempt({
+      stage: 'transaction',
+      inputMint: stored.inputMint,
+      outputMint: stored.outputMint,
+      inputBaseUnits: stored.amountBaseUnits,
+      outBaseUnits: stored.outBaseUnits,
+      routeVenue: stored.routeVenue,
+      priceImpactPct: stored.priceImpactPct,
+      slippageBps: stored.slippageBps,
+      routeAvailable: true,
+    });
     return {
       transaction: stored.transaction,
       requestId: stored.jupiterRequestId,
@@ -392,12 +530,40 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
     slippageBps: stored.slippageBps,
   });
   if (!order.transaction) {
-    throw upstream('SWAP_UNAVAILABLE', order.errorMessage || 'Jupiter could not build this swap transaction.');
+    logSwapAttempt({
+      stage: 'transaction',
+      inputMint: stored.inputMint,
+      outputMint: stored.outputMint,
+      inputBaseUnits: stored.amountBaseUnits,
+      routeVenue: typeof order.router === 'string' ? order.router : null,
+      priceImpactPct: order.priceImpactPct ?? null,
+      slippageBps: stored.slippageBps,
+      routeAvailable: false,
+      rejectReason: order.errorMessage ?? 'no transaction returned',
+    });
+    throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
   }
+  logSwapAttempt({
+    stage: 'transaction',
+    inputMint: stored.inputMint,
+    outputMint: stored.outputMint,
+    inputBaseUnits: stored.amountBaseUnits,
+    outBaseUnits: order.outAmount,
+    routeVenue: typeof order.router === 'string' ? order.router : null,
+    priceImpactPct: order.priceImpactPct ?? null,
+    slippageBps: stored.slippageBps,
+    routeAvailable: true,
+  });
   quoteStore.updateSwap(quoteId, {
     taker: userPublicKey,
     transaction: order.transaction,
     jupiterRequestId: order.requestId ?? stored.jupiterRequestId,
+    outBaseUnits: order.outAmount ?? null,
+    routeVenue: typeof order.router === 'string' && order.router ? order.router : null,
+    priceImpactPct:
+      order.priceImpactPct === undefined || order.priceImpactPct === null
+        ? stored.priceImpactPct
+        : String(order.priceImpactPct),
   });
   return {
     transaction: order.transaction,

@@ -30,7 +30,7 @@ async function checkJupiter(): Promise<'ok' | 'degraded'> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const headers: Record<string, string> = { 'user-agent': 'Umbra-backend/0.1.0 (Stocklana-hackathon)' };
+      const headers: Record<string, string> = { 'user-agent': 'Umbra-backend/0.1.0 (Umbra)' };
       if (env.JUPITER_API_KEY) headers['x-api-key'] = env.JUPITER_API_KEY;
       const res = await fetch('https://api.jup.ag/tokens/v2/search?query=USDC', {
         headers,

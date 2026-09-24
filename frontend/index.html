@@ -3036,8 +3036,21 @@
       // provider text (timeouts, aborts, upstream payloads) is never shown.
       function friendlyQuoteError(code, msg, sym) {
         var thin = THIN.indexOf(sym) !== -1;
-        if (code === 'INSUFFICIENT_LIQUIDITY' || (thin && code === 'SWAP_UNAVAILABLE')) {
-          return 'Thin liquidity on this pair — try a smaller amount.';
+        // The backend classifies the real reason and sends trader-safe wording.
+        // Show it. Synthesising our own line here is what turned a wallet-balance
+        // problem into "thin liquidity — try a smaller amount", which sent people
+        // to shrink an amount that was never the cause.
+        if (code === 'INSUFFICIENT_BALANCE') {
+          return msg || 'Your wallet cannot cover this swap — it needs the token you are selling plus a little SOL for fees.';
+        }
+        if (code === 'NO_ROUTE') {
+          return msg || 'No executable route is currently available for this pair.';
+        }
+        if (code === 'INSUFFICIENT_LIQUIDITY') {
+          return msg || 'The pool for this pair is too thin for this size right now. Try a smaller amount or the reverse direction.';
+        }
+        if (thin && code === 'SWAP_UNAVAILABLE') {
+          return 'This pair is hard to route right now. Try a smaller amount or the reverse direction.';
         }
         if (code === 'RATE_LIMITED') return 'Quoting is busy right now — wait a moment and try again.';
         if (code === 'QUOTE_UNAVAILABLE') {
@@ -3122,6 +3135,10 @@
           return;
         }
         try {
+          // Ask for the quote WITH the wallet address when one is connected. That
+          // way Jupiter builds the transaction during the quote, and the swap we
+          // later hand the wallet is that exact order — same route, same numbers.
+          // It also surfaces "this wallet cannot cover it" before the user clicks.
           var url =
             API_BASE +
             '/api/swap/quote?sell=' +
@@ -3131,7 +3148,8 @@
             '&amount=' +
             encodeURIComponent(amt) +
             '&slippageBps=' +
-            slippageBps;
+            slippageBps +
+            (window.umbraWallet ? '&userPublicKey=' + encodeURIComponent(window.umbraWallet) : '');
           var res = await fetch(url);
           var data = await res.json();
           if (mySeq !== quoteSeq) return; // superseded by newer typing — never paint stale

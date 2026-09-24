@@ -17,6 +17,11 @@ export interface StoredSwapQuote {
   jupiterRequestId: string | null;
   transaction: string | null;
   receiveAmountDisplay: string;
+  /** Jupiter's quoted output in atomic units, as returned on the order. */
+  outBaseUnits: string | null;
+  /** The venue Jupiter routed through on that order ("metis", "dflow", ...). */
+  routeVenue: string | null;
+  priceImpactPct: string | null;
   signature: string | null;
   expiresAt: number;
 }

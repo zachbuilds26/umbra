@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSwapQuote, assertStockStablePair } from '../src/services/jupiter/quote.service.js';
+import {
+  buildSwapQuote,
+  assertStockStablePair,
+  classifyJupiterFailure,
+  displayToAtomicUnits,
+} from '../src/services/jupiter/quote.service.js';
 import { canonicalSymbol } from '../src/services/xstocks/assets.service.js';
 
 // Offline rejection paths. Live quote paths (USDC↔NVDAx) run against the real
@@ -98,4 +103,73 @@ describe('stock↔base pair rules', () => {
     assert.equal(canonicalSymbol('nvdaX'), 'NVDAx');
   });
 });
+
+describe('routing failure classification', () => {
+  it('reads "Insufficient funds" as a wallet balance problem, never thin liquidity', () => {
+    // This is the exact payload Jupiter returns when the taker cannot cover the
+    // swap. Reporting it as thin liquidity told users to shrink an amount that
+    // was never the problem.
+    const r = classifyJupiterFailure({
+      status: 200,
+      errorCode: 1,
+      errorMessage: 'Insufficient funds',
+      hasTaker: true,
+    });
+    assert.equal(r.code, 'INSUFFICIENT_BALANCE');
+    assert.notEqual(r.code, 'INSUFFICIENT_LIQUIDITY');
+    assert.match(r.message, /wallet cannot cover/i);
+    assert.match(r.message, /SOL/, 'must name the fee currency the wallet is short of');
+  });
+
+  it('reads an HTTP 400 as no executable route, not thin liquidity', () => {
+    const r = classifyJupiterFailure({ status: 400, hasTaker: true });
+    assert.equal(r.code, 'NO_ROUTE');
+    assert.match(r.message, /No executable route/i);
+  });
+
+  it('only says thin liquidity when the router actually says so', () => {
+    const r = classifyJupiterFailure({
+      status: 200,
+      errorMessage: 'Insufficient liquidity in pool',
+      hasTaker: true,
+    });
+    assert.equal(r.code, 'INSUFFICIENT_LIQUIDITY');
+  });
+
+  it('keeps named route failures truthful', () => {
+    const r = classifyJupiterFailure({
+      status: 200,
+      errorMessage: 'Could not find any route between the tokens',
+      hasTaker: true,
+    });
+    assert.equal(r.code, 'NO_ROUTE');
+  });
+
+  it('falls back to a provider error without inventing a reason', () => {
+    const r = classifyJupiterFailure({ status: 500, hasTaker: true });
+    assert.equal(r.code, 'SWAP_UNAVAILABLE');
+    assert.equal(r.reason, 'upstream http 500');
+  });
+});
+
+describe('atomic unit conversion', () => {
+  it('converts USDC (6dp) exactly, including values a float would truncate', () => {
+    assert.equal(displayToAtomicUnits('0.01', 6), '10000');
+    assert.equal(displayToAtomicUnits('1', 6), '1000000');
+    // Math.floor(1.005 * 1e6) === 1004999 in binary floating point.
+    assert.equal(displayToAtomicUnits('1.005', 6), '1005000');
+    assert.equal(displayToAtomicUnits('0.07', 6), '70000');
+  });
+
+  it('converts ANTHROPIC-style 9dp tokens exactly', () => {
+    assert.equal(displayToAtomicUnits('0.0001', 9), '100000');
+    assert.equal(displayToAtomicUnits('1.005', 9), '1005000000');
+  });
+
+  it('never invents atomic units below one token unit', () => {
+    assert.equal(displayToAtomicUnits('0.0000001', 6), '0');
+    assert.equal(displayToAtomicUnits('0.000000001', 9), '1');
+  });
+});
+
 

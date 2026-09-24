@@ -37,6 +37,11 @@ export interface UmbraQuote {
   platformFeeBps: number | null;
   minimumReceived: string;
   route: Array<{ symbol: string }>;
+  /**
+   * The venue Jupiter actually routed through, straight from its order response
+   * (e.g. "metis"). Reported only when the provider names one — never invented.
+   */
+  routeVenue?: string | null;
   expiresAt: string;
   transaction: string | null;
 }
