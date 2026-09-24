@@ -2132,7 +2132,7 @@
           <div style="text-align:center; margin-top:8px;">
             <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Explorer <i data-lucide="external-link" width="14" height="14"></i></a>
           </div>
-          <div id="drawerChart" style="margin-top:8px; height:80px; background:var(--umbra-bg); border:1px solid var(--umbra-border); border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--umbra-muted); font-size:13px;">No chart data yet</div>
+          <div id="drawerChart" style="margin-top:8px; min-height:80px; background:var(--umbra-bg); border:1px solid var(--umbra-border); border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--umbra-muted); font-size:13px; padding:4px 0;">Loading price history…</div>
           <button id="drawerSwapBtn" class="swap-action" style="margin-top:8px;">Buy this stock</button>
           <button id="drawerSellBtn" class="swap-action swap-danger" style="margin-top:8px;">Sell this stock</button>
           <div id="drawerNote" style="font-size:12px; color:var(--umbra-muted); text-align:center; display:none;"></div>
@@ -3840,9 +3840,19 @@
         scheduleQuote();
         window.scrollTo({ top: 0, behavior: 'auto' });
       });
-      function renderSparkline(points) {
+      function renderSparkline(points, change24hPct) {
         if (!points || points.length < 2) {
-          drawerChartEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:var(--umbra-muted);"><i data-lucide="line-chart" width="20" height="20"></i><span>No chart data yet — trading history will build after a few price samples.</span></div>';
+          // We do NOT promise history we will never collect: only part of the
+          // shelf is sampled, so "it will build" would be a lie. Show the one
+          // movement figure we actually have instead of an empty box.
+          var chg = Number(change24hPct);
+          var chgTxt = isFinite(chg)
+            ? '<span style="margin-top:2px;">24h ' + (chg > 0 ? '+' : '') + chg.toFixed(2) + '%</span>'
+            : '';
+          drawerChartEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:var(--umbra-muted);">' +
+            '<i data-lucide="line-chart" width="20" height="20"></i>' +
+            '<span style="text-align:center;">No observed price history for this name — we chart only prices we have actually seen.</span>' +
+            chgTxt + '</div>';
           if (window.lucide) window.lucide.createIcons();
           return;
         }
@@ -3957,7 +3967,9 @@
         drawerSymbolEl.textContent = symbol;
         drawerIconEl.innerHTML = tkIcon(symbol, 'tk-48');
         drawerNameEl.textContent = (directory.find(function (d) { return d.symbol === symbol; }) || {}).name || symbol;
-        drawerSubEl.textContent = symbol;
+        // Skeleton, not the symbol: the real line is "TICKER • Solana" and
+        // showing the bare symbol first made it visibly flip on load.
+        drawerSubEl.innerHTML = '<span class="skeleton" style="width:96px; height:9px; display:inline-block;"></span>';
         drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
         drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
         drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
@@ -4011,8 +4023,8 @@
             drawerChangeEl.textContent = sign + chg.toFixed(2) + '%';
             drawerChangeEl.style.color = chg >= 0 ? 'var(--umbra-accent)' : '#f6465d';
           }
-          drawerSubEl.textContent = (s.asset && s.asset.underlyingSymbol ? s.asset.underlyingSymbol + ' • ' : '') + (s.asset ? s.asset.network : '');
-          renderSparkline(s.sparkline || []);
+          drawerSubEl.textContent = (s.asset && s.asset.underlyingSymbol ? s.asset.underlyingSymbol + ' • ' : '') + (s.asset && s.asset.network ? s.asset.network : '');
+          renderSparkline(s.sparkline || [], chg);
           paintDrawerHoldings(symbol);
           paintDrawerTop(symbol);
           paintDrawerPyth(symbol, myReq);
