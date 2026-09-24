@@ -566,7 +566,9 @@
 
     .swap-card {
       width: 100%;
-      max-width: 28rem;
+      /* Same width as the stocks card (.stocks-card) so the app has one card
+         size, not two — both wrappers use 16px side padding. */
+      max-width: 780px;
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 0;
