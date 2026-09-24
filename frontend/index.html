@@ -1687,6 +1687,20 @@
       color: var(--umbra-accent);
       text-decoration: none;
     }
+    /* Right cluster: even rhythm, build tag as a quiet pill */
+    .site-footer .foot-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .site-footer .build-tag {
+      font-size: 11px;
+      color: var(--umbra-muted);
+      background: var(--umbra-secondary);
+      border-radius: 999px;
+      padding: 3px 10px;
+      white-space: nowrap;
+    }
 
     .api-status {
       display: inline-flex;
@@ -2141,9 +2155,9 @@
 
   <footer class="site-footer">
     <span class="foot-brand">UMBRA</span>
-    <span style="display:flex; align-items:center; gap:6px;">
+    <span class="foot-status">
       <a class="api-status" id="apiStatus" href="/health" target="_blank" rel="noreferrer"><span class="dot"></span><span id="apiStatusText">API</span></a>
-      <span id="umbraBuild" style="font-size:11px; color:var(--umbra-muted);">build 2026-09-23f</span>
+      <span id="umbraBuild" class="build-tag">build 2026-09-23g</span>
       <span class="info-icon" data-tip="API status — green is live. Check /health for xStocks, Jupiter, Solana, 0x."><i data-lucide="info" width="14" height="14"></i></span>
     </span>
   </footer>
@@ -3357,6 +3371,11 @@
         executeSwap();
       });
 
+      // Build tag from file deploy time — auto-fresh every deploy, no manual bumps.
+      try {
+        var _lm = new Date(document.lastModified);
+        if (!isNaN(_lm)) document.getElementById('umbraBuild').textContent = 'deploy ' + _lm.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } catch (_) {}
       // API status dot in the footer (live health, not decoration).
       (function apiStatus() {
         try {
