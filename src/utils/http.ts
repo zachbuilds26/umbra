@@ -35,9 +35,13 @@ export async function fetchJson<T>(
     }
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // Throw typed 502s so routes return PROVIDER_ERROR, never INTERNAL (plan §27).
-    throw new HttpError(502, 'PROVIDER_ERROR', sanitizeProviderMessage(`Upstream request failed: ${message}`));
+    // The raw transport text (aborted, socket hang up, DNS) is logged for us,
+    // never returned: it means nothing to an end user and leaks internals.
+    const raw = err instanceof Error ? err.message : String(err);
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn(`[http] ${new URL(url).host} ${init.method ?? 'GET'} failed: ${sanitizeProviderMessage(raw)}`);
+    }
+    throw new HttpError(502, 'PROVIDER_ERROR', 'Our data provider did not respond.');
   } finally {
     clearTimeout(timer);
     init.signal?.removeEventListener('abort', onCallerAbort);

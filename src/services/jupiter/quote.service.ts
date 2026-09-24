@@ -75,9 +75,15 @@ async function toBaseUnits(symbol: string, displayAmount: string): Promise<strin
   if (pre.has(symbol.toUpperCase())) {
     return new Decimal(displayAmount).mul(new Decimal(10).pow(PRESTOCKS_DECIMALS)).floor().toFixed(0);
   }
-  const multiplier = await getMultiplier(symbol, 'Solana');
+  // getMultiplier never throws (it degrades to last-known/null), so a failure
+  // here is a genuine "we cannot convert units" — one clean message, no
+  // transport text leaking through from the provider fetch.
+  const multiplier = await getMultiplier(symbol, 'Solana').catch(() => null);
   if (!multiplier) {
-    throw upstream('QUOTE_UNAVAILABLE', `No live multiplier for ${symbol}; refusing to quote without it.`);
+    throw upstream(
+      'QUOTE_UNAVAILABLE',
+      `${symbol} pricing is temporarily unavailable, so we cannot quote it right now. Try again shortly or pick another asset.`,
+    );
   }
   return displayToBaseUnits(displayAmount, multiplier, 8);
 }
@@ -94,7 +100,10 @@ async function fromBaseUnits(symbol: string, baseUnits: string): Promise<string>
   }
   const multiplier = await getMultiplier(symbol, 'Solana').catch(() => null);
   if (!multiplier) {
-    throw upstream('QUOTE_UNAVAILABLE', `No live multiplier for ${symbol}; cannot normalize quote.`);
+    throw upstream(
+      'QUOTE_UNAVAILABLE',
+      `${symbol} pricing is temporarily unavailable, so we cannot quote it right now. Try again shortly or pick another asset.`,
+    );
   }
   return baseUnitsToDisplay(baseUnits, multiplier, 8);
 }
@@ -113,7 +122,9 @@ async function fetchOrder(args: {
     if (err instanceof HttpError && err.statusCode === 429) {
       throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
     }
-    throw upstream('SWAP_UNAVAILABLE', `Swap quote unavailable: ${(err as Error).message}`);
+    // Never pass a raw transport error (timeouts, aborts, socket text) to the
+    // user: it says nothing they can act on.
+    throw upstream('SWAP_UNAVAILABLE', 'Our quote provider did not respond. Try again in a moment.');
   }
   if (!res.data) {
     // Jupiter 400 = no route for this exact pair/amount (thin or missing pools),

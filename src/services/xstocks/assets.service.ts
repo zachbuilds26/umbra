@@ -26,6 +26,36 @@ const LAST_GOOD_FILE = lastGoodPath();
 let lastGoodLoaded = false;
 let lastGoodSaveTimer: ReturnType<typeof setInterval> | null = null;
 
+// Last-good multipliers. The multiplier converts an xStock's raw on-chain units
+// into share units, so a swap cannot be priced without it — but xStocks stalls
+// often enough that losing it would break trading. Cached (memory + disk), the
+// multiplier survives the blips the same way prices do.
+const MULT_LAST_GOOD_FILE = join(process.cwd(), 'data', 'last-good-multipliers.json');
+const lastGoodMult = new Map<string, { value: string; timestamp: string }>();
+let lastGoodMultLoaded = false;
+
+function loadLastGoodMultipliers(): void {
+  if (lastGoodMultLoaded) return;
+  lastGoodMultLoaded = true;
+  try {
+    const obj = JSON.parse(readFileSync(MULT_LAST_GOOD_FILE, 'utf-8')) as Record<string, { value: string; timestamp: string }>;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v.value === 'string' && Number(v.value) > 0) lastGoodMult.set(k, v);
+    }
+  } catch {
+    // first boot / no file yet
+  }
+}
+
+function saveLastGoodMultipliers(): void {
+  try {
+    mkdirSync(dirname(MULT_LAST_GOOD_FILE), { recursive: true });
+    writeFileSync(MULT_LAST_GOOD_FILE, JSON.stringify(Object.fromEntries(lastGoodMult)));
+  } catch {
+    // best-effort persistence
+  }
+}
+
 function loadLastGoodPrices(): void {
   if (lastGoodLoaded) return;
   lastGoodLoaded = true;
@@ -302,12 +332,28 @@ export async function getMultiplier(symbol: string, network = 'Solana'): Promise
   const key = `${canonical.toUpperCase()}:${network}`;
   const cached = multCache.get(key);
   if (cached) return cached;
-  const res = await xstocksClient.getMultiplier(canonical, network);
-  if (res.currentMultiplier === undefined || !Number.isFinite(res.currentMultiplier) || res.currentMultiplier <= 0) {
-    return null;
+  loadLastGoodMultipliers();
+  const last = lastGoodMult.get(key);
+  let res: { currentMultiplier?: number } | null = null;
+  try {
+    // xStocks can stall for the full fetch timeout. A swap must not hang behind
+    // it, and a raw transport error must never surface as a quote failure.
+    res = await Promise.race([
+      xstocksClient.getMultiplier(canonical, network).catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000)),
+    ]);
+  } catch {
+    res = null;
+  }
+  if (res?.currentMultiplier === undefined || !Number.isFinite(res.currentMultiplier) || res.currentMultiplier <= 0) {
+    // Upstream is down or has no value: the last known multiplier still converts
+    // raw units correctly (it barely moves), so trading continues.
+    return last ? last.value : null;
   }
   const value = String(res.currentMultiplier);
   multCache.set(key, value);
+  lastGoodMult.set(key, { value, timestamp: new Date().toISOString() });
+  saveLastGoodMultipliers();
   return value;
 }
 

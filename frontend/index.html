@@ -2845,8 +2845,28 @@
         return parts[0] + '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
-      function quoteError(msg) {
-        if (/429/.test(msg || '')) msg = 'Quoting is busy right now — wait a moment and try again.';
+      // Every failure the user can see, in language a trader can act on. Raw
+      // provider text (timeouts, aborts, upstream payloads) is never shown.
+      function friendlyQuoteError(code, msg, sym) {
+        var thin = THIN.indexOf(sym) !== -1;
+        if (code === 'INSUFFICIENT_LIQUIDITY' || (thin && code === 'SWAP_UNAVAILABLE')) {
+          return 'Thin liquidity on this pair — try a smaller amount.';
+        }
+        if (code === 'RATE_LIMITED') return 'Quoting is busy right now — wait a moment and try again.';
+        if (code === 'QUOTE_UNAVAILABLE') {
+          return (sym ? sym + ' pricing is' : 'This pair\'s pricing is') + ' temporarily unavailable. Try again shortly, or pick another asset.';
+        }
+        if (code === 'UNSUPPORTED_ASSET') return 'That asset is not available for swap yet.';
+        if (code === 'VALIDATION_ERROR') return 'That amount is not valid — enter a different amount.';
+        if (code === 'QUOTE_EXPIRED') return 'That quote went stale — we are fetching a fresh one.';
+        if (code === 'SWAP_UNAVAILABLE' || code === 'PROVIDER_ERROR') {
+          return 'Our quote provider did not respond. Try again in a moment.';
+        }
+        // Unknown code: show a fixed line, never an unvetted server string.
+        return 'Quote unavailable right now — try again in a moment.';
+      }
+      function quoteError(msg, code) {
+        msg = friendlyQuoteError(code, msg);
         quoteLinesEl.hidden = false;
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
@@ -2933,7 +2953,7 @@
                 // Stop hammering: tell the user to wait instead of silent-looping
                 if (buyLoadingEl) buyLoadingEl.style.display = 'none';
                 setBuyDots(false);
-                quoteError('Quoting is busy right now — wait a moment and try again.');
+                quoteError(null, 'RATE_LIMITED');
                 return;
               }
               // Silent retry — don't flash the scary message, just try again
@@ -2942,11 +2962,8 @@
             }
             quote429s = 0;
             if (buyLoadingEl) buyLoadingEl.style.display = 'none';
-            var thinSym = THIN.indexOf(buySym) !== -1 || THIN.indexOf(sellSym) !== -1;
             var errCode = data.error && data.error.code;
-            quoteError(thinSym && (errCode === 'INSUFFICIENT_LIQUIDITY' || errCode === 'SWAP_UNAVAILABLE')
-              ? 'Thin liquidity on this pair — try a smaller amount.'
-              : (data.error && data.error.message) || 'Quote unavailable.');
+            quoteError(data.error && data.error.message, errCode);
             return;
           }
           var prevRecv = window.umbraLastReceive || null;
@@ -3025,7 +3042,7 @@
           buyAmountEl.placeholder = '0.00';
           buyUsdEl.textContent = '$0.00';
           lastQuote = null;
-          quoteError('Quote unavailable — the backend did not answer. Check your connection and try again.');
+          quoteError(null, 'PROVIDER_ERROR');
         }
       }
 
@@ -3162,6 +3179,11 @@
         // "Invalid request" from the wallet on a $0 balance means the network
         // can't execute it (no SOL for gas) — say so instead of the raw code.
         else if (/invalid request/i.test(msg || '')) msg = 'Wallet refused: with nothing in it, there is no SOL for gas. Fund a little SOL and try again.';
+        // Transport/provider text ("This operation was aborted", upstream
+        // payloads) means nothing to the user — never surface it.
+        else if (/abort|upstream request failed|fetch failed|network|socket|timeout|ECONN|ETIMEDOUT|provider did not respond/i.test(msg || '')) {
+          msg = 'Our quote provider did not respond. Try again in a moment.';
+        }
         paintSwapTitle('Swap failed', 'bad');
         swapErrorEl.style.display = 'flex';
         swapErrorEl.textContent = msg;
