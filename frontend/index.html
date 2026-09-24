@@ -2782,17 +2782,11 @@
 
       function renderTokenList(filter) {
         var f = (filter || '').trim().toUpperCase();
-        // Umbra swaps one stock against one cash asset (USDC/USDT) — never
-        // stock↔stock. Each box lists the other side of the pair it is not
-        // filling: with a stock selected, the receive box offers every stock and
-        // the sell box offers USDC/USDT. Flip the card to trade the other way.
-        var bases = { USDC: 1, USDT: 1 };
-        var other = modalSide === 'sell' ? buySym : sellSym;
-        var wantBase = !!bases[String(other || '').toUpperCase()];
+        // Both boxes list the whole shelf: every stable and every stock. Picking
+        // an unsupported pair is caught by the router, which explains why it
+        // cannot execute — the list is not second-guessed for the user.
         var rows = directory
           .filter(function (t) {
-            var isBase = !!bases[t.symbol.toUpperCase()];
-            if (isBase !== wantBase) return false;
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
