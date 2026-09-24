@@ -2858,15 +2858,24 @@
         return parts[0] + '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
-      // Pyth feed names say what they benchmark: "Equity" for stocks, "Metal"
-      // for gold, "FX"/"Crypto" for the rest. Judges should never have to guess
-      // which asset class a reference price belongs to.
-      function pythLabel(feed) {
+      // The stock side of the pair. A Pyth line on a USDC leg would print a
+      // stablecoin peg next to a stock rate, which reads as nonsense.
+      function pythSubject() {
+        var stables = { USDC: 1, USDT: 1 };
+        if (!stables[String(buySym || '').toUpperCase()]) return buySym;
+        if (!stables[String(sellSym || '').toUpperCase()]) return sellSym;
+        return buySym;
+      }
+      // Pyth feed names say what they benchmark: "TSLA equity" for stocks,
+      // "Gold spot" for metals, "USDC peg" for stablecoins. Nobody should have
+      // to guess which asset class a reference price belongs to.
+      function pythLabel(feed, subject) {
         var f = String(feed || '');
-        if (f.indexOf('Equity.') === 0) return 'Equity (Pyth)';
+        var who = String(subject || '').replace(/x$/i, '');
+        if (f.indexOf('Equity.') === 0) return (who || 'Equity') + ' equity (Pyth)';
         if (f.indexOf('Metal.') === 0) return 'Gold spot (Pyth)';
-        if (f.indexOf('FX.') === 0) return 'FX (Pyth)';
-        if (f.indexOf('Crypto.') === 0) return 'Token feed (Pyth)';
+        if (f.indexOf('FX.') === 0) return 'FX rate (Pyth)';
+        if (f.indexOf('Crypto.') === 0) return (who || 'Token') + ' peg (Pyth)';
         return 'Reference (Pyth)';
       }
       // Every failure the user can see, in language a trader can act on. Raw
@@ -3041,11 +3050,12 @@
           applyDetails(detailsUserChoice === null ? true : detailsUserChoice);
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
-          // Pyth comparison: the equity (or gold/FX) feed for this ticker versus
-          // what the token actually trades at. Only feeds our key is entitled to
-          // are ever returned, so "no leg" means not covered, not broken.
+          // Pyth comparison: the reference feed for the STOCK side of this pair
+          // (TSLAx → USDC must compare TSLAx against TSLA, never against USDC's
+          // peg). Only feeds our key is entitled to are ever returned, so a
+          // missing leg means "not covered", never "broken".
           try {
-            var fairRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(buySym) + '/fair-price');
+            var fairRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(pythSubject()) + '/fair-price');
             if (mySeq !== quoteSeq) return;
             if (fairRes.ok) {
               var fair = await fairRes.json();
@@ -3054,12 +3064,14 @@
               var bps = fair.tokenVsEquityBps !== null && fair.tokenVsEquityBps !== undefined ? fair.tokenVsEquityBps : fair.equityVsReferenceBps;
               var leg = fair.equity || fair.token;
               if (leg) {
-                var cls = Math.abs(bps) <= 50 ? 'good' : 'bad';
+                var subject = fair.symbol || pythSubject();
+                var hasBps = bps !== null && bps !== undefined;
+                var cls = hasBps && Math.abs(bps) <= 50 ? 'good' : (hasBps ? 'bad' : '');
                 var sign = bps > 0 ? '+' : '';
                 var stale = leg.stalenessSeconds;
                 quoteLinesEl.innerHTML +=
-                  '<div class="row"><span>' + esc(pythLabel(leg.feed)) + '</span><span class="' + (bps === null || bps === undefined ? '' : cls) + '">$' + esc(leg.price) +
-                  (bps === null || bps === undefined ? '' : ' (' + sign + bps + ' bps)') + '</span></div>' +
+                  '<div class="row"><span>' + esc(pythLabel(leg.feed, subject)) + '</span><span class="' + cls + '">$' + esc(leg.price) +
+                  (hasBps ? ' · ' + esc(subject) + ' ' + sign + bps + ' bps' : '') + '</span></div>' +
                   (fair.note
                     ? '<div class="row"><span class="pyth-note">' + esc(fair.note) + '</span></div>'
                     : (stale !== null && stale !== undefined
