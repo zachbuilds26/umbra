@@ -57,11 +57,6 @@ Key env vars:
 | POST | `/api/bridge/transaction` `{bridgeQuoteId, sourceWalletAddress, destinationSolanaAddress}` | Verified bridge contract + token data + `trackingId` |
 | GET | `/api/bridge/transactions/:id?wallet=…` | Bridge status (`source_pending → source_confirmed → ccip_in_flight → …`) |
 | POST | `/api/bridge/transactions/:id/source` `{sourceTxHash, ccipMessageId?, wallet}` | Record source confirmation (owning wallet only) |
-| GET | `/api/dbc/presets` | Equity launch presets with real curve economics (start price + graduation threshold) |
-| GET | `/api/dbc/pools?baseMint=…` | DBC pool state, or `pool:null` for unlaunched names |
-| GET | `/api/dbc/quote?pool=…&side=buy\|sell&amount=…&slippageBps=50` | Live curve quote (max 5% slippage) |
-| POST | `/api/dbc/transaction` `{pool, side, amount, userPublicKey, slippageBps}` | Unsigned exact-in swap against a pool |
-| POST | `/api/dbc/broadcast` `{userPublicKey, transaction}` | Relay the wallet-signed curve swap (verifies the signer) |
 
 Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "message": "…", "details": {} } }`. Secrets are never logged or returned.
 
@@ -89,22 +84,6 @@ curl -X POST localhost:3002/api/bridge/quote -H "Content-Type: application/json"
   -d '{"sourceNetwork":"Ethereum","asset":"NVDAx","amount":"1.5","destinationNetwork":"Solana","destinationAddress":"<SOLANA_PUBKEY>"}'
 ```
 
-## Meteora DBC — devnet end-to-end (free)
-
-Launches a real bonding-curve pool **and trades it**, on devnet, for zero SOL. Same builders the API uses (`createConfig` → `createPool` → pool read → quote → buy), so it proves the mainnet path without funding anything.
-
-```bash
-# 1) build + inspect the createConfig instruction, sends nothing
-$env:SOLANA_RPC_URL="https://api.devnet.solana.com"
-npx tsx scripts/dbc-devnet-e2e.ts --dry-run
-
-# 2) run it for real (needs a funded devnet key; the public faucet is IP-limited)
-#    fund once, free: https://faucet.solana.com
-$env:DEVNET_PAYER_KEY="<base58 secret key>"
-npx tsx scripts/dbc-devnet-e2e.ts
-```
-
-The script hard-refuses to run against a mainnet RPC. Devnet has no canonical USDC, so it creates its own 6-decimal quote token and mints it to the payer; on mainnet the same code uses real USDC. Launch cost on mainnet is ~0.005 SOL (mostly rent), optional — nothing in the API requires a pool to exist.
 
 ## Tests
 

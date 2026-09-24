@@ -10,8 +10,8 @@ export function isValidSolanaAddress(value: string): boolean {
   }
 }
 
-// Any 32-byte base58 account — includes program-derived addresses (DBC pools,
-// mints, vaults), which are off-curve by construction and must not be rejected.
+// Any 32-byte base58 account — includes program-derived addresses (pool vaults,
+// mints, PDAs), which are off-curve by construction and must not be rejected.
 export function isValidSolanaPublicKey(value: string): boolean {
   try {
     new PublicKey(value);
