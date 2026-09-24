@@ -2316,24 +2316,33 @@
         }
       }
       var balancesSeq = 0;
+      function paintSellBalance(text) {
+        var el = document.getElementById('sellBalance');
+        if (el) el.textContent = text;
+      }
       async function refreshWalletBalances() {
         var w = window.umbraWallet;
         if (!w) return;
         // A response for a wallet we already left must not repopulate state:
         // Max would then spend the previous account's balance.
         var mySeq = ++balancesSeq;
+        // "Loading" must not look like a zero balance: a real 0.00 is only
+        // printed once the chain has actually answered for this wallet.
+        paintSellBalance('Loading…');
         try {
           var res = await fetch(API_BASE + '/api/wallet/' + encodeURIComponent(w) + '/balances');
-          if (!res.ok) return;
+          if (!res.ok) throw new Error('balances ' + res.status);
           var data = await res.json();
           if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
           var bal = (data.balances || []).find(function (b) {
             return b.symbol === sellSym;
           });
-          document.getElementById('sellBalance').textContent = bal ? bal.display + ' ' + bal.symbol : '0.00 ' + sellSym;
+          paintSellBalance(bal ? fmtAmt(bal.display) + ' ' + bal.symbol : '0.00 ' + sellSym);
           window.umbraBalances = data.balances || [];
         } catch (e) {
-          /* balances are a bonus — don't block the UI */
+          if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
+          // Unavailable, not zero: a dash says "we could not check".
+          paintSellBalance('—');
         }
       }
       // (removed: custom wallet detection + grid — Reown AppKit owns discovery now)
@@ -2867,10 +2876,10 @@
       }
       function quoteError(msg, code) {
         msg = friendlyQuoteError(code, msg);
-        quoteLinesEl.hidden = false;
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
-        paintDetailToggle();
+        // An error must be visible even if the user had collapsed the panel.
+        applyDetails(true);
         setBuyDots(false);
       }
 
@@ -2892,6 +2901,14 @@
       }
 
       var detailToggleEl = document.getElementById('detailToggle');
+      // null = no choice yet (auto-open on the first quote). Once the user opens
+      // or closes it themselves, that choice sticks: a background price refresh
+      // must not re-open a panel they deliberately closed.
+      var detailsUserChoice = null;
+      function applyDetails(open) {
+        quoteLinesEl.hidden = !open;
+        paintDetailToggle();
+      }
       function paintDetailToggle() {
         var open = !quoteLinesEl.hidden;
         detailToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -2900,9 +2917,8 @@
       }
       detailToggleEl.addEventListener('click', function () {
         if (detailToggleEl.hasAttribute('disabled')) return;
-        var open = quoteLinesEl.hidden;
-        quoteLinesEl.hidden = !open;
-        paintDetailToggle();
+        detailsUserChoice = quoteLinesEl.hidden;
+        applyDetails(detailsUserChoice);
       });
 
       async function runQuote() {
@@ -3005,8 +3021,9 @@
             '<div class="row"><span>Price impact</span><span>' + impact + '</span></div>' +
             '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>';
           quoteLinesEl.innerHTML = html;
-          quoteLinesEl.hidden = false; // auto-open on every fresh quote
-          paintDetailToggle();
+          // Auto-open so the first price is never a mystery, but respect a
+          // manual close afterwards: a background refresh must not fight the user.
+          applyDetails(detailsUserChoice === null ? true : detailsUserChoice);
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
           // Pyth deal line (best effort — absent on limited keys).
