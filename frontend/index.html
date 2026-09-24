@@ -3840,20 +3840,18 @@
         scheduleQuote();
         window.scrollTo({ top: 0, behavior: 'auto' });
       });
-      function renderSparkline(points, change24hPct) {
+      function renderSparkline(points, change24hPct, symbol) {
         if (!points || points.length < 2) {
-          // We do NOT promise history we will never collect: only part of the
-          // shelf is sampled, so "it will build" would be a lie. Show the one
-          // movement figure we actually have instead of an empty box.
+          // We don't promise history we never collect: only part of the shelf is
+          // sampled. Say it in one short line, naming the token, and show the
+          // one movement figure we actually have.
           var chg = Number(change24hPct);
           var chgTxt = isFinite(chg)
             ? '<span style="margin-top:2px;">24h ' + (chg > 0 ? '+' : '') + chg.toFixed(2) + '%</span>'
             : '';
           drawerChartEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:var(--umbra-muted);">' +
-            '<i data-lucide="line-chart" width="20" height="20"></i>' +
-            '<span style="text-align:center;">No observed price history for this name — we chart only prices we have actually seen.</span>' +
+            '<span style="text-align:center;">No price history for ' + esc(symbol || 'this token') + ' yet</span>' +
             chgTxt + '</div>';
-          if (window.lucide) window.lucide.createIcons();
           return;
         }
         var w = 360, h = 80, pad = 8;
@@ -4024,7 +4022,7 @@
             drawerChangeEl.style.color = chg >= 0 ? 'var(--umbra-accent)' : '#f6465d';
           }
           drawerSubEl.textContent = (s.asset && s.asset.underlyingSymbol ? s.asset.underlyingSymbol + ' • ' : '') + (s.asset && s.asset.network ? s.asset.network : '');
-          renderSparkline(s.sparkline || [], chg);
+          renderSparkline(s.sparkline || [], chg, symbol);
           paintDrawerHoldings(symbol);
           paintDrawerTop(symbol);
           paintDrawerPyth(symbol, myReq);
