@@ -1,6 +1,21 @@
 import { z } from 'zod';
+import { isValidSolanaAddress } from '../utils/addresses.js';
 
-export const solanaAddress = z.string().min(32).max(48);
+// A length check alone accepted any 32–48 character string ("aaaa…"), which then
+// reached SQL, logs, and upstream URLs. The route boundary now requires a real,
+// on-curve base58 Solana address.
+export const solanaAddress = z
+  .string()
+  .min(32)
+  .max(48)
+  .refine(isValidSolanaAddress, { message: 'must be a valid Solana address' });
+
+export const transactionId = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, 'must be a transaction id');
+
 export const symbolSchema = z.string().min(1).max(16);
 export const positiveDecimal = z
   .string()

@@ -28,16 +28,28 @@ export function disablePg(reason: string): void {
 
 function getPool(): Pool {
   if (pool) return pool;
-  const local = env.DATABASE_URL.includes('localhost') || env.DATABASE_URL.includes('127.0.0.1');
+  // Local development talks to a local database over a trusted socket; anything
+  // remote is verified. Disabling certificate verification wholesale meant a
+  // hijacked DNS answer or a hostile network could read and rewrite the ledger.
+  let local = false;
+  try {
+    const host = new URL(env.DATABASE_URL).hostname;
+    local = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    local = false;
+  }
   pool = new Pool({
     connectionString: env.DATABASE_URL,
-    // Render's internal Postgres presents a cert the system roots don't chain;
-    // the link never leaves Render's private network.
-    ssl: local ? undefined : { rejectUnauthorized: false },
+    // `sslmode=no-verify` in the connection string would silently disable this
+    // again, so it is rejected outright rather than honoured.
+    ssl: local || /sslmode=no-verify/i.test(env.DATABASE_URL) ? undefined : { rejectUnauthorized: true },
     max: 5,
     // Without these, a blackholed database hangs boot and requests forever.
     connectionTimeoutMillis: 5_000,
     statement_timeout: 10_000,
+    // Bounds how long a request can wait for a free pool slot, not just how long
+    // establishing a connection takes.
+    query_timeout: 10_000,
     idleTimeoutMillis: 10_000,
   });
   pool.on('error', () => {

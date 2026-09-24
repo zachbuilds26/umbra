@@ -15,15 +15,31 @@ import { swapRoutes } from './routes/swaps.js';
 import { bridgeRoutes } from './routes/bridges.js';
 import { walletRoutes } from './routes/wallet.js';
 
+/**
+ * Which address the rate limiter keys on.
+ *
+ * Measured behaviour of Fastify's trustProxy (verified against this app):
+ *   trustProxy: true            -> the LEFT-most X-Forwarded-For entry, which the
+ *                                  client itself wrote, so every request could
+ *                                  claim a new IP and get a fresh limit bucket.
+ *   trustProxy: false / number  -> the socket address, which behind Render is one
+ *                                  shared internal IP for every visitor.
+ *   hop === 0 (used here)       -> the address the proxy itself appended, i.e. the
+ *                                  real client, ignoring anything the client
+ *                                  prepended to the header.
+ */
+const trustOneProxyHop = (_address: string, hop: number): boolean => hop === 0;
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: env.isProd ? 'info' : 'debug',
     },
-    // Behind Render's proxy (and any CDN), the socket IP is the proxy's.
-    // Without this, req.ip is identical for every visitor and the per-IP
-    // rate-limit bucket is shared globally — one page load can 429 everyone.
-    trustProxy: true,
+    // Behind Render's proxy the socket IP is the proxy's, so `req.ip` has to be
+    // taken from the forwarding header. Trusting the *whole* chain means a
+    // client can also put whatever it likes in that header and mint a fresh
+    // rate-limit bucket per request, so exactly one hop is trusted.
+    trustProxy: trustOneProxyHop,
     requestIdHeader: 'x-request-id',
     genReqId: () => newRequestId(),
   });
@@ -52,7 +68,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setErrorHandler((err, req, reply) => {
     const requestId = req.id;
     if (err instanceof HttpError) {
-      return reply.status(err.statusCode).send(apiError(err.code, err.message, err.details));
+      // `details` can carry a provider's own words (a Jupiter/RPC message, an
+      // upstream URL). Those are logged, not returned: clients get our message
+      // and the request id, and nothing about our providers' internals.
+      if (err.details && Object.keys(err.details).length > 0) {
+        req.log.warn({ err: err.message, details: err.details, requestId }, 'upstream failure');
+      }
+      return reply.status(err.statusCode).send(apiError(err.code, err.message, { requestId }));
     }
     if (err instanceof ZodError) {
       return reply
@@ -130,6 +152,10 @@ export async function buildApp(): Promise<FastifyInstance> {
       // Never publish dotfiles: a .env or editor backup dropped in frontend/
       // is downloadable by URL regardless of .gitignore.
       dotfiles: 'deny',
+      // The whole directory was served, so anything that ever lands in
+      // frontend/ — a local dev log, a source map, a .bak — is public. Only the
+      // app shell and the curated asset folders are meant to be.
+      globIgnore: ['**/*.log', '**/*.map', '**/*.bak', '**/*.tmp', '**/*.ts', '**/*.md'],
       // Asset filenames are stable, not fingerprinted, so a year-long
       // immutable cache would pin visitors to last deploy's logo/script.
       // One day is a real win and still revalidates on every deploy after.

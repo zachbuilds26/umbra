@@ -48,6 +48,12 @@ export async function getZeroExQuote(params: {
   slippageBps?: number;
 }): Promise<ZeroExQuote | null> {
   if (!env.ZEROEX_API_KEY) return null;
+  // The API insists on a JSON number, which caps us at 2^53-1. Converting a
+  // larger u64 with Number() would silently round the trade size, so refuse
+  // instead of quoting an amount the user never asked for.
+  if (!/^\d+$/.test(params.amountInBaseUnits)) return null;
+  const amountIn = Number(params.amountInBaseUnits);
+  if (!Number.isSafeInteger(amountIn) || amountIn <= 0) return null;
   const url = `${env.ZEROEX_BASE_URL.replace(/\/$/, '')}/solana/swap-instructions`;
   let res;
   try {
@@ -58,8 +64,7 @@ export async function getZeroExQuote(params: {
       body: JSON.stringify({
         token_in: params.tokenIn,
         token_out: params.tokenOut,
-        // 0x is strict: amount_in must be a JSON number (u64), not a string.
-        amount_in: Number(params.amountInBaseUnits),
+        amount_in: amountIn,
         taker: QUOTE_TAKER,
         slippage_bps: params.slippageBps ?? 50,
       }),

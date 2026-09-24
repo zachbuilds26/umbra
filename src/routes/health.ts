@@ -62,21 +62,54 @@ function checkZeroEx(): Promise<'ok' | 'degraded' | 'disabled'> {
   })().catch((): 'degraded' => 'degraded');
 }
 
+interface ProviderReport {
+  status: 'ok' | 'degraded';
+  providers: { xstocks: string; jupiter: string; solana: string; zeroex: string };
+  checkedAt: string;
+}
+
+let providerCache: ProviderReport | null = null;
+let providerProbe: Promise<ProviderReport> | null = null;
+const PROVIDER_CACHE_MS = 30_000;
+
+/**
+ * One shared, cached provider probe.
+ *
+ * Every request used to fire four upstream calls, so a public endpoint was a
+ * free amplifier against our rate-limited provider keys. Results are shared for
+ * 30 seconds and concurrent callers await the same in-flight probe.
+ */
+async function probeProviders(): Promise<ProviderReport> {
+  const now = Date.now();
+  if (providerCache && now - Date.parse(providerCache.checkedAt) < PROVIDER_CACHE_MS) {
+    return providerCache;
+  }
+  if (providerProbe) return providerProbe;
+  providerProbe = (async () => {
+    try {
+      const [xstocks, solana, jupiter, zeroex] = await Promise.all([
+        checkXstocks(),
+        checkSolana(),
+        checkJupiter(),
+        checkZeroEx(),
+      ]);
+      const allOk =
+        xstocks === 'ok' && solana === 'ok' && jupiter === 'ok' && (zeroex === 'ok' || zeroex === 'disabled');
+      providerCache = {
+        status: allOk ? 'ok' : 'degraded',
+        providers: { xstocks, jupiter, solana, zeroex },
+        checkedAt: new Date().toISOString(),
+      };
+      return providerCache;
+    } finally {
+      providerProbe = null;
+    }
+  })();
+  return providerProbe;
+}
+
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
   app.get('/health', async () => ({ status: 'ok', service: 'umbra-backend', time: new Date().toISOString() }));
 
-  app.get('/health/providers', async () => {
-    const [xstocks, solana, jupiter, zeroex] = await Promise.all([
-      checkXstocks(),
-      checkSolana(),
-      checkJupiter(),
-      checkZeroEx(),
-    ]);
-    const allOk =
-      xstocks === 'ok' && solana === 'ok' && jupiter === 'ok' && (zeroex === 'ok' || zeroex === 'disabled');
-    return {
-      status: allOk ? 'ok' : 'degraded',
-      providers: { xstocks, jupiter, solana, zeroex },
-    };
-  });
+  app.get('/health/providers', async () => probeProviders());
 }

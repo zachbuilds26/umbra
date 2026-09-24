@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { swapQuoteQuery, swapTransactionBody, swapSubmitBody, swapBroadcastBody, transactionsQuery } from '../schemas/index.js';
+import { z } from 'zod';
+import { swapQuoteQuery, swapTransactionBody, swapSubmitBody, swapBroadcastBody, transactionsQuery, transactionId } from '../schemas/index.js';
 import { buildSwapQuote, getSwapTransaction, broadcastSignedSwap } from '../services/jupiter/quote.service.js';
 import { quoteStore } from '../services/quotes.store.js';
 import { createTransaction, getTransaction, updateTransaction, listTransactions } from '../db/transactions.store.js';
@@ -133,7 +134,7 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /api/transactions/:id?wallet=... — status for the caller's own swap.
   app.get('/api/transactions/:id', async (req) => {
-    const params = req.params as { id: string };
+    const params = z.object({ id: transactionId }).parse(req.params);
     const q = transactionsQuery.pick({ wallet: true }).parse(req.query);
     const tx = await getTransaction(params.id, q.wallet);
     if (!tx) throw notFound('NOT_FOUND', `Transaction ${params.id} not found.`);

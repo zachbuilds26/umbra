@@ -1,28 +1,36 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// Provider base URLs carry API keys in their headers, so plaintext HTTP would
+// send those credentials in the clear. `z.string().url()` happily accepts
+// http:// and any host, which is how a typo could downgrade a key-bearing call.
+const httpsUrl = z
+  .string()
+  .url()
+  .refine((v) => new URL(v).protocol === 'https:', { message: 'must use https' });
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3002),
 
-  SOLANA_RPC_URL: z.string().url().default('https://api.mainnet-beta.solana.com'),
+  SOLANA_RPC_URL: httpsUrl.default('https://api.mainnet-beta.solana.com'),
   SOLANA_COMMITMENT: z.enum(['processed', 'confirmed', 'finalized']).default('confirmed'),
 
   JUPITER_API_KEY: z.string().optional().default(''),
-  JUPITER_BASE_URL: z.string().url().default('https://api.jup.ag/swap/v2'),
-  JUPITER_PRICE_URL: z.string().url().default('https://api.jup.ag/price/v3'),
+  JUPITER_BASE_URL: httpsUrl.default('https://api.jup.ag/swap/v2'),
+  JUPITER_PRICE_URL: httpsUrl.default('https://api.jup.ag/price/v3'),
 
   // 0x Swap API (Solana, open beta) — quoter #2 behind Jupiter. Free key from
   // https://dashboard.0x.org; empty = 0x leg disabled, everything else works.
   ZEROEX_API_KEY: z.string().optional().default(''),
-  ZEROEX_BASE_URL: z.string().url().default('https://api.0x.org'),
+  ZEROEX_BASE_URL: httpsUrl.default('https://api.0x.org'),
 
-  XSTOCKS_API_BASE_URL: z.string().url().default('https://api.xstocks.fi/api/v2'),
+  XSTOCKS_API_BASE_URL: httpsUrl.default('https://api.xstocks.fi/api/v2'),
 
   // Pyth Pro (Lazer) key — demo keys cover a limited feed set (see /v1/symbols?entitled_only=true).
   PYTH_API_KEY: z.string().optional().default(''),
-  PYTH_PRO_URL: z.string().url().default('https://pyth-lazer.dourolabs.app'),
-  PYTH_SYMBOLOGY_URL: z.string().url().default('https://pyth.dourolabs.app'),
+  PYTH_PRO_URL: httpsUrl.default('https://pyth-lazer.dourolabs.app'),
+  PYTH_SYMBOLOGY_URL: httpsUrl.default('https://pyth.dourolabs.app'),
 
   // Finnhub for xStocks marketCap (free 60/min, https://finnhub.io). Empty = mcap stays null.
   FINNHUB_API_KEY: z.string().optional().default(''),
@@ -38,10 +46,20 @@ if (!parsed.success) {
   throw new Error('Invalid environment configuration');
 }
 
+const isProd = parsed.data.NODE_ENV === 'production';
+const corsOrigins = parsed.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean);
+
+// A wildcard entry silently disables the allowlist: @fastify/cors treats any
+// list containing "*" as "reflect every origin". That is fine for a local
+// experiment and never acceptable for a deployed wallet application.
+if (isProd && corsOrigins.some((o) => o === '*' || o.includes('*'))) {
+  throw new Error('CORS_ORIGINS must list exact origins in production; wildcards are rejected');
+}
+
 export const env = {
   ...parsed.data,
-  corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
-  isProd: parsed.data.NODE_ENV === 'production',
+  corsOrigins,
+  isProd,
   // node:test sets NODE_TEST_CONTEXT in its child processes. Detecting it here
   // means `npm test` is safe on any shell (no NODE_ENV= prefix required) and can
   // never reach a real database or provider account.
