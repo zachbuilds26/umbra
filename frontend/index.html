@@ -2551,14 +2551,13 @@
       // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
       function tkIcon(symbol, size) {
         symbol = String(symbol || '');
-        // SOL is native and has no token logo file — use the chain mark we ship.
-        var isSol = symbol === 'SOL';
-        var file = isSol ? './assets/solana-mark.png' : (manifest[symbol] ? './assets/tokens/' + encodeURIComponent(manifest[symbol]) : '');
+        var file = manifest[symbol]
+          ? './assets/tokens/' + encodeURIComponent(manifest[symbol])
+          : '';
         var main = file
           ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
-        var chain = isSol ? '' : '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" />';
-        return '<span class="tk ' + (size || 'tk-20') + '">' + main + chain + '</span>';
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
       function iconHtml(symbol) {
         return tkIcon(symbol, 'tk-20');
@@ -2715,19 +2714,6 @@
               var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
               return { symbol: a.symbol, name: a.name, kind: kind };
             });
-          // SOL is native, not an SPL token, so it is not in the asset list —
-          // but it is a supported swap side. Add it with its real price.
-          directory.unshift({ symbol: 'SOL', name: 'Solana', kind: 'MAJOR' });
-          try {
-            var solRes = await fetch(API_BASE + '/api/assets/SOL/price');
-            if (solRes.ok) {
-              var solJson = await solRes.json();
-              var solPx = Number(solJson.price);
-              if (isFinite(solPx) && solPx > 0) {
-                directory[0].price = { value: String(solPx), currency: 'USD', timestamp: solJson.timestamp };
-              }
-            }
-          } catch (_) { /* price optional; the swap quote is authoritative */ }
         } catch (e) {
           directory = [];
         }
@@ -2796,13 +2782,13 @@
 
       function renderTokenList(filter) {
         var f = (filter || '').trim().toUpperCase();
-        // Umbra swaps one stock for one base asset, never stock↔stock and never
-        // base↔base. The two boxes are therefore fixed: the receive box offers
-        // the cash-out side (USDC, USDT, SOL) and the sell box offers every
-        // stock. To pay with a base asset instead, flip the card — the chosen
-        // stock travels to the receive side. Offering a pair the router cannot
-        // execute only produces "not available for swap" after the user chose.
-        var bases = { USDC: 1, USDT: 1, SOL: 1 };
+        // Umbra swaps one stock for one cash asset, never stock↔stock and never
+        // cash↔cash. The two boxes are therefore fixed: the receive box offers
+        // the cash-out side (USDC, USDT) and the sell box offers every stock.
+        // To trade the other way, flip the card. Offering a pair the router
+        // cannot execute only produces "not available for swap" after the user
+        // has already chosen.
+        var bases = { USDC: 1, USDT: 1 };
         var rows = directory
           .filter(function (t) {
             var isBase = !!bases[t.symbol.toUpperCase()];
@@ -3029,7 +3015,7 @@
       // The stock side of the pair. A Pyth line on a USDC leg would print a
       // stablecoin peg next to a stock rate, which reads as nonsense.
       function pythSubject() {
-        var bases = { USDC: 1, USDT: 1, SOL: 1 };
+        var bases = { USDC: 1, USDT: 1 };
         if (!bases[String(buySym || '').toUpperCase()]) return buySym;
         if (!bases[String(sellSym || '').toUpperCase()]) return sellSym;
         return buySym;
