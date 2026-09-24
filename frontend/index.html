@@ -2590,6 +2590,7 @@
           return;
         }
         var half = items.map(chipHtml).join('');
+        try { localStorage.setItem('umbra_tape_cache', JSON.stringify({ t: Date.now(), items: items })); } catch (_) {}
         track.innerHTML = half + half; // doubled for a seamless loop
         skeleton.hidden = true;
         skeleton.style.display = 'none';
@@ -2605,6 +2606,22 @@
         return API_BASE + '/api/assets/ticker?symbols=' + TAPE_SYMBOLS.join(',');
       }
 
+      // Instant tape: paint last visit's chips synchronously (real recent
+      // numbers, <30min old), then refresh live underneath. No skeleton wait.
+      try {
+        var _tc = JSON.parse(localStorage.getItem('umbra_tape_cache') || 'null');
+        if (_tc && Date.now() - _tc.t < 30 * 60 * 1000 && Array.isArray(_tc.items) && _tc.items.length) {
+          var half0 = _tc.items.map(chipHtml).join('');
+          track.innerHTML = half0 + half0;
+          skeleton.hidden = true;
+          skeleton.style.display = 'none';
+          if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
+          note.hidden = true;
+          note.style.display = 'none';
+          track.hidden = false;
+          track.style.display = '';
+        }
+      } catch (_) {}
       loadTape().catch(function () {
         showNote('Prices unavailable — is the Umbra backend running on :3002?');
       });
