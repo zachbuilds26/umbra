@@ -63,6 +63,61 @@ export const quoteStore = {
     swapQuotes.set(quoteId, updated, ttl);
     return updated;
   },
+  /**
+   * Bind a quote to a wallet, or report that someone else already owns it.
+   *
+   * Synchronous on purpose: no `await` can interleave between the read and the
+   * write, so two callers racing for the same unbound quote cannot both win.
+   * Without this, wallet A's quote could be silently taken over by wallet B and
+   * B would sign a transaction for A's displayed terms.
+   */
+  claimSwapTaker(quoteId: string, taker: string): 'claimed' | 'owned' | 'taken' | 'missing' {
+    const existing = swapQuotes.get(quoteId);
+    if (!existing) return 'missing';
+    if (existing.taker === taker) return 'owned';
+    if (existing.taker !== null) return 'taken';
+    const ttl = existing.expiresAt - Date.now();
+    if (ttl <= 0) {
+      swapQuotes.delete(quoteId);
+      return 'missing';
+    }
+    swapQuotes.set(quoteId, { ...existing, taker }, ttl);
+    return 'claimed';
+  },
+  /**
+   * Write the built transaction, but only while `taker` still owns the quote.
+   * Returns the stored quote, or undefined when the quote expired or was taken.
+   */
+  bindSwapTransaction(
+    quoteId: string,
+    taker: string,
+    patch: Partial<StoredSwapQuote>,
+  ): StoredSwapQuote | undefined {
+    const existing = swapQuotes.get(quoteId);
+    if (!existing) return undefined;
+    if (existing.taker !== taker) return undefined;
+    const updated = { ...existing, ...patch, quoteId, taker };
+    const ttl = updated.expiresAt - Date.now();
+    if (ttl <= 0) {
+      swapQuotes.delete(quoteId);
+      return undefined;
+    }
+    swapQuotes.set(quoteId, updated, ttl);
+    return updated;
+  },
+  /** Record the submitted signature only if this quote has none yet. */
+  bindSwapSignature(quoteId: string, taker: string, signature: string): boolean {
+    const existing = swapQuotes.get(quoteId);
+    if (!existing || existing.taker !== taker) return false;
+    if (existing.signature) return existing.signature === signature;
+    const ttl = existing.expiresAt - Date.now();
+    if (ttl <= 0) {
+      swapQuotes.delete(quoteId);
+      return false;
+    }
+    swapQuotes.set(quoteId, { ...existing, signature }, ttl);
+    return true;
+  },
   putBridge(q: StoredBridgeQuote): void {
     const ttl = q.expiresAt - Date.now();
     if (ttl <= 0) return;

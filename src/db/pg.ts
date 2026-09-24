@@ -8,6 +8,10 @@ import { env } from '../config/env.js';
 // so `npm run dev` needs no database at all.
 
 export function isPg(): boolean {
+  // Tests must never touch a real database. A developer's .env (or a leaked
+  // DATABASE_URL in CI) would otherwise point the suite at production data and
+  // make results depend on live rows.
+  if (env.isTest) return false;
   return pgEnabled && env.DATABASE_URL.trim().length > 0;
 }
 

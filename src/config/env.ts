@@ -42,4 +42,8 @@ export const env = {
   ...parsed.data,
   corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
   isProd: parsed.data.NODE_ENV === 'production',
+  // node:test sets NODE_TEST_CONTEXT in its child processes. Detecting it here
+  // means `npm test` is safe on any shell (no NODE_ENV= prefix required) and can
+  // never reach a real database or provider account.
+  isTest: parsed.data.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT),
 };

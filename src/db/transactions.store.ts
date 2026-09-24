@@ -47,6 +47,34 @@ function normalizeStatus(type: string, value: unknown): SwapTxStatus | BridgeTxS
   return type === 'bridge' ? 'source_pending' : 'pending';
 }
 
+/**
+ * Legal status moves. Terminal states are final: a late confirmation callback or
+ * a retry must never drag a finished transaction backwards, and an unfinished
+ * one must never be declared finished by a weaker signal (a provider timeout is
+ * not proof of failure).
+ */
+const SWAP_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  pending: new Set(['submitted', 'failed', 'expired']),
+  submitted: new Set(['confirmed', 'failed', 'expired']),
+  confirmed: new Set(),
+  failed: new Set(),
+  expired: new Set(),
+};
+const BRIDGE_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  source_pending: new Set(['source_confirmed', 'failed']),
+  source_confirmed: new Set(['ccip_in_flight', 'failed']),
+  ccip_in_flight: new Set(['destination_pending', 'completed', 'failed']),
+  destination_pending: new Set(['completed', 'failed']),
+  completed: new Set(),
+  failed: new Set(),
+};
+
+function canTransition(type: string, from: string, to: string): boolean {
+  if (from === to) return true;
+  const table = type === 'bridge' ? BRIDGE_TRANSITIONS : SWAP_TRANSITIONS;
+  return table[from]?.has(to) ?? false;
+}
+
 function rowToTx(r: TxRow): UmbraTransaction {
   const type = r.type === 'bridge' ? 'bridge' : 'swap';
   return {
@@ -175,15 +203,24 @@ export async function updateTransaction(
   patch: Partial<Pick<UmbraTransaction, 'status' | 'destinationTxHash' | 'destinationAmount' | 'ccipMessageId' | 'errorCode' | 'errorMessage' | 'sourceTxHash' | 'providerReference'>>,
   ownerWallet?: string,
 ): Promise<UmbraTransaction | undefined> {
+  const current = await getTransaction(id, ownerWallet);
+  if (!current) return undefined;
+  // Reject an illegal move before touching storage: a late confirmation callback
+  // must not overwrite a finished transaction, and a retry must not resurrect one.
+  if (patch.status !== undefined) {
+    const next = normalizeStatus(current.type, patch.status);
+    if (!canTransition(current.type, current.status, next)) {
+      return current;
+    }
+  }
   if (!isPg()) {
-    const existing = mem.get(id);
-    if (!existing) return undefined;
-    if (ownerWallet && !owns(existing, ownerWallet)) return undefined;
     const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
     const updated: UmbraTransaction = {
-      ...existing,
+      ...current,
       ...defined,
-      status: normalizeStatus(existing.type, defined.status ?? existing.status),
+      status: patch.status === undefined
+        ? current.status
+        : normalizeStatus(current.type, patch.status),
       updatedAt: now(),
     };
     mem.set(id, updated);
@@ -198,20 +235,30 @@ export async function updateTransaction(
       sets.push(`${col} = $${vals.length}`);
     }
   }
-  if (sets.length === 0) return getTransaction(id, ownerWallet);
+  if (sets.length === 0) return current;
   sets.push('updated_at = now()');
-  const filters = ['id = $' + (vals.length + 1)];
+  // Placeholders are numbered in the same order the values are appended, so the
+  // owner filter is added before the id. Numbering the id first compared the id
+  // column against the wallet value.
+  const filters: string[] = [];
   if (ownerWallet) {
     vals.push(ownerWallet);
     filters.push(`(source_wallet = $${vals.length} OR destination_wallet = $${vals.length})`);
   }
+  // Compare-and-set on the status we just read, so a concurrent writer that
+  // moved the row first makes this update a no-op instead of a lost update.
+  vals.push(current.status);
+  filters.push(`status = $${vals.length}`);
   vals.push(id);
+  filters.push(`id = $${vals.length}`);
   const rows = await pgQuery<TxRow>(
     `UPDATE transactions SET ${sets.join(', ')} WHERE ${filters.join(' AND ')} RETURNING *`,
     vals,
   );
   const row = rows[0];
-  return row ? rowToTx(row) : undefined;
+  if (row) return rowToTx(row);
+  // Someone else changed it first: report their state, never overwrite it.
+  return getTransaction(id, ownerWallet);
 }
 
 export async function listTransactions(limit = 20, ownerWallet?: string): Promise<UmbraTransaction[]> {

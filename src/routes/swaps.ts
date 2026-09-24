@@ -68,7 +68,23 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
     if (!SIGNATURE_RE.test(body.signature)) {
       throw badRequest('VALIDATION_ERROR', 'Signature is not a valid Solana transaction signature.');
     }
-    if (stored.signature && stored.signature !== body.signature) {
+    // The ledger row must belong to the wallet the quote was built for, and the
+    // signature must be the one this backend actually broadcast. Without both
+    // checks any caller could attach an invented signature to a live quote, and
+    // one quote could end up with several rows.
+    if (!stored.taker) {
+      throw badRequest('QUOTE_EXPIRED', 'This quote has no wallet bound to it yet. Request a fresh quote.');
+    }
+    if (stored.taker !== body.wallet) {
+      throw badRequest('VALIDATION_ERROR', 'This quote belongs to a different wallet.');
+    }
+    if (!stored.signature) {
+      throw badRequest(
+        'VALIDATION_ERROR',
+        'The swap was not submitted by Umbra. Retry the swap so it can be sent and recorded.',
+      );
+    }
+    if (stored.signature !== body.signature) {
       throw badRequest('VALIDATION_ERROR', 'That is not the signature broadcast for this quote.');
     }
 
@@ -81,8 +97,8 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
       destinationAsset: stored.buySymbol,
       sourceAmount: stored.sellAmountDisplay,
       destinationAmount: stored.receiveAmountDisplay,
-      sourceWallet: body.wallet,
-      destinationWallet: stored.taker ?? body.wallet,
+      sourceWallet: stored.taker,
+      destinationWallet: stored.taker,
       providerReference: stored.jupiterRequestId ?? undefined,
       sourceTxHash: null,
       destinationTxHash: null,
@@ -92,15 +108,18 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
       errorMessage: null,
     });
 
-    // Confirm in the background; the GET endpoint reports the final status.
+    // Confirm in the background; the GET endpoint reports the final status. A
+    // timeout is not a failure: the row stays `submitted` so a later check can
+    // still resolve it, instead of being written off as expired.
     void confirmSignature(body.signature, 60_000)
       .then((result) => {
+        if (result === 'indeterminate') return;
         void updateTransaction(tx.id, {
-          status: result === 'confirmed' ? 'confirmed' : result === 'failed' ? 'failed' : 'expired',
+          status: result === 'confirmed' ? 'confirmed' : 'failed',
         }).catch(() => undefined);
       })
       .catch(() => {
-        void updateTransaction(tx.id, { status: 'expired' }).catch(() => undefined);
+        // Never downgrade the row on an internal error.
       });
 
     return { id: tx.id, signature: body.signature, status: 'submitted', type: 'swap' };

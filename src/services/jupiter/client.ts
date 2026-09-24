@@ -27,6 +27,8 @@ export interface JupiterOrderResponse {
   errorCode?: number;
   errorMessage?: string;
   priceImpactPct?: string | number;
+  /** Current field: price impact in percentage points (1.5 = 1.5%). */
+  priceImpact?: string | number;
   slippageBps?: number;
   /** Exact on-chain minimum output in base units — the real slippage floor. */
   otherAmountThreshold?: string;

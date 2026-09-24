@@ -28,7 +28,19 @@ export function getConnection(): Connection {
   return connection;
 }
 
-export async function confirmSignature(signature: string, timeoutMs = 60_000): Promise<'confirmed' | 'failed' | 'expired'> {
+/**
+ * Poll a signature until it reaches a terminal state or the budget runs out.
+ *
+ * `indeterminate` is deliberately distinct from `expired`: a provider timeout,
+ * an RPC error, or a signature the chain has not indexed yet says nothing about
+ * whether the transaction landed. Reporting that as "expired" wrote a false
+ * failure into the ledger, and a late confirmation could then be discarded as
+ * an illegal state change.
+ */
+export async function confirmSignature(
+  signature: string,
+  timeoutMs = 60_000,
+): Promise<'confirmed' | 'failed' | 'indeterminate'> {
   const conn = getConnection();
   // timeoutMs=0 means "check once, right now" (used when reconciling a row a
   // previous process left in `submitted`) — no polling loop at all.
@@ -45,10 +57,11 @@ export async function confirmSignature(signature: string, timeoutMs = 60_000): P
       }
       if (status?.err) return 'failed';
     } catch {
-      // Provider error or deadline: keep polling while budget remains.
+      // Provider error or deadline: keep polling while budget remains. Running
+      // out of budget is not evidence the transaction failed.
     }
     const remaining = deadline - Date.now();
-    if (remaining <= 0) return 'expired';
+    if (remaining <= 0) return 'indeterminate';
     await new Promise((r) => setTimeout(r, Math.min(2_000, remaining)));
   }
 }
