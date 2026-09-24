@@ -3112,12 +3112,14 @@
         runQuote();
       }, 10000);
 
+      // With nothing held, 50%/Max do nothing at all: a dead button is clearer
+      // than a message, and the balance line already reads 0.00.
       on('halfBtn', 'click', function () {
         var w = window.umbraBalances || [];
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b) { hintNoBalance(); return; }
+        if (!b || !(Number(b.display) > 0)) return;
         var half = (Number(b.display) / 2).toString();
         sellAmountEl.value = half;
         scheduleQuote();
@@ -3127,16 +3129,10 @@
         var b = w.find(function (x) {
           return x.symbol === sellSym;
         });
-        if (!b) { hintNoBalance(); return; }
+        if (!b || !(Number(b.display) > 0)) return;
         sellAmountEl.value = b.display;
         scheduleQuote();
       });
-      // Clicking Max with nothing held used to do nothing at all, which reads as
-      // a broken button. Say why in one line.
-      function hintNoBalance() {
-        var el = document.getElementById('sellBalance');
-        if (el) el.textContent = 'No ' + sellSym + ' in this wallet';
-      }
 
       // Swap/Bridge tabs in the card switch views just like the header pills.
       function setCardTab(which) {
