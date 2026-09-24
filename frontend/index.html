@@ -1372,6 +1372,21 @@
     /* API status pill — phones only, where the card leaves a real gap. It is
        an indicator, not a control: no pointer, no click handler. Auto margins
        center it in whatever space the card leaves behind. */
+    /* Boot veil: an empty dark screen until the app has real data. */
+    .boot-veil {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: #0d1210;
+      opacity: 1;
+      transition: opacity 0.28s ease;
+    }
+    .boot-veil.gone { opacity: 0; pointer-events: none; }
+    /* Failsafe: if JS never runs, the veil still lifts itself. */
+    @keyframes bootAutoLift {
+      to { opacity: 0; visibility: hidden; }
+    }
+    .boot-veil { animation: bootAutoLift 0s linear 7s forwards; }
     .api-pill { display: none; }
     @keyframes apiPulse {
       0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(85, 185, 138, 0.5); }
@@ -1837,6 +1852,10 @@
   </style>
 </head>
 <body>
+  <!-- Nothing of the app is visible until the first data lands: no half-painted
+       header, no empty card, no white flash. A CSS animation removes it even if
+       scripting fails, so the page can never stay blank. -->
+  <div class="boot-veil" id="bootVeil" aria-hidden="true"></div>
   <header class="site-header">
     <div class="nav-left">
       <!-- Brand = a real page load at the site root, not a hash route. "/" keeps
@@ -2631,9 +2650,25 @@
           }
         }
       } catch (e) { try { console.warn('[umbra] tape cache unreadable', e); } catch (_) {} }
-      loadTape().catch(function () {
-        showNote('Prices unavailable right now — check your connection and retry.');
-      });
+      // Lift the boot veil once the app has painted something real — the tape is
+      // the first thing to land, whether it filled or failed. Either way the user
+      // gets the UI instead of an empty screen.
+      function revealApp() {
+        try {
+          var v = document.getElementById('bootVeil');
+          if (!v || v.classList.contains('gone')) return;
+          v.classList.add('gone');
+          setTimeout(function () { if (v.parentNode) v.parentNode.removeChild(v); }, 400);
+        } catch (_) {}
+      }
+      window.umbraRevealApp = revealApp;
+      loadTape()
+        .then(revealApp, function () {
+          showNote('Prices unavailable right now — check your connection and retry.');
+          revealApp();
+        });
+      // Hard ceiling: a hanging request must never hold the whole app hostage.
+      setTimeout(revealApp, 4000);
       // Always retry in background (even when hidden): a latched error note or
       // missing track must recover without a reload.
       setInterval(function () {
