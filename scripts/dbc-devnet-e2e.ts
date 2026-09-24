@@ -20,7 +20,7 @@
  *   $env:SOLANA_RPC_URL="https://api.devnet.solana.com"
  *   npx tsx scripts/dbc-devnet-e2e.ts
  */
-import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 import {
   createAssociatedTokenAccount,
   createMint,
@@ -81,6 +81,42 @@ if (/mainnet-beta|api\.mainnet|helius-rpc\.com\/?(\?|$)/i.test(RPC) && !/devnet/
 
 function decode(txB64: string): Transaction {
   return Transaction.from(Buffer.from(txB64, 'base64'));
+}
+
+/** Curve swaps come back wallet-ready (versioned), unlike config/pool. */
+function decodeSwap(txB64: string): VersionedTransaction {
+  return VersionedTransaction.deserialize(Uint8Array.from(Buffer.from(txB64, 'base64')));
+}
+
+async function sendSigned(tx: Transaction | VersionedTransaction, signers: Keypair[], label: string): Promise<string> {
+  const raw = tx instanceof VersionedTransaction ? tx.serialize() : tx.serialize();
+  tx.sign(...signers);
+  const sig = await connection.sendRawTransaction(raw, { skipPreflight: false });
+  log(`${label}: ${bs58(sig)}`);
+  const res = await connection.confirmTransaction(sig, 'confirmed');
+  if (res.value.err) throw new Error(`${label} failed on devnet: ${JSON.stringify(res.value.err)}`);
+  log(`${label}: confirmed`);
+  return bs58(sig);
+}
+
+function bs58(bytes: Uint8Array): string {
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const digits: number[] = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i] as number;
+    for (let j = 0; j < digits.length; j++) {
+      carry += (digits[j] as number) * 256;
+      digits[j] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let out = '';
+  for (let i = digits.length - 1; i >= 0; i--) out += ALPHABET[digits[i] as number];
+  return out;
 }
 
 async function send(tx: Transaction, signers: Keypair[], label: string): Promise<string> {
@@ -220,7 +256,7 @@ async function main(): Promise<void> {
   const q = await getDbcQuote(state.pool, 'buy', BUY_AMOUNT, 100);
   log(`quote    ${q.amountInDisplay} -> ${q.amountOutDisplay} (min ${q.minimumOut}, fee ${q.tradingFee})`);
   const swap = await buildDbcSwapTransaction(state.pool, 'buy', BUY_AMOUNT, payer.publicKey.toBase58(), 100);
-  await send(decode(swap.transaction), [payer], 'buy');
+  await sendSigned(decodeSwap(swap.transaction), [payer], 'buy');
 
   const after = await getDbcPoolByMint(baseMint.toBase58());
   log(`after buy: baseReserve=${after?.baseReserve} quoteReserve=${after?.quoteReserve} progress=${((after?.curveProgress ?? 0) * 100).toFixed(2)}%`);

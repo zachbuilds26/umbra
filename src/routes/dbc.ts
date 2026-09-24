@@ -9,10 +9,12 @@ import {
   buildDbcCreateConfigTransaction,
   buildDbcCreatePoolTransaction,
   buildDbcSwapTransaction,
+  broadcastDbcTransaction,
   getDbcPoolByMint,
   getDbcQuote,
 } from '../services/meteora/dbc.service.js';
 import {
+  dbcBroadcastBody,
   dbcCreateConfigBody,
   dbcCreatePoolBody,
   dbcQuoteQuery,
@@ -67,6 +69,19 @@ export async function dbcRoutes(app: FastifyInstance): Promise<void> {
       const q = dbcQuoteQuery.parse(req.query);
       requireAccount(q.pool, 'pool');
       return { quote: await getDbcQuote(q.pool, q.side, q.amount, q.slippageBps) };
+    },
+  );
+
+  // POST /api/dbc/broadcast { transaction, userPublicKey } — submit a curve swap
+  // the wallet signed. Same relay rule as /api/swap/broadcast: we verify the
+  // fee payer is the connected wallet, then send it over our own RPC.
+  app.post(
+    '/api/dbc/broadcast',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const b = dbcBroadcastBody.parse(req.body);
+      requireAddress(b.userPublicKey, 'userPublicKey');
+      return broadcastDbcTransaction(b.transaction, b.userPublicKey);
     },
   );
 

@@ -57,10 +57,11 @@ Key env vars:
 | POST | `/api/bridge/transaction` `{bridgeQuoteId, sourceWalletAddress, destinationSolanaAddress}` | Verified bridge contract + token data + `trackingId` |
 | GET | `/api/bridge/transactions/:id?wallet=…` | Bridge status (`source_pending → source_confirmed → ccip_in_flight → …`) |
 | POST | `/api/bridge/transactions/:id/source` `{sourceTxHash, ccipMessageId?, wallet}` | Record source confirmation (owning wallet only) |
-| GET | `/api/dbc/presets` | Equity launch presets with real curve economics |
+| GET | `/api/dbc/presets` | Equity launch presets with real curve economics (start price + graduation threshold) |
 | GET | `/api/dbc/pools?baseMint=…` | DBC pool state, or `pool:null` for unlaunched names |
 | GET | `/api/dbc/quote?pool=…&side=buy\|sell&amount=…&slippageBps=50` | Live curve quote (max 5% slippage) |
 | POST | `/api/dbc/transaction` `{pool, side, amount, userPublicKey, slippageBps}` | Unsigned exact-in swap against a pool |
+| POST | `/api/dbc/broadcast` `{userPublicKey, transaction}` | Relay the wallet-signed curve swap (verifies the signer) |
 
 Errors always look like `{ "error": { "code": "UNSUPPORTED_BRIDGE_ROUTE", "message": "…", "details": {} } }`. Secrets are never logged or returned.
 

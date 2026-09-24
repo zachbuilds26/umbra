@@ -22,8 +22,8 @@ import { SOLANA_USDC_MINT } from '../xstocks/assets.service.js';
 // launches use steep exponential curves + high fees; equity-like assets want
 // the opposite: a flat two-segment curve (orderly price discovery), low fixed
 // fees, no dynamic-volatility fee (stocks don't need meme anti-snipe), and a
-// USDC migration threshold at/above 750 USDC so Meteora's mainnet keepers
-// auto-migrate finished pools to DAMM v2 (docs: keeper threshold table).
+// USDC quote token. Graduation thresholds are computed from the assembled
+// curve (150k / 1M / 500k USDC below) and reported per preset — never typed in.
 //
 // All amounts below are human units; the builder converts to base units.
 
@@ -50,7 +50,7 @@ export const EQUITY_PRESETS: EquityPresetDef[] = [
     id: 'equity-discovery',
     name: 'Equity Discovery',
     description:
-      'Price discovery for thinly-traded or newly tokenized stocks with no reliable Jupiter price (e.g. MDTx/MEITx/MIXUx today). Low start mcap, flat two-segment curve, 750 USDC graduation for keeper auto-migration.',
+      'Price discovery for thinly-traded or newly tokenized stocks with no reliable Jupiter price. Low start valuation, flat two-segment curve, graduates once 150,000 USDC of quote liquidity is collected.',
     baseDecimals: TokenDecimal.EIGHT,
     totalSupply: 1_000_000_000,
     initialMarketCapUsd: 50_000,
@@ -64,7 +64,7 @@ export const EQUITY_PRESETS: EquityPresetDef[] = [
     id: 'equity-bluechip',
     name: 'Equity Blue-Chip',
     description:
-      'Higher-valuation launches tracking liquid names. Tighter fees end-to-end; same keeper-compatible 750 USDC graduation into a 25bps DAMM v2 pool.',
+      'Higher-valuation launches tracking liquid names. Tightest fees end-to-end, and the largest quote band (1,000,000 USDC) before it graduates into a 25bps DAMM v2 pool.',
     baseDecimals: TokenDecimal.EIGHT,
     totalSupply: 1_000_000_000,
     initialMarketCapUsd: 500_000,
@@ -78,7 +78,7 @@ export const EQUITY_PRESETS: EquityPresetDef[] = [
     id: 'preipo-fractional',
     name: 'Pre-IPO Fractional',
     description:
-      'Fractional exposure to pre-IPO style names (9-decimal base, matching the PreStocks shelf). Wide mcap band for long discovery, keeper-compatible graduation.',
+      'Fractional exposure to pre-IPO style names (9-decimal base, matching the PreStocks shelf). Widest discovery window of the three, graduating at 500,000 USDC.',
     baseDecimals: TokenDecimal.NINE,
     totalSupply: 1_000_000_000,
     initialMarketCapUsd: 100_000,

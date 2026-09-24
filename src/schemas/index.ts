@@ -79,6 +79,12 @@ export const dbcSwapBody = z.object({
   slippageBps: slippageBpsSchema,
 });
 
+// A signed DBC swap relayed to the chain: base64 legacy transaction.
+export const dbcBroadcastBody = z.object({
+  userPublicKey: solanaAddress,
+  transaction: z.string().min(80).max(20_000),
+});
+
 export const dbcCreateConfigBody = z.object({
   preset: z.string().min(1).max(64),
   config: solanaAddress,

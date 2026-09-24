@@ -1367,6 +1367,260 @@
     .stocks-search::placeholder {
       color: var(--umbra-muted);
     }
+    /* ---------- Launch (Meteora DBC) ---------- */
+    .launch-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      padding: 20px 16px 48px;
+      gap: 32px;
+    }
+    .launch-card {
+      width: 100%;
+      max-width: 880px;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .launch-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .launch-title {
+      font-family: var(--umbra-font-display);
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .launch-sub {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--umbra-muted);
+      max-width: 62ch;
+      margin: 0;
+    }
+    .launch-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--umbra-muted);
+      border: 1px solid var(--umbra-border);
+      border-radius: 999px;
+      padding: 7px 12px;
+      white-space: nowrap;
+    }
+    .launch-badge img { width: 14px; height: 14px; }
+    .launch-block { display: flex; flex-direction: column; gap: 14px; }
+    .launch-block-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .launch-block-head h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .launch-note { font-size: 12px; color: var(--umbra-muted); }
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .preset {
+      background: var(--umbra-bg);
+      border: 1px solid var(--umbra-border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .preset-name { font-size: 15px; font-weight: 600; }
+    .preset-desc { font-size: 12.5px; line-height: 1.55; color: var(--umbra-muted); }
+    .preset-stats { display: flex; flex-direction: column; gap: 7px; }
+    .preset-stat {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12.5px;
+      border-top: 1px solid var(--umbra-border);
+      padding-top: 7px;
+    }
+    .preset-stat span:first-child { color: var(--umbra-muted); }
+    .preset-stat span:last-child { font-variant-numeric: tabular-nums; }
+    .preset-flag {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--umbra-muted);
+      border: 1px solid var(--umbra-border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      align-self: flex-start;
+    }
+    .preset-skeleton {
+      height: 178px;
+      border-radius: 14px;
+      background: linear-gradient(100deg, #1b1b1b 30%, #232323 50%, #1b1b1b 70%);
+      background-size: 220% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+    }
+    .monitor-row { display: flex; gap: 10px; }
+    .monitor-input,
+    .curve-input {
+      flex: 1;
+      min-width: 0;
+      background: var(--umbra-bg);
+      border: 1px solid var(--umbra-border);
+      border-radius: 12px;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      padding: 13px 14px;
+    }
+    .monitor-input:focus, .curve-input:focus { border-color: var(--umbra-accent); }
+    .launch-btn {
+      background: var(--umbra-accent);
+      color: var(--umbra-accent-ink);
+      border: 0;
+      border-radius: 12px;
+      padding: 13px 20px;
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .launch-btn.wide { width: 100%; }
+    .launch-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .pool-panel { font-size: 13px; }
+    .pool-empty {
+      border: 1px dashed var(--umbra-border);
+      border-radius: 12px;
+      padding: 18px;
+      color: var(--umbra-muted);
+      line-height: 1.6;
+    }
+    .pool-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 18px;
+      border: 1px solid var(--umbra-border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .pool-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .pool-cell b { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--umbra-muted); font-weight: 500; }
+    .pool-cell span { font-size: 13.5px; word-break: break-all; font-variant-numeric: tabular-nums; }
+    .pool-progress {
+      grid-column: 1 / -1;
+      height: 6px;
+      border-radius: 999px;
+      background: #1f1f1f;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .pool-progress i { display: block; height: 100%; background: var(--umbra-accent); }
+    .pool-progress-label {
+      grid-column: 1 / -1;
+      font-size: 12px;
+      color: var(--umbra-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .curve-trade {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+    }
+    .curve-side {
+      background: var(--umbra-bg);
+      border: 1px solid var(--umbra-border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .curve-amount-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 12px;
+      padding: 6px 6px 6px 12px;
+    }
+    .curve-input { background: transparent; border: 0; font-size: 22px; font-weight: 600; padding: 8px 0; }
+    .curve-unit {
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      color: var(--umbra-muted);
+      border: 1px solid var(--umbra-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      white-space: nowrap;
+    }
+    .curve-toggle { display: flex; gap: 8px; }
+    .curve-side-btn {
+      flex: 1;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      color: var(--umbra-muted);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: var(--umbra-font-body);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .curve-side-btn.active { color: var(--umbra-text); border-color: var(--umbra-accent); }
+    .curve-quote {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--umbra-muted);
+      min-height: 42px;
+    }
+    .curve-quote b { color: var(--umbra-text); font-weight: 600; }
+    .curve-status { font-size: 12.5px; color: var(--umbra-muted); min-height: 18px; }
+    .curve-status a { color: var(--umbra-accent); }
+    .curve-label {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--umbra-muted);
+    }
+    .curve-steps {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--umbra-muted);
+    }
+    @media (max-width: 760px) {
+      .launch-card { padding: 18px; border-radius: 16px; }
+      .launch-title { font-size: 22px; }
+      .preset-grid { grid-template-columns: 1fr; }
+      .curve-trade { grid-template-columns: 1fr; }
+      .monitor-row { flex-direction: column; }
+      .pool-grid { grid-template-columns: 1fr; }
+    }
     .stocks-list {
       min-height: 320px;
       max-height: 520px;
@@ -1782,6 +2036,7 @@
       <nav class="nav-links" aria-label="Primary">
         <a class="nav-pill active" href="#swap">Swap</a>
         <a class="nav-pill" href="#stocks">Stocks</a>
+        <a class="nav-pill" href="#launch">Launch</a>
         <a class="nav-pill" href="#transactions">Transactions</a>
       </nav>
     </div>
@@ -1804,6 +2059,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="#swap" class="mrow active"><span class="micon"><i data-lucide="repeat" width="17" height="17"></i></span><span>Swap</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
     <a href="#stocks" class="mrow"><span class="micon"><i data-lucide="trending-up" width="17" height="17"></i></span><span>Stocks</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
+    <a href="#launch" class="mrow"><span class="micon"><i data-lucide="line-chart" width="17" height="17"></i></span><span>Launch</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
     <a href="#transactions" class="mrow"><span class="micon"><span class="material-symbols-outlined" style="font-size:18px; line-height:1;">search_activity</span></span><span>Transactions</span><i data-lucide="arrow-up-right" class="marrow" width="18" height="18"></i></a>
     <div class="mobile-foot">
       <button class="mobile-connect" id="menuConnectBtn" type="button"><span>Connect Wallet</span></button>
@@ -1978,6 +2234,71 @@
       </div>
     </section>
     <!-- (deleted: bridge page — #bridge now falls through to #swap) -->
+    <section id="launch" class="page-section" aria-label="Launch">
+      <div class="launch-wrap">
+        <div class="launch-card">
+          <div class="launch-head">
+            <div>
+              <h2 class="launch-title">Bonding-curve launches</h2>
+              <p class="launch-sub">Umbra issues a stock's price on a Meteora dynamic bonding curve, then graduates it into a DAMM v2 pool once the quote threshold is met. Curated for equity-like assets: flat discovery curves, no anti-snipe fee, USDC-quoted.</p>
+            </div>
+            <span class="launch-badge"><img src="./assets/solana-mark.png" alt="" /> Solana mainnet</span>
+          </div>
+
+          <div class="launch-block">
+            <div class="launch-block-head">
+              <h3>Issuance presets</h3>
+              <span class="launch-note">Curve maths is computed on our backend from each preset, not typed in.</span>
+            </div>
+            <div id="presetList" class="preset-grid" aria-live="polite">
+              <div class="preset-skeleton"></div><div class="preset-skeleton"></div><div class="preset-skeleton"></div>
+            </div>
+          </div>
+
+          <div class="launch-block">
+            <div class="launch-block-head">
+              <h3>Pool monitor</h3>
+              <span class="launch-note">Paste the base mint of a launched curve to read its live state.</span>
+            </div>
+            <div class="monitor-row">
+              <input id="dbcMintInput" class="monitor-input" type="text" placeholder="Base mint (e.g. an SPL mint of a launched stock)" autocomplete="off" spellcheck="false" aria-label="Base mint address" />
+              <button id="dbcMintBtn" class="launch-btn" type="button">Read pool</button>
+            </div>
+            <div id="dbcPoolPanel" class="pool-panel" aria-live="polite"></div>
+          </div>
+
+          <div class="launch-block">
+            <div class="launch-block-head">
+              <h3>Trade on a curve</h3>
+              <span class="launch-note">Quotes come from the curve itself, not an aggregator.</span>
+            </div>
+            <div class="curve-trade">
+              <div class="curve-side">
+                <div class="curve-amount-row">
+                  <input id="dbcAmount" class="curve-input" type="number" min="0" step="any" placeholder="0.00" inputmode="decimal" aria-label="Amount" />
+                  <span id="dbcSideLabel" class="curve-unit">BUY</span>
+                </div>
+                <div class="curve-toggle" role="group" aria-label="Trade side">
+                  <button id="dbcSideBuy" class="curve-side-btn active" type="button">Buy</button>
+                  <button id="dbcSideSell" class="curve-side-btn" type="button">Sell</button>
+                </div>
+                <div class="curve-quote" id="dbcQuoteLine">Enter an amount to quote against the curve.</div>
+                <button id="dbcTradeBtn" class="launch-btn wide" type="button" disabled>Read a pool first</button>
+                <div id="dbcStatus" class="curve-status" role="status" aria-live="polite"></div>
+              </div>
+              <div class="curve-side curve-side-out">
+                <div class="curve-label">What happens next</div>
+                <ol class="curve-steps">
+                  <li>Buys add quote to the pool and walk the price up the curve.</li>
+                  <li>When the quote reserve hits the graduation threshold, trading on the curve stops.</li>
+                  <li>Meteora's keeper moves the pool into DAMM v2, where Jupiter can route it.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
     <section id="transactions" class="page-section" aria-label="Transactions">
       <div class="stocks-wrap">
         <div class="stocks-card">
@@ -2221,6 +2542,9 @@
           a.classList.toggle('active', a.getAttribute('href') === hash);
         });
         showSection(hash);
+        // The launch page reads live chain state, so it loads when opened
+        // instead of on page load — no wasted calls for swap-only visitors.
+        if (hash === '#launch' && typeof ensureLaunchData === 'function') ensureLaunchData();
         window.scrollTo({ top: 0, behavior: 'auto' });
       }
       pills.concat(mobileLinks).forEach(function (el) {
@@ -3959,6 +4283,228 @@
           drawerNoteEl.style.display = 'none';
         }
       }
+
+      // ---- Launch: Meteora DBC presets, pool monitor, curve trading ----
+      // Everything here is live chain state: presets are computed by the
+      // backend's curve maths, pool state is read from Solana, and quotes come
+      // from the bonding curve itself. Nothing is typed in or estimated here.
+      (function () {
+        var presetListEl = document.getElementById('presetList');
+        var mintInput = document.getElementById('dbcMintInput');
+        var mintBtn = document.getElementById('dbcMintBtn');
+        var poolPanel = document.getElementById('dbcPoolPanel');
+        var amountEl = document.getElementById('dbcAmount');
+        var sideLabel = document.getElementById('dbcSideLabel');
+        var quoteLine = document.getElementById('dbcQuoteLine');
+        var tradeBtn = document.getElementById('dbcTradeBtn');
+        var statusEl = document.getElementById('dbcStatus');
+        var buyBtn = document.getElementById('dbcSideBuy');
+        var sellBtn = document.getElementById('dbcSideSell');
+        if (!presetListEl || !mintInput) return;
+
+        var side = 'buy';
+        var pool = null;          // live DbcPoolState once a pool is read
+        var quote = null;         // latest curve quote
+        var quoteSeq = 0;
+        var poolSeq = 0;
+        var presetsLoaded = false;
+        var trading = false;
+
+        function money(n, dp) {
+          var v = Number(n);
+          if (!isFinite(v)) return '—';
+          return v.toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
+        }
+        function shortAddr(a) { return a ? a.slice(0, 4) + '…' + a.slice(-4) : '—'; }
+
+        function presetCard(p) {
+          var fees = p.startingFeeBps + '→' + p.endingFeeBps + ' bps';
+          var band = money(p.initialMarketCapUsd) + ' → ' + money(p.migrationMarketCapUsd);
+          return '<div class="preset">' +
+            '<div class="preset-name">' + esc(p.name) + '</div>' +
+            '<div class="preset-desc">' + esc(p.description || '') + '</div>' +
+            '<div class="preset-stats">' +
+              '<div class="preset-stat"><span>Start price</span><span>$' + esc(p.startPriceUsd || '—') + '</span></div>' +
+              '<div class="preset-stat"><span>Valuation band</span><span>$' + esc(band) + '</span></div>' +
+              '<div class="preset-stat"><span>Trading fee</span><span>' + esc(fees) + '</span></div>' +
+              '<div class="preset-stat"><span>Graduation</span><span>' + esc(money(Number(p.migrationThresholdUsdc || 0))) + ' USDC</span></div>' +
+              '<div class="preset-stat"><span>Supply on graduation</span><span>' + esc(String(p.percentageSupplyOnMigration)) + '%</span></div>' +
+            '</div>' +
+            '<div class="preset-flag">' + (p.keeperAutoMigrate ? 'Keeper auto-migrates' : 'Manual migration') + '</div>' +
+          '</div>';
+        }
+
+        function loadPresets() {
+          return fetch(API_BASE + '/api/dbc/presets')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+              if (!j || !j.presets || !j.presets.length) {
+                presetListEl.innerHTML = '<div class="pool-empty">Could not read the issuance presets. Reload to try again.</div>';
+                return;
+              }
+              presetListEl.innerHTML = j.presets.map(presetCard).join('');
+              presetsLoaded = true;
+            })
+            .catch(function () {
+              presetListEl.innerHTML = '<div class="pool-empty">Could not reach Umbra to read the issuance presets. Check your connection and reload.</div>';
+            });
+        }
+
+        function setTradeEnabled(on, label) {
+          tradeBtn.disabled = !on;
+          tradeBtn.textContent = label;
+        }
+
+        function renderPool(state) {
+          var pct = Math.max(0, Math.min(1, state.curveProgress || 0));
+          var threshold = Number(state.migrationQuoteThreshold || 0) / Math.pow(10, state.quoteDecimals || 6);
+          poolPanel.innerHTML = '<div class="pool-grid">' +
+            '<div class="pool-cell"><b>Pool</b><span>' + esc(shortAddr(state.pool)) + '</span></div>' +
+            '<div class="pool-cell"><b>Base mint</b><span>' + esc(shortAddr(state.baseMint)) + '</span></div>' +
+            '<div class="pool-cell"><b>Base reserve</b><span>' + esc(money(Number(state.baseReserve) / Math.pow(10, state.baseDecimals || 0), 4)) + '</span></div>' +
+            '<div class="pool-cell"><b>Quote reserve</b><span>' + esc(money(Number(state.quoteReserve) / Math.pow(10, state.quoteDecimals || 6), 2)) + ' USDC</span></div>' +
+            '<div class="pool-cell"><b>Decimals</b><span>' + esc(String(state.baseDecimals)) + ' / ' + esc(String(state.quoteDecimals)) + '</span></div>' +
+            '<div class="pool-cell"><b>Graduation</b><span>' + esc(money(threshold, 0)) + ' USDC</span></div>' +
+            '<div class="pool-progress"><i style="width:' + (pct * 100).toFixed(2) + '%"></i></div>' +
+            '<div class="pool-progress-label"><span>Curve progress</span><span>' + (pct * 100).toFixed(2) + '%</span></div>' +
+          '</div>';
+        }
+
+        function readPool() {
+          var mint = (mintInput.value || '').trim();
+          if (!mint) {
+            poolPanel.innerHTML = '<div class="pool-empty">Paste a base mint to read its curve state.</div>';
+            return;
+          }
+          var myReq = ++poolSeq;
+          poolPanel.innerHTML = '<div class="pool-empty">Reading curve state from Solana…</div>';
+          mintBtn.disabled = true;
+          fetch(API_BASE + '/api/dbc/pools?baseMint=' + encodeURIComponent(mint))
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+              if (myReq !== poolSeq) return;
+              if (!res.ok) {
+                pool = null;
+                poolPanel.innerHTML = '<div class="pool-empty">Could not read that mint. Check the address, or try again shortly.</div>';
+                setTradeEnabled(false, 'Read a pool first');
+                return;
+              }
+              if (!res.body.pool) {
+                // Honest answer: this mint has no curve. Not an error.
+                pool = null;
+                poolPanel.innerHTML = '<div class="pool-empty">No bonding curve is live on that mint yet. Umbra reads real state — an unlaunched name stays empty until a pool exists.</div>';
+                setTradeEnabled(false, 'Read a pool first');
+                return;
+              }
+              pool = res.body.pool;
+              renderPool(pool);
+              setTradeEnabled(true, 'Connect wallet to trade');
+              if (typeof window.lucide) window.lucide.createIcons();
+              runQuote();
+            })
+            .catch(function () {
+              if (myReq !== poolSeq) return;
+              poolPanel.innerHTML = '<div class="pool-empty">Could not reach Umbra. Check your connection and try again.</div>';
+            })
+            .then(function () { mintBtn.disabled = false; });
+        }
+
+        function runQuote() {
+          var amt = (amountEl.value || '').trim();
+          quote = null;
+          if (!pool) { quoteLine.textContent = 'Read a pool first.'; return; }
+          if (!amt || Number(amt) <= 0) { quoteLine.innerHTML = 'Enter an amount to quote against the curve.'; return; }
+          var mySeq = ++quoteSeq;
+          quoteLine.innerHTML = 'Quoting the curve…';
+          fetch(API_BASE + '/api/dbc/quote?pool=' + encodeURIComponent(pool.pool) + '&side=' + side + '&amount=' + encodeURIComponent(amt) + '&slippageBps=100')
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+              if (mySeq !== quoteSeq) return;
+              if (!res.ok || !res.body.quote) {
+                quoteLine.innerHTML = 'The curve cannot fill that size right now — try a smaller amount.';
+                return;
+              }
+              quote = res.body.quote;
+              quoteLine.innerHTML = 'You receive <b>' + esc(quote.amountOutDisplay) + '</b> ' +
+                (side === 'buy' ? 'tokens' : 'USDC') + ' · price after <b>$' + esc(quote.priceAfter || '—') + '</b>';
+              if (window.umbraWallet) setTradeEnabled(true, side === 'buy' ? 'Buy on the curve' : 'Sell on the curve');
+              else setTradeEnabled(true, 'Connect wallet to trade');
+            })
+            .catch(function () {
+              if (mySeq !== quoteSeq) return;
+              quoteLine.innerHTML = 'Could not reach Umbra to quote. Try again in a moment.';
+            });
+        }
+
+        function setSide(next) {
+          side = next;
+          buyBtn.classList.toggle('active', next === 'buy');
+          sellBtn.classList.toggle('active', next === 'sell');
+          sideLabel.textContent = next.toUpperCase() + (next === 'buy' ? ' USDC' : ' tokens');
+          runQuote();
+        }
+
+        function trade() {
+          if (trading || !pool || !quote || !window.umbraWallet) return;
+          if (typeof resolveReownSigner === 'function') resolveReownSigner();
+          if (!walletProvider || !walletProvider.signTransaction) {
+            statusEl.textContent = 'Connect a wallet that can sign Solana transactions.';
+            return;
+          }
+          trading = true;
+          setTradeEnabled(false, 'Signing…');
+          statusEl.textContent = 'Build the swap, then sign in your wallet.';
+          var amt = (amountEl.value || '').trim();
+          fetch(API_BASE + '/api/dbc/transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pool: pool.pool, side: side, amount: amt, userPublicKey: window.umbraWallet, slippageBps: 100 }),
+          })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+              if (!res.ok) throw new Error((res.body.error && res.body.error.message) || 'Could not build the swap.');
+              if (!window.solanaWeb3) throw new Error('Swap library failed to load — refresh the page.');
+              var raw = Uint8Array.from(atob(res.body.transaction), function (c) { return c.charCodeAt(0); });
+              var vtx = window.solanaWeb3.VersionedTransaction.deserialize(raw);
+              return walletProvider.signTransaction(vtx);
+            })
+            .then(function (signed) {
+              var bytes = signed && signed.serialize ? new Uint8Array(signed.serialize()) : new Uint8Array(signed);
+              return fetch(API_BASE + '/api/dbc/broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userPublicKey: window.umbraWallet, transaction: btoa(String.fromCharCode.apply(null, bytes)) }),
+              }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
+            })
+            .then(function (res) {
+              if (!res.ok) throw new Error((res.body.error && res.body.error.message) || 'Solana rejected the swap.');
+              statusEl.innerHTML = 'Sent. <a href="https://explorer.solana.com/tx/' + esc(res.body.signature) + '" target="_blank" rel="noopener">View on the Solana explorer</a>';
+              setTradeEnabled(true, side === 'buy' ? 'Buy on the curve' : 'Sell on the curve');
+              readPool();
+            })
+            .catch(function (e) {
+              var msg = (e && e.message) || String(e);
+              if (/reject|denied|declin|cancel/i.test(msg) || (e && e.code === 4001)) msg = 'Signature rejected — nothing was sent.';
+              statusEl.textContent = msg;
+              setTradeEnabled(true, side === 'buy' ? 'Buy on the curve' : 'Sell on the curve');
+            })
+            .then(function () { trading = false; });
+        }
+
+        mintBtn.addEventListener('click', readPool);
+        mintInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); readPool(); } });
+        buyBtn.addEventListener('click', function () { setSide('buy'); });
+        sellBtn.addEventListener('click', function () { setSide('sell'); });
+        amountEl.addEventListener('input', runQuote);
+        tradeBtn.addEventListener('click', trade);
+        setTradeEnabled(false, 'Read a pool first');
+        sideLabel.textContent = 'BUY USDC';
+        quoteLine.textContent = 'Read a pool first.';
+
+        window.ensureLaunchData = function () {
+          if (!presetsLoaded) loadPresets();
+        };
+      })();
 
       // ---- Bridge (same card, cross-chain) ----
       (function () {

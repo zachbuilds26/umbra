@@ -1,6 +1,6 @@
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import {
   SwapMode,
   deriveDbcPoolAddress,
@@ -14,7 +14,7 @@ import { getConnection } from '../solana/connection.js';
 import { getDbcClient } from './dbc-client.js';
 import { DBC_QUOTE_MINT, buildEquityConfig, getEquityPreset } from './dbc-presets.js';
 import { TtlCache } from '../../utils/cache.js';
-import { badRequest, notFound, upstream, sanitizeProviderMessage } from '../../utils/errors.js';
+import { badRequest, notFound, upstream, sanitizeProviderMessage, HttpError } from '../../utils/errors.js';
 import { isValidSolanaAddress, isValidSolanaPublicKey } from '../../utils/addresses.js';
 
 Decimal.set({ precision: 40 });
@@ -54,6 +54,29 @@ export interface DbcQuote {
 
 const POOL_CACHE_MS = 30 * 1000;
 const poolCache = new TtlCache<DbcPoolState>(POOL_CACHE_MS);
+
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function bs58(bytes: Uint8Array): string {
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+  const digits: number[] = [0];
+  for (let i = zeros; i < bytes.length; i++) {
+    let carry = bytes[i] as number;
+    for (let j = 0; j < digits.length; j++) {
+      carry += (digits[j] as number) * 256;
+      digits[j] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let out = '1'.repeat(zeros);
+  for (let i = digits.length - 1; i >= 0; i--) out += B58[digits[i] as number];
+  return out;
+}
 
 function dbcError(e: unknown, fallback: string): never {
   const msg = e instanceof Error ? sanitizeProviderMessage(e.message) : fallback;
@@ -265,7 +288,27 @@ export async function buildDbcSwapTransaction(
   } catch (e) {
     dbcError(e, 'DBC swap transaction build failed');
   }
-  return { transaction: await finalizeUnsigned(tx, owner), quote };
+  return { transaction: await finalizeUnsignedVersioned(tx, owner), quote };
+}
+
+/**
+ * Wallet-ready form: wallets in this app sign VersionedTransaction, while the
+ * SDK hands back a legacy one. Converting here means a curve swap goes through
+ * exactly the same sign-and-relay path as a Jupiter swap.
+ */
+async function finalizeUnsignedVersioned(tx: unknown, feePayer: PublicKey): Promise<string> {
+  try {
+    const t = tx as Transaction;
+    const { blockhash } = await getConnection().getLatestBlockhash('confirmed');
+    const message = new TransactionMessage({
+      payerKey: feePayer,
+      recentBlockhash: blockhash,
+      instructions: t.instructions,
+    }).compileToLegacyMessage();
+    return Buffer.from(new VersionedTransaction(message).serialize()).toString('base64');
+  } catch (e) {
+    dbcError(e, 'DBC transaction build failed');
+  }
 }
 
 /**
@@ -357,6 +400,71 @@ export async function buildDbcCreatePoolTransaction(
     dbcError(e, 'DBC pool transaction build failed');
   }
   return { transaction: await finalizeUnsigned(tx, new PublicKey(payer)), pool: pool.toBase58(), config: configAddress };
+}
+
+/**
+ * Submit a DBC swap the connected wallet signed. The wallet signs; we relay it
+ * over our RPC. Verified first: a signed transaction can never confirm if it is
+ * never sent, and we refuse to relay anything that isn't the user's own.
+ */
+export async function broadcastDbcTransaction(
+  signedTransactionB64: string,
+  userPublicKey: string,
+): Promise<{ signature: string }> {
+  if (!isValidSolanaAddress(userPublicKey)) {
+    throw badRequest('INVALID_ADDRESS', 'userPublicKey is not a valid Solana address.');
+  }
+  if (!/^[A-Za-z0-9+/]{80,}={0,2}$/.test(signedTransactionB64)) {
+    throw badRequest('VALIDATION_ERROR', 'transaction must be base64.');
+  }
+  let raw: Buffer;
+  try {
+    raw = Buffer.from(signedTransactionB64, 'base64');
+  } catch {
+    throw badRequest('VALIDATION_ERROR', 'transaction could not be decoded.');
+  }
+  // Wallets here sign versioned transactions; the config/pool builders still
+  // produce legacy ones, so accept whichever shape the caller signed.
+  let signer: string;
+  let sig64: Uint8Array | null = null;
+  try {
+    const vtx = VersionedTransaction.deserialize(new Uint8Array(raw));
+    const required = vtx.message.header?.numRequiredSignatures ?? 0;
+    const first = vtx.signatures[0];
+    if (!first || first.every((b) => b === 0)) {
+      throw badRequest('VALIDATION_ERROR', 'Transaction is not signed.');
+    }
+    signer = required > 0 ? vtx.message.staticAccountKeys[0]?.toBase58() ?? '' : '';
+    sig64 = first;
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    let tx: Transaction;
+    try {
+      tx = Transaction.from(raw);
+    } catch {
+      throw badRequest('VALIDATION_ERROR', 'transaction could not be decoded.');
+    }
+    if (tx.signatures.some((s) => !s.signature || s.signature.equals(Buffer.alloc(64)))) {
+      throw badRequest('VALIDATION_ERROR', 'Transaction is not signed.');
+    }
+    signer = tx.feePayer ? tx.feePayer.toBase58() : '';
+    sig64 = new Uint8Array(tx.signatures[0]?.signature ?? []);
+  }
+  if (signer !== userPublicKey) {
+    throw badRequest('VALIDATION_ERROR', 'Transaction signer does not match userPublicKey.');
+  }
+  let signature: string;
+  try {
+    signature = await getConnection().sendRawTransaction(raw, { skipPreflight: false, maxRetries: 3 });
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    // A wallet that broadcast itself races us here; the tx is already known.
+    if (!/already|processed|BlockhashNotFound/i.test(msg)) {
+      throw upstream('PROVIDER_ERROR', 'Solana rejected this swap. Nothing was sent.');
+    }
+    signature = bs58(sig64 ?? new Uint8Array(64));
+  }
+  return { signature };
 }
 
 interface UnsignedTx {
