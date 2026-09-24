@@ -310,6 +310,29 @@ export async function getMultiplier(symbol: string, network = 'Solana'): Promise
   return value;
 }
 
+// Underlyings Finnhub would misattribute (Vx -> "V" = Visa Inc). Skipped there;
+// the Jupiter fallback below still applies.
+const FINNHUB_SKIP = new Set(['V']);
+
+/** Underlying equity market cap for display: Finnhub first (fast, complete
+ * for single stocks), Jupiter fallback (covers ETFs like SPY/QQQ/GLD that
+ * Finnhub profile2 doesn't return). Pre-IPO assets already carry theirs. */
+export async function getEquityMarketCapForAsset(asset: UmbraAsset): Promise<string | null> {
+  if (asset.marketCap) return asset.marketCap;
+  const underlying = asset.underlyingSymbol ?? asset.symbol.replace(/x$/i, '');
+  if (underlying && !FINNHUB_SKIP.has(underlying.toUpperCase())) {
+    const { getFinnhubMarketCap } = await import('../marketcap/finnhub.js');
+    const mcap = await getFinnhubMarketCap(underlying).catch(() => null);
+    if (mcap) return mcap;
+  }
+  if (!asset.address) return null;
+  const { getJupiterPrice } = await import('../jupiter/price.service.js');
+  const jp = await getJupiterPrice(asset.address).catch(() => null);
+  const m = (jp as unknown as { stockData?: { mcap?: number }; marketCap?: number } | null);
+  const v = m?.stockData?.mcap ?? m?.marketCap;
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? String(Math.round(v)) : null;
+}
+
 /** Attach live price + multiplier + marketCap to a base asset (GET /api/assets/:symbol). */
 export async function enrichAsset(symbol: string): Promise<UmbraAsset | null> {
   const asset = await getAsset(symbol);
@@ -318,13 +341,9 @@ export async function enrichAsset(symbol: string): Promise<UmbraAsset | null> {
   const [price, multiplier, marketCap, liquidity] = await Promise.all([
     getPrice(symbol).catch(() => null),
     isStableSymbol(canonicalSymbol(symbol)) ? Promise.resolve('1') : getMultiplier(symbol).catch(() => null),
-    asset.marketCap
-      ? Promise.resolve(asset.marketCap)
-      : isStableSymbol(canonicalSymbol(symbol))
-        ? Promise.resolve(null)
-        : import('../jupiter/price.service.js')
-            .then((m) => m.getJupiterPrice(asset.address).then((jp) => (jp as any)?.stockData?.mcap ? String((jp as any).stockData.mcap) : (jp as any)?.marketCap ? String((jp as any).marketCap) : null).catch(() => null))
-            .catch(() => null),
+    isStableSymbol(canonicalSymbol(symbol))
+      ? Promise.resolve(null)
+      : getEquityMarketCapForAsset(asset).catch(() => null),
     isStableSymbol(canonicalSymbol(symbol))
       ? Promise.resolve(null)
       : import('../jupiter/price.service.js')

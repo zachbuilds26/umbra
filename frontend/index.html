@@ -3524,10 +3524,13 @@
                       var slice = stocksCache.slice(j, j + 20);
                       Promise.all(slice.map(function (a) {
                         if (a.marketCap) { a._mcapChecked = true; return false; }
-                        return fetch(API_BASE + '/api/assets/' + a.symbol)
+                        // Valuation-only endpoint (~300ms: Finnhub first, no
+                        // price/multiplier legs). Accepts both shapes.
+                        return fetch(API_BASE + '/api/assets/' + a.symbol + '/marketcap')
                           .then(function (r) { return r.ok ? r.json() : null; })
                           .then(function (d) {
-                            if (d && d.asset && d.asset.marketCap) { a.marketCap = d.asset.marketCap; a._mcapChecked = true; return true; }
+                            var mc = d && (d.marketCap || (d.asset && d.asset.marketCap));
+                            if (mc) { a.marketCap = mc; a._mcapChecked = true; return true; }
                             a._mcapChecked = true;
                             return false;
                           })

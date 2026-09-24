@@ -163,6 +163,17 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     return { asset };
   });
 
+  // GET /api/assets/:symbol/marketcap — valuation only (~300ms: no price or
+  // multiplier legs). Powers the stocks list; Finnhub first, Jupiter fallback.
+  app.get('/api/assets/:symbol/marketcap', async (req) => {
+    const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
+    const symbol = await canonicalAssetSymbol(params.symbol);
+    const asset = await getAsset(symbol).catch(() => null);
+    if (!asset) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
+    const { getEquityMarketCapForAsset } = await import('../services/xstocks/assets.service.js');
+    return { symbol, marketCap: await getEquityMarketCapForAsset(asset).catch(() => null) };
+  });
+
   app.get('/api/assets/:symbol/price', async (req) => {
     const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
     const symbol = canonicalSymbol(params.symbol);
