@@ -565,12 +565,13 @@
     .page-section.active {
       display: flex;
     }
-    /* Phones: content sizes naturally so the footer follows the card
-       instead of a viewport-stretched void sitting between them. */
+    /* Phones: footer stays docked to the viewport bottom AND the card sits
+       just above it — no void between card and footer, none below footer.
+       (margin-top:auto bottom-docks short content; long lists flow normally.) */
     @media (max-width: 640px) {
-      main { min-height: 0; }
-      .page-section { flex: none; }
-      .page-section.active { padding-bottom: 20px; }
+      main { min-height: calc(100dvh - 140px); display: flex; flex-direction: column; }
+      .page-section.active { flex: 1; display: flex; flex-direction: column; padding-bottom: 20px; }
+      .swap-wrap, .stocks-wrap { margin-top: auto; }
     }
 
     /* ---------- Swap card (their structure, our colour) ----------
