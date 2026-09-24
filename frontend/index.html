@@ -2524,9 +2524,9 @@
       function fmtChg(pct) {
         // Number(null) is 0, so a missing 24h change used to render as a
         // fabricated "+0.00%". No data must look like no data.
-        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">—</span>';
+        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">0.00%</span>';
         pct = Number(pct);
-        if (!isFinite(pct)) return ' <span class="chg-none">—</span>';
+        if (!isFinite(pct)) return ' <span class="chg-none">0.00%</span>';
         var sign = pct > 0 ? '+' : '';
         var cls = pct >= 0 ? 'chg-up' : 'chg-down';
         return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
@@ -4131,9 +4131,11 @@
           }
           var chg = s.change24hPct;
           if (chg === null || chg === undefined) {
-            // Keep skeleton while still loading; only show — after we know it's truly missing
+            // No 24h figure for this name: read as a flat day, in muted grey so
+            // it never looks like a measured gain. Skeleton only while the price
+            // itself is still loading.
             if (!price) drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
-            else drawerChangeEl.textContent = '—';
+            else drawerChangeEl.textContent = '0.00%';
             drawerChangeEl.style.color = 'var(--umbra-muted)';
           } else {
             var sign = chg > 0 ? '+' : '';
