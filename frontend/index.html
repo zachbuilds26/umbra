@@ -1737,6 +1737,10 @@
       font-weight: 600;
     }
 
+    .tape-chip .chg-none {
+      color: var(--umbra-muted);
+    }
+
     .tape-note {
       padding: 10px 24px;
       font-size: 13px;
@@ -2449,8 +2453,11 @@
       }
 
       function fmtChg(pct) {
+        // Number(null) is 0, so a missing 24h change used to render as a
+        // fabricated "+0.00%". No data must look like no data.
+        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">—</span>';
         pct = Number(pct);
-        if (!isFinite(pct)) return '';
+        if (!isFinite(pct)) return ' <span class="chg-none">—</span>';
         var sign = pct > 0 ? '+' : '';
         var cls = pct >= 0 ? 'chg-up' : 'chg-down';
         return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
