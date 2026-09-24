@@ -2349,13 +2349,16 @@
       function setConnected(pubkey) {
         window.umbraWallet = pubkey;
         var btn = document.getElementById('connectBtn');
-        btn.innerHTML = shortKey(pubkey) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+        // esc(): the address comes from the wallet provider/session, and this
+        // string is interpolated into innerHTML. Unescaped, a crafted provider
+        // value would inject markup into the page that holds the user's session.
+        btn.innerHTML = esc(shortKey(pubkey)) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
         btn.classList.add('connected');
         btn.classList.remove('flipped');
         try {
           var mbtn2 = document.getElementById('menuConnectBtn');
           if (mbtn2 && window.umbraWallet) {
-            mbtn2.innerHTML = shortKey(pubkey) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+            mbtn2.innerHTML = esc(shortKey(pubkey)) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
             mbtn2.classList.add('connected');
             mbtn2.classList.remove('flipped');
           }
@@ -2544,11 +2547,12 @@
       }
 
       function fmtChg(pct) {
-        // Number(null) is 0, so a missing 24h change used to render as a
-        // fabricated "+0.00%". No data must look like no data.
-        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">0.00%</span>';
+        // No 24h observation yet is not a 0.00% move. The API returns null until
+        // it holds two real prices inside the window, and printing "0.00%" here
+        // turned missing data into a measured-looking change.
+        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">—</span>';
         pct = Number(pct);
-        if (!isFinite(pct)) return ' <span class="chg-none">0.00%</span>';
+        if (!isFinite(pct)) return ' <span class="chg-none">—</span>';
         var sign = pct > 0 ? '+' : '';
         var cls = pct >= 0 ? 'chg-up' : 'chg-down';
         return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
@@ -2619,6 +2623,9 @@
         var half = items.map(chipHtml).join('');
         try { localStorage.setItem('umbra_tape_cache', JSON.stringify({ t: Date.now(), items: items })); } catch (_) {}
         track.innerHTML = half + half; // doubled for a seamless loop
+        tapeStaleMarked = false;
+        track.removeAttribute('data-stale');
+        track.style.opacity = '';
         skeleton.hidden = true;
         skeleton.style.display = 'none';
         if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
@@ -2657,8 +2664,32 @@
       // Always retry in background (even when hidden): a latched error note or
       // missing track must recover without a reload.
       setInterval(function () {
-        loadTape().catch(function () {});
+        loadTape().catch(function () {
+          // A failed refresh must not leave the last prices on screen looking
+          // live. Cached chips are real but no longer current, so say so.
+          markTapeStale();
+        });
       }, 30000);
+
+      // Once a refresh fails, the chips still on screen are the previous
+      // snapshot. Mark them instead of implying they are current.
+      var tapeStaleMarked = false;
+      function markTapeStale() {
+        if (tapeStaleMarked) return;
+        var trackEl = document.getElementById('tapeTrack');
+        if (!trackEl || trackEl.hidden) return;
+        tapeStaleMarked = true;
+        try {
+          trackEl.setAttribute('data-stale', '1');
+          trackEl.style.opacity = '0.55';
+          var noteEl = document.getElementById('tapeNote');
+          if (noteEl) {
+            noteEl.textContent = 'Prices may be out of date — reconnecting…';
+            noteEl.hidden = false;
+            noteEl.style.display = 'block';
+          }
+        } catch (_) {}
+      }
 
       /* ---------- Swap card ---------- */
       var sellSym = 'NVDAx';
@@ -2701,12 +2732,17 @@
       // manifest — no fetch needed), instead of waiting for the tape/directory.
       try { refreshSelectors(); } catch (_) {}
 
+      // 'idle' | 'loading' | 'ready' | 'error'. An empty directory used to double
+      // as "still loading", so a failed fetch left the picker saying
+      // "Loading stocks…" for the rest of the session.
+      var directoryState = 'idle';
       async function loadDirectory() {
+        directoryState = 'loading';
         try {
           // Shelf-only fetch: 58 symbols, not 1000+ discovery lookups.
           var shelf = ['USDC', 'USDT'].concat(ALLOWLIST, PREIPO).join(',');
           var res = await fetch(API_BASE + '/api/assets?symbols=' + encodeURIComponent(shelf));
-          if (!res.ok) return;
+          if (!res.ok) throw new Error('assets ' + res.status);
           var data = await res.json();
           // Picker shows EXACTLY the Stocks shelf: stables + ALLOWLIST + PREIPO.
           // All 56 are live quote-verified, so no price gate is needed (and none
@@ -2720,8 +2756,10 @@
               var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
               return { symbol: a.symbol, name: a.name, kind: kind };
             });
+          directoryState = 'ready';
         } catch (e) {
           directory = [];
+          directoryState = 'error';
         }
       }
 
@@ -2768,22 +2806,37 @@
         window.addEventListener('focus', ping);
       })();
 
+      var modalReturnFocus = null;
       function openModal(side) {
         modalSide = side;
+        // Remember what opened the dialog so focus can go back there on close;
+        // otherwise focus lands on <body> and keyboard users restart at the top.
+        modalReturnFocus = document.activeElement;
         tokenSearchEl.value = '';
         renderTokenList('');
         tokenModalEl.classList.add('open');
-        // No autofocus — list first, keyboard only when the user taps the
-        // search field (auto-focus pops the keyboard over the list).
+        // No autofocus on the search field — that pops the keyboard over the
+        // list on mobile. Focus the first option instead so the dialog is
+        // immediately keyboard-operable and Escape/Tab behave.
+        var firstOption = tokenListEl.querySelector('.token-opt');
+        if (firstOption && typeof firstOption.focus === 'function') firstOption.focus();
         // If the page loaded while the backend was down, directory is still
         // empty — refetch now instead of showing a blank list forever.
         if (!directory.length) {
-          loadDirectory().then(function () { renderTokenList(tokenSearchEl.value || ''); });
+          loadDirectory().then(function () {
+            renderTokenList(tokenSearchEl.value || '');
+            var option = tokenListEl.querySelector('.token-opt');
+            if (option && typeof option.focus === 'function') option.focus();
+          });
         }
       }
 
       function closeModal() {
         tokenModalEl.classList.remove('open');
+        if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') {
+          try { modalReturnFocus.focus(); } catch (_) {}
+        }
+        modalReturnFocus = null;
       }
 
       function renderTokenList(filter) {
@@ -2807,7 +2860,13 @@
             );
           })
           .join('');
-        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + (f ? 'No matches found.' : 'Loading assets…') + '</div>';
+        var emptyCopy = 'No matches found.';
+        if (directoryState === 'error') {
+          emptyCopy = 'Could not load the asset list. Check your connection and try again.';
+        } else if (!f && directoryState !== 'ready') {
+          emptyCopy = 'Loading assets…';
+        }
+        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + esc(emptyCopy) + '</div>';
         Array.prototype.forEach.call(tokenListEl.querySelectorAll('.token-opt'), function (btn) {
           btn.addEventListener('click', function () {
             var sym = btn.getAttribute('data-symbol');
@@ -3680,11 +3739,18 @@
         var el = document.getElementById(containerId);
         if (!el) return;
         if (!list.length) {
-          // Empty cache = still loading (full-height loader, never a short
-          // card); typed filter with no hits = honest no-matches.
-          el.innerHTML = !stocksCache.length
-            ? '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div>'
-            : '<div style="display:flex; align-items:center; justify-content:center; min-height:200px; padding:24px; text-align:center; color:var(--umbra-muted); font-size:14px;">' + (f ? 'No matches found.' : 'No stocks found') + '</div>';
+          // Three distinct states. An empty cache used to always mean "still
+          // loading", so a failed shelf fetch left the page saying "Loading
+          // stocks..." forever.
+          var emptyMsg;
+          if (stocksLoadFailed) {
+            emptyMsg = 'Could not load the stocks list. Check your connection and try again.';
+          } else if (!stocksCache.length) {
+            emptyMsg = 'Loading stocks...';
+          } else {
+            emptyMsg = f ? 'No matches found.' : 'No stocks found';
+          }
+          el.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">' + esc(emptyMsg) + '</div>';
           return;
         }
         el.innerHTML = list.map(stockRowHtml).join('');
@@ -3709,6 +3775,7 @@
       // Overlapping refreshes (re-entering the tab, a cache hit plus a fetch)
       // would otherwise let the slower, older response overwrite newer rows.
       var stocksReq = 0;
+      var stocksLoadFailed = false;
       function refreshStocksCards() {
           var myReq = ++stocksReq;
           var _listEl = document.getElementById('stocksList');
@@ -3733,14 +3800,15 @@
               _listEl.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div>';
             }
           }
-          var shelf2 = ['USDC', 'USDT'].concat(ALLOWLIST, PREIPO).join(',');
-          fetch(API_BASE + '/api/assets?symbols=' + encodeURIComponent(shelf2))
-            .then(function (r) { return r.ok ? r.json() : { assets: [] }; })
-            .then(function (data) {
-              if (myReq !== stocksReq) return;
-              var fresh = (data.assets || [])
+          // The shelf list is already being loaded for the picker by
+          // loadDirectory(). Fetching the identical URL again here doubled the
+          // request count on every page load; share the one result instead.
+          loadDirectory().then(function () {
+              stocksLoadFailed = directoryState === 'error';
+              var fresh = directory
                 .filter(function (a) { return a && (ALLOWLIST.indexOf(a.symbol) !== -1 || PREIPO.indexOf(a.symbol) !== -1); })
                 .sort(function (a, b) { return a.symbol.localeCompare(b.symbol); });
+              if (myReq !== stocksReq) return;
               // Only update if fresh is not empty — keep cached if fetch is slow
               if (fresh.length) {
                 stocksCache = fresh;
@@ -3791,29 +3859,24 @@
                   if (i >= syms.length) {
                     // Rows are never dropped for missing prices: the count is fixed
                     // and every row has a loading state. (Old code filtered here.)
-                    (function fetchMcaps(j) {
-                      if (j >= stocksCache.length) return;
-                      var slice = stocksCache.slice(j, j + 20);
-                      Promise.all(slice.map(function (a) {
-                        if (a.marketCap) { a._mcapChecked = true; return false; }
-                        // Valuation-only endpoint (~300ms: Finnhub first, no
-                        // price/multiplier legs). Accepts both shapes.
-                        return fetch(API_BASE + '/api/assets/' + encodeURIComponent(a.symbol) + '/marketcap')
-                          .then(function (r) { return r.ok ? r.json() : null; })
-                          .then(function (d) {
-                            var mc = d && (d.marketCap || (d.asset && d.asset.marketCap));
-                            if (mc) { a.marketCap = mc; a._mcapChecked = true; return true; }
-                            // The lookup came back with no valuation: that is a
-                            // real "not available here", not a pending request.
-                            a._mcapChecked = true;
-                            return false;
-                          })
-                          .catch(function () { return false; });
-                      })).then(function (results) {
-                        if (results.some(Boolean)) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
-                        setTimeout(function () { fetchMcaps(j + 20); }, 1200);
-                      });
-                    })(0);
+                    // Valuations come from ONE batched request. Asking per symbol
+                    // meant 56 calls on page load against a provider key with a
+                    // 60/minute budget — one visit could exhaust it for everyone.
+                    fetch(API_BASE + '/api/assets/marketcaps?symbols=' + encodeURIComponent(syms.join(',')))
+                      .then(function (r) { return r.ok ? r.json() : null; })
+                      .then(function (d) {
+                        if (!d || !d.marketCaps || myReq !== stocksReq) return;
+                        var patched = false;
+                        stocksCache.forEach(function (a) {
+                          var mc = d.marketCaps[a.symbol];
+                          if (mc) { a.marketCap = mc; a._mcapChecked = true; patched = true; }
+                          else a._mcapChecked = true;
+                        });
+                        if (patched) {
+                          renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                        }
+                      })
+                      .catch(function () { /* leave the rows unresolved, never guess a valuation */ });
                     return;
                   }
                   // Price patch per chunk (rows are never dropped — count is fixed).
@@ -3847,8 +3910,11 @@
                 }
                 fetchChunk(0);
               }
-            })
-            .catch(function () {});
+              if (stocksLoadFailed) {
+                stocksCache = [];
+                renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+              }
+            });
         }
       var allTransactions = [];
       var txView = { range: '90', type: 'all', status: 'all' };
@@ -3878,7 +3944,15 @@
           if (emptyEl) {
             emptyEl.style.display = 'flex';
             var rangeTxt = txView.range === 'all' ? '' : ' in the last ' + txView.range + ' days';
-            document.getElementById('activityEmptyText').textContent = 'No records found' + rangeTxt;
+            // A failed fetch must never read as "no records".
+            var emptyText = document.getElementById('activityEmptyText');
+            if (activityError) {
+              emptyText.textContent = activityError;
+            } else if (txView.range !== 'all' || txView.type !== 'all' || txView.status !== 'all') {
+              emptyText.textContent = 'No matching records for these filters.';
+            } else {
+              emptyText.textContent = 'No records yet' + rangeTxt + '.';
+            }
           }
           return;
         }
@@ -3912,24 +3986,32 @@
         if (isConnected) refreshActivity();
       }
       var activitySeq = 0;
+      var activityError = '';
       function refreshActivity() {
         // Activity is per-wallet: the ledger endpoint requires the owner, and a
         // response for a previous wallet must never paint over the current one.
         var wallet = window.umbraWallet;
-        if (!wallet) { allTransactions = []; renderActivity([]); return; }
+        if (!wallet) { allTransactions = []; activityError = ''; renderActivity([]); return; }
         var mySeq = ++activitySeq;
         fetch(API_BASE + '/api/transactions?limit=30&wallet=' + encodeURIComponent(wallet))
-          .then(function (r) { return r.ok ? r.json() : { transactions: [] }; })
+          .then(function (r) {
+            if (!r.ok) throw new Error('ledger ' + r.status);
+            return r.json();
+          })
           .then(function (data) {
             if (mySeq !== activitySeq || window.umbraWallet !== wallet) return;
+            activityError = '';
             allTransactions = data.transactions || [];
             renderActivity(allTransactions);
             if (window.lucide) window.lucide.createIcons();
           })
           .catch(function () {
-            if (mySeq !== activitySeq) return;
-            allTransactions = [];
-            renderActivity([]);
+            if (mySeq !== activitySeq || window.umbraWallet !== wallet) return;
+            // A failed request is not an empty history. Keep whatever was last
+            // shown and say the refresh failed, rather than telling the user
+            // they have no records.
+            activityError = 'Could not load activity. Check your connection and try again.';
+            renderActivity(allTransactions);
           });
       }
       function paintTxChips() {
@@ -4013,7 +4095,20 @@
       var drawerCurrent = null;
       var drawerReq = 0;
       var drawerCtrl = null;
-      function closeStockDrawer() { drawerEl.classList.remove('open'); drawerEl.setAttribute('aria-hidden','true'); }
+      var drawerReturnFocus = null;
+      function closeStockDrawer() {
+        drawerEl.classList.remove('open');
+        drawerEl.setAttribute('aria-hidden','true');
+        // Cancel the in-flight summary so a late response cannot repaint a
+        // drawer that is already closed, and hand focus back to the row that
+        // opened it instead of leaving it on a hidden element.
+        drawerReq++;
+        if (drawerCtrl) { try { drawerCtrl.abort(); } catch (_) {} drawerCtrl = null; }
+        if (drawerReturnFocus && typeof drawerReturnFocus.focus === 'function') {
+          try { drawerReturnFocus.focus(); } catch (_) {}
+        }
+        drawerReturnFocus = null;
+      }
       document.getElementById('drawerClose').addEventListener('click', closeStockDrawer);
       drawerEl.addEventListener('click', function (e) { if (e.target === drawerEl) closeStockDrawer(); });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && drawerEl.classList.contains('open')) closeStockDrawer(); });
@@ -4185,6 +4280,7 @@
         if (_sol0) _sol0.style.display = 'none';
         drawerChartEl.textContent = 'Loading…';
         drawerNoteEl.style.display = 'none';
+        drawerReturnFocus = document.activeElement;
         drawerEl.classList.add('open');
         drawerEl.setAttribute('aria-hidden','false');
         if (window.lucide) window.lucide.createIcons();
@@ -4215,11 +4311,10 @@
           }
           var chg = s.change24hPct;
           if (chg === null || chg === undefined) {
-            // No 24h figure for this name: read as a flat day, in muted grey so
-            // it never looks like a measured gain. Skeleton only while the price
-            // itself is still loading.
+            // No 24h figure for this name. A muted dash says "not measured";
+            // "0.00%" claimed the price had not moved, which we cannot know.
             if (!price) drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
-            else drawerChangeEl.textContent = '0.00%';
+            else drawerChangeEl.textContent = '—';
             drawerChangeEl.style.color = 'var(--umbra-muted)';
           } else {
             var sign = chg > 0 ? '+' : '';
@@ -4242,16 +4337,17 @@
             if (window.lucide) window.lucide.createIcons();
           }
           if (liqEl) {
-            // Loading = skeleton, not a dash: a dash claims we looked and found
-            // nothing. Only a completed summary without liquidity earns "—".
+            // A completed summary with no liquidity is a real "not published"
+            // and earns a dash. While the request is outstanding the skeleton
+            // stays, because a dash would claim we looked and found nothing.
             var liqVal = (s.asset && s.asset.liquidity) || cachedLiq(symbol);
             if (liqVal) {
               liqEl.textContent = '$' + Number(liqVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
             } else {
-              liqEl.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
+              liqEl.textContent = '—';
+              liqEl.style.color = 'var(--umbra-muted)';
             }
           }
-          if (liqEl) liqEl.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
           if (!price) {
             // Keep skeleton, don't flash the scary timeout message — price will arrive via Jupiter/last-good on retry
             drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
@@ -4262,13 +4358,15 @@
           // An aborted/superseded request must not repaint the drawer: the next
           // stock is already loading and would show this stock's skeletons.
           if (myReq !== drawerReq || drawerCurrent !== symbol) return;
-          // Keep skeletons, don't flash scary timeout — will retry on next open
-          drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
-          drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
-          drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
+          // The request is over and it failed, so a skeleton would spin forever.
+          // "—" says the data is unavailable, which is what actually happened.
+          drawerPriceEl.textContent = '—';
+          drawerPriceEl.style.color = 'var(--umbra-muted)';
+          drawerMcapEl.textContent = '—';
+          drawerChangeEl.textContent = '—';
           var liqErr = document.getElementById('drawerLiquidity');
-          if (liqErr) liqErr.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
-          document.getElementById('drawerTop').innerHTML = '<span class="skeleton" style="width:48px; height:8px;"></span>';
+          if (liqErr) liqErr.textContent = '—';
+          document.getElementById('drawerTop').textContent = '—';
           drawerNoteEl.style.display = 'none';
         }
       }
@@ -4451,9 +4549,13 @@
             var tj = await tr.json();
             if (!tr.ok) throw new Error((tj.error && tj.error.message) || 'Bridge build failed');
             bridgeLines.hidden = false;
-            bridgeLines.innerHTML = '<div class="row"><span class="good">Bridge ready — tracking '+ esc(tj.trackingId || '') +'</span></div><div class="row"><span>Next: send source chain tx, then POST /api/bridge/transactions/'+esc(tj.trackingId||'')+'/source with hash</span></div>';
-            bridgeActionBtn.textContent = 'Tracking '+ (tj.trackingId || '');
-            if (typeof refreshActivity === 'function') refreshActivity();
+            // The bridge cannot send or verify a transfer, and the API now
+            // refuses the write. Say exactly that instead of announcing a
+            // tracking id for a transfer that was never created.
+            bridgeLines.hidden = false;
+            bridgeLines.innerHTML = '<div class="row"><span class="error">Bridging is not available yet — Umbra cannot send or verify a cross-chain transfer.</span></div>';
+            bridgeActionBtn.textContent = 'Unavailable';
+            bridgeActionBtn.disabled = true;
           } catch (e) {
             bridgeLines.hidden = false;
             bridgeLines.innerHTML = '<div class="row"><span class="error">'+esc((e && e.message)||'Bridge failed')+'</span></div>';
@@ -4461,7 +4563,6 @@
             bridgeActionBtn.disabled = false;
           }
         });
-        loadBridgeRoutes();
       })();
 
       // Info tooltip handler — click the ⓘ to toggle, click outside to close

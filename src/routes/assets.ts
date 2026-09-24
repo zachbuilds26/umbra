@@ -187,6 +187,34 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     return { asset };
   });
 
+  // GET /api/assets/marketcaps?symbols=A,B,C — one request for the whole shelf.
+  //
+  // The stocks list used to ask for each valuation separately: 56 requests on
+  // page load, against a Finnhub key that allows 60 calls a minute. A single
+  // visitor's page view could exhaust the quota for everyone, and the browser
+  // paid 56 round trips for data the server can gather once.
+  app.get('/api/assets/marketcaps', async (req) => {
+    const q = z.object({ symbols: z.string().min(1).max(600) }).parse(req.query);
+    const wanted = [...new Set(q.symbols.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 60);
+    if (wanted.length === 0) return { marketCaps: {} };
+    const { getEquityMarketCapForAsset, getAsset } = await import('../services/xstocks/assets.service.js');
+    const resolved = await Promise.all(
+      wanted.map(async (raw) => {
+        const symbol = await canonicalAssetSymbol(raw).catch(() => null);
+        if (!symbol) return null;
+        const asset = await getAsset(symbol).catch(() => null);
+        if (!asset) return null;
+        const marketCap = await getEquityMarketCapForAsset(asset).catch(() => null);
+        return marketCap ? ([symbol, marketCap] as const) : null;
+      }),
+    );
+    const marketCaps: Record<string, string> = {};
+    for (const entry of resolved) {
+      if (entry) marketCaps[entry[0]] = entry[1];
+    }
+    return { marketCaps };
+  });
+
   // GET /api/assets/:symbol/marketcap — valuation only (~300ms: no price or
   // multiplier legs). Powers the stocks list; Finnhub first, Jupiter fallback.
   app.get('/api/assets/:symbol/marketcap', async (req) => {
