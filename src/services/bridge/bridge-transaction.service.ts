@@ -87,6 +87,15 @@ export async function buildBridgeTransaction(params: {
       bridgeQuoteId: params.bridgeQuoteId,
     });
   }
+  // The destination is part of the quoted intent. Accepting a different address
+  // here meant the numbers the user saw (for destination A) could be applied to
+  // an approval/instruction paying destination B.
+  if (stored.destinationAddress && stored.destinationAddress !== params.destinationSolanaAddress) {
+    throw badRequest(
+      'VALIDATION_ERROR',
+      'This quote is for a different destination address. Request a fresh quote for the new destination.',
+    );
+  }
   validateBridgeWallets(stored.sourceNetwork, params.sourceWalletAddress, params.destinationSolanaAddress);
 
   const solanaEntry = await getSolanaBridgeEntry().catch(() => null);
