@@ -2538,7 +2538,8 @@
       }
 
       function fmtChg(pct) {
-        if (pct === null || pct === undefined) return '';
+        pct = Number(pct);
+        if (!isFinite(pct)) return '';
         var sign = pct > 0 ? '+' : '';
         var cls = pct >= 0 ? 'chg-up' : 'chg-down';
         return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
@@ -2557,10 +2558,12 @@
       }
 
       function chipHtml(item) {
+        var sym = String((item && item.symbol) || '');
+        if (!sym) return '';
         return (
-          '<span class="tape-chip" data-symbol="' + item.symbol + '" style="cursor:default;">' +
-          iconHtml(item.symbol) +
-          '<span class="sym">$' + item.symbol + '</span>' +
+          '<span class="tape-chip" data-symbol="' + sym + '" style="cursor:default;">' +
+          iconHtml(sym) +
+          '<span class="sym">$' + sym + '</span>' +
           '<span>' + fmtPrice(item.price) + '</span>' +
           fmtChg(item.change24hPct) +
           '</span>'
@@ -2568,6 +2571,12 @@
       }
 
       function showNote(text) {
+        // Never wipe a painted track (cache or previous load): a failed refresh
+        // must not flash the tape away. Only take over when nothing is showing.
+        if (track && !track.hidden && track.children.length) {
+          try { console.warn('[umbra] tape refresh failed:', text); } catch (_) {}
+          return;
+        }
         skeleton.hidden = true;
         skeleton.style.display = 'none';
         track.hidden = true;
@@ -2612,22 +2621,26 @@
       try {
         var _tc = JSON.parse(localStorage.getItem('umbra_tape_cache') || 'null');
         if (_tc && Date.now() - _tc.t < 30 * 60 * 1000 && Array.isArray(_tc.items) && _tc.items.length) {
-          var half0 = _tc.items.map(chipHtml).join('');
-          track.innerHTML = half0 + half0;
-          skeleton.hidden = true;
-          skeleton.style.display = 'none';
-          if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
-          note.hidden = true;
-          note.style.display = 'none';
-          track.hidden = false;
-          track.style.display = '';
+          var half0 = _tc.items.filter(function (t) { return t && t.symbol; }).map(chipHtml).join('');
+          if (half0) {
+            track.innerHTML = half0 + half0;
+            skeleton.hidden = true;
+            skeleton.style.display = 'none';
+            if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
+            note.hidden = true;
+            note.style.display = 'none';
+            track.hidden = false;
+            track.style.display = '';
+          }
         }
-      } catch (_) {}
+      } catch (e) { try { console.warn('[umbra] tape cache unreadable', e); } catch (_) {} }
       loadTape().catch(function () {
         showNote('Prices unavailable — is the Umbra backend running on :3002?');
       });
+      // Always retry in background (even when hidden): a latched error note or
+      // missing track must recover without a reload.
       setInterval(function () {
-        if (!track.hidden) loadTape().catch(function () {});
+        loadTape().catch(function () {});
       }, 30000);
 
       /* ---------- Swap card ---------- */

@@ -11,6 +11,10 @@ import type { UmbraAsset } from '../domain/models.js';
 const ASSETS_CACHE_MS = 5 * 60 * 1000;
 const assetsCache = new TtlCache<UmbraAsset[]>(ASSETS_CACHE_MS);
 let assetsInflight: Promise<UmbraAsset[]> | null = null;
+// Short-TTL ticker responses keyed by symbol set: tape + chunks re-request
+// identical sets, and each uncached call repays ~10s of paced lookups.
+const TICKER_CACHE_MS = 45 * 1000;
+const tickerCache = new TtlCache<{ ticker: unknown[] }>(TICKER_CACHE_MS);
 // Last-known-complete list: xStocks stalls/delist-blips must never shrink the
 // served directory (the frontend count is fixed, so rows must be too).
 let lastGoodAssets: UmbraAsset[] | null = null;
@@ -62,6 +66,9 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
           )
         )
       : [];
+    const tkey = [...requested].sort().join(',');
+    const theld = tickerCache.get(tkey);
+    if (theld) return theld;
     const out: Array<{ symbol: string; price: string | null; marketCap: string | null; liquidity: string | null; change24hPct: number | null; timestamp: string }> = [];
     // Bounded concurrency + per-symbol timeout: xStocks can stall (60s per
     // symbol when Cloudflare blocks us) — cap it so pre-IPO prices stay fast.
@@ -135,6 +142,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     // Preserve request order.
     const order = new Map(requested.map((s, i) => [s, i]));
     out.sort((a, b) => (order.get(a.symbol) ?? 0) - (order.get(b.symbol) ?? 0));
+    tickerCache.set(tkey, { ticker: out });
     return { ticker: out };
   });
 
