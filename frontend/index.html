@@ -1695,26 +1695,17 @@
       text-decoration: none;
     }
 
-    /* Right cluster: even rhythm, build tag as a quiet pill */
-    .api-status {
+    /* X social link */
+    .x-link {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
       color: var(--umbra-muted);
       text-decoration: none;
-      font-size: 13px;
+      padding: 6px;
     }
-
-    .api-status .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--umbra-muted);
-    }
-
-    .api-status.ok .dot {
-      background: var(--umbra-accent);
-    }
+    .x-link:hover { color: var(--umbra-text); }
+    .x-link svg { display: block; }
 
     /* ---------- Ticker tape ---------- */
     .tape {
@@ -2149,11 +2140,7 @@
 
   <footer class="site-footer">
     <span class="foot-brand">UMBRA</span>
-    <span style="display:flex; align-items:center; gap:6px;">
-      <a class="api-status" id="apiStatus" href="/health" target="_blank" rel="noreferrer"><span class="dot"></span><span id="apiStatusText">API</span></a>
-      <span id="umbraBuild" style="font-size:11px; color:var(--umbra-muted);"></span>
-      <span class="info-icon" data-tip="API status — green is live. Check /health for xStocks, Jupiter, Solana, 0x."><i data-lucide="info" width="14" height="14"></i></span>
-    </span>
+    <a class="x-link" href="https://x.com/umbra_trade" target="_blank" rel="noreferrer" aria-label="Umbra on X"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.3L1.2 2h6.4l4.4 5.9L18.9 2zm-1.1 17.8h1.7L7.1 3.9H5.3l12.5 16z"/></svg></a>
   </footer>
 
   <div class="modal-backdrop" id="tokenModal">
@@ -3074,13 +3061,12 @@
           };
           var impact = data.priceImpactBps === null || data.priceImpactBps === undefined ? '—' : (data.priceImpactBps / 100).toFixed(2) + '%';
           // No fee rows here: the wallet shows the network fee at signing time.
-          var wasOpen = !quoteLinesEl.hidden;
           var html =
             '<div class="row"><span>Rate</span><span>' + fmtRate(data.rate) + '</span></div>' +
             '<div class="row"><span>Price impact</span><span>' + impact + '</span></div>' +
             '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + data.receive.symbol + '</span></div>';
           quoteLinesEl.innerHTML = html;
-          quoteLinesEl.hidden = !wasOpen;
+          quoteLinesEl.hidden = false; // auto-open on every fresh quote
           paintDetailToggle();
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
@@ -3404,29 +3390,6 @@
         lastQuote = null;
         executeSwap();
       });
-
-      // Build tag from file deploy time — auto-fresh every deploy, no manual bumps.
-      try {
-        var _lm = new Date(document.lastModified);
-        if (!isNaN(_lm)) document.getElementById('umbraBuild').textContent = 'deploy ' + _lm.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      } catch (_) {}
-      // API status dot in the footer (live health, not decoration).
-      (function apiStatus() {
-        try {
-          var _apiLink = document.getElementById('apiStatus');
-          if (_apiLink) _apiLink.href = API_BASE + '/health';
-        } catch (_) {}
-        fetch(API_BASE + '/health')
-          .then(function (res) {
-            if (res.ok) {
-              var _apiEl = document.getElementById('apiStatus');
-              if (_apiEl) _apiEl.classList.add('ok');
-              var _apiTx = document.getElementById('apiStatusText');
-              if (_apiTx) _apiTx.textContent = 'API online';
-            }
-          })
-          .catch(function () {});
-      })();
 
       refreshSelectors();
       // Keep directory and stocks card in sync (valuations come from OUR backend —
