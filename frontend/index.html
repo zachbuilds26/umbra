@@ -1367,6 +1367,37 @@
     .stocks-search::placeholder {
       color: var(--umbra-muted);
     }
+    /* API status pill — phones only, where the card leaves a real gap. It is
+       an indicator, not a control: no pointer, no click handler. */
+    .api-pill { display: none; }
+    @media (max-width: 640px) {
+      .api-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        align-self: center;
+        margin: 0 auto 10px;
+        border: 1px solid var(--umbra-border);
+        border-radius: 999px;
+        background: var(--umbra-surface);
+        padding: 8px 14px;
+        font-size: 12.5px;
+        color: var(--umbra-text);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+      .api-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--umbra-muted);
+        flex: none;
+      }
+      .api-pill.ok .api-dot { background: var(--umbra-accent); }
+      .api-pill.slow .api-dot { background: #d8a657; }
+      .api-pill.bad .api-dot { background: #f6465d; }
+      .api-ms { color: var(--umbra-muted); font-variant-numeric: tabular-nums; }
+    }
     .stocks-list {
       min-height: 320px;
       max-height: 520px;
@@ -1961,6 +1992,13 @@
         </div>
 
         <div class="quick-pick" id="quickPick" hidden></div>
+      </div>
+      <!-- Fills the gap under the card on phones. Not a control: it pings
+           /health and reports what actually came back, latency included. -->
+      <div class="api-pill" id="apiPill" role="status" aria-live="polite">
+        <span class="api-dot" id="apiDot" aria-hidden="true"></span>
+        <span id="apiPillText">Checking API…</span>
+        <span class="api-ms" id="apiMs"></span>
       </div>
     </section>
     <section id="stocks" class="page-section" aria-label="Stocks">
@@ -2631,6 +2669,49 @@
           directory = [];
         }
       }
+
+      // API status pill: a real health ping, not a decorative label. Render
+      // sleeps on the free tier, so a stale "live" would be a lie — we re-ping
+      // whenever the tab becomes visible again.
+      (function () {
+        var pill = document.getElementById('apiPill');
+        var textEl = document.getElementById('apiPillText');
+        var msEl = document.getElementById('apiMs');
+        if (!pill || !textEl) return;
+        function paint(state, label, ms) {
+          pill.classList.remove('ok', 'slow', 'bad');
+          pill.classList.add(state);
+          textEl.textContent = label;
+          msEl.textContent = ms ? ms + ' ms' : '';
+        }
+        function ping() {
+          var started = Date.now();
+          var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+          var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 6000);
+          fetch(API_BASE + '/health', { signal: ctrl ? ctrl.signal : undefined, cache: 'no-store' })
+            .then(function (r) {
+              clearTimeout(timer);
+              if (!r.ok) throw new Error('status ' + r.status);
+              return r.json();
+            })
+            .then(function (j) {
+              var ms = Date.now() - started;
+              if (j && j.status === 'ok') {
+                paint(ms > 3000 ? 'slow' : 'ok', ms > 3000 ? 'API slow' : 'API live', ms);
+              } else {
+                paint('bad', 'API degraded', ms);
+              }
+            })
+            .catch(function () {
+              clearTimeout(timer);
+              paint('bad', 'API unreachable', 0);
+            });
+        }
+        ping();
+        setInterval(ping, 30_000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) ping(); });
+        window.addEventListener('focus', ping);
+      })();
 
       function openModal(side) {
         modalSide = side;
