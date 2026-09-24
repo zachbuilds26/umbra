@@ -16,7 +16,6 @@ export interface StoredSwapQuote {
   slippageBps: number;
   jupiterRequestId: string | null;
   transaction: string | null;
-  outAmountBaseUnits: string;
   receiveAmountDisplay: string;
   signature: string | null;
   expiresAt: number;

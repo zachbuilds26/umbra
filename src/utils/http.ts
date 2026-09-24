@@ -6,8 +6,6 @@ export interface FetchResult<T> {
   ok: boolean;
   status: number;
   data?: T;
-  rawText: string;
-  latencyMs: number;
 }
 
 export async function fetchJson<T>(
@@ -15,7 +13,6 @@ export async function fetchJson<T>(
   options: RequestInit & { timeoutMs?: number } = {},
 ): Promise<FetchResult<T>> {
   const { timeoutMs = 10_000, ...init } = options;
-  const started = Date.now();
   const controller = new AbortController();
   // Caller cancellation must survive: a caller signal aborts us too.
   const onCallerAbort = () => controller.abort();
@@ -36,7 +33,7 @@ export async function fetchJson<T>(
     } catch {
       data = undefined;
     }
-    return { ok: res.ok, status: res.status, data, rawText: rawText.slice(0, 4000), latencyMs: Date.now() - started };
+    return { ok: res.ok, status: res.status, data };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Throw typed 502s so routes return PROVIDER_ERROR, never INTERNAL (plan §27).

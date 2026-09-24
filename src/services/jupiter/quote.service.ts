@@ -19,7 +19,6 @@ interface ResolvedSide {
   symbol: string;
   mint: string;
   decimals: number;
-  isXstock: boolean;
 }
 
 /** Resolve a domain symbol to its verified Solana mint. Rejects arbitrary mints (plan §11). */
@@ -38,7 +37,7 @@ async function resolveSide(symbol: string, extraStocks: Set<string> = new Set())
   // they pass the shape gate above (plan §11 — no arbitrary mints).
   const found = await getSolanaMint(canonical);
   if (!found) throw badRequest('UNSUPPORTED_ASSET', `Asset ${symbol} has no verified Solana mint.`);
-  return { symbol: canonical, mint: found.mint, decimals: found.decimals, isXstock: !isStableSymbol(canonical) };
+  return { symbol: canonical, mint: found.mint, decimals: found.decimals };
 }
 
 /**
@@ -332,7 +331,6 @@ export async function buildSwapQuote(params: {
     slippageBps,
     jupiterRequestId: order.requestId ?? null,
     transaction: order.transaction ?? null,
-    outAmountBaseUnits: order.outAmount,
     receiveAmountDisplay: receiveDisplay,
     signature: null,
     expiresAt: expiresAtMs,

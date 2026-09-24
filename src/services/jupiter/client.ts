@@ -46,7 +46,7 @@ export async function getJupiterOrder(params: {
   /** Omit for quote-only pricing (no assembled transaction). */
   taker?: string;
   slippageBps?: number;
-}): Promise<{ status: number; data?: JupiterOrderResponse; raw: string }> {
+}): Promise<{ status: number; data?: JupiterOrderResponse }> {
   const qs = new URLSearchParams({
     inputMint: params.inputMint,
     outputMint: params.outputMint,
@@ -56,5 +56,5 @@ export async function getJupiterOrder(params: {
   if (params.slippageBps !== undefined) qs.set('slippageBps', String(params.slippageBps));
   const url = `${env.JUPITER_BASE_URL.replace(/\/$/, '')}/order?${qs}`;
   const res = await fetchJsonWithRetry<JupiterOrderResponse>(url, { headers: headers(), timeoutMs: 15_000 }, 1);
-  return { status: res.status, data: res.ok ? res.data : undefined, raw: res.rawText };
+  return { status: res.status, data: res.ok ? res.data : undefined };
 }

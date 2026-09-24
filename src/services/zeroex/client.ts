@@ -1,40 +1,16 @@
-import Decimal from 'decimal.js';
 import { env } from '../../config/env.js';
 import { fetchJson } from '../../utils/http.js';
-import { TtlCache } from '../../utils/cache.js';
-import { SOLANA_USDC_MINT, SOLANA_USDC_DECIMALS } from '../xstocks/assets.service.js';
 
 // 0x Swap API (Solana, open beta) — quoter #2 behind Jupiter. Same REST shape
 // idea (quote endpoint, key header), no installs, no custody: we only read the
-// quoted amounts, we never build or send transactions with it. Scope is
-// deliberately price-fallback: it kills the blank `—` when Jupiter 429s or
-// can't price a thin xStock. Execution stays on Jupiter (0x returns raw
-// instructions + ALTs that need client-side assembly — a later milestone).
+// quoted amounts, we never build or send transactions with it. Execution stays
+// on Jupiter (0x returns raw instructions + ALTs that need client-side
+// assembly — a later milestone). Currently used by the provider health probe.
 //
-// Docs: https://docs.0x.org/svm/solana-swap-api/guides/get-started-with-solana-swap-api
+// Docs: https://docs.0x.org/svm/solana-swap-api/guides/getting-started
 // POST {ZEROEX_BASE_URL}/solana/swap-instructions {token_in, token_out,
 // amount_in, taker, slippage_bps} with `0x-api-key` header. Empty key =
 // leg disabled (null, never throws).
-
-Decimal.set({ precision: 40 });
-
-const PRICE_TTL_MS = 60 * 1000;
-const priceCache = new TtlCache<string>(PRICE_TTL_MS);
-
-// Free tier is 5 RPS — light pacing so fallback fan-outs don't 429 themselves.
-// Serialized through a promise tail: concurrent callers computing the same wait
-// would otherwise all fire at the same instant.
-let lastCallAt = 0;
-let paceTail: Promise<void> = Promise.resolve();
-function pace(): Promise<void> {
-  const run = paceTail.then(async () => {
-    const wait = 300 - (Date.now() - lastCallAt);
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastCallAt = Date.now();
-  });
-  paceTail = run.catch(() => undefined);
-  return run;
-}
 
 /** Dummy taker for quote-only reads (quoting never checks funds). */
 const QUOTE_TAKER = '11111111111111111111111111111111';
@@ -72,7 +48,6 @@ export async function getZeroExQuote(params: {
   slippageBps?: number;
 }): Promise<ZeroExQuote | null> {
   if (!env.ZEROEX_API_KEY) return null;
-  await pace();
   const url = `${env.ZEROEX_BASE_URL.replace(/\/$/, '')}/solana/swap-instructions`;
   let res;
   try {
@@ -95,25 +70,4 @@ export async function getZeroExQuote(params: {
   }
   if (!res.ok) return null;
   return parseZeroExQuote(res.data);
-}
-
-/**
- * USD price for a mint via a 1-whole-token → USDC probe quote.
- * Returns the price string or null (disabled leg, unpriced, error — all null).
- */
-export async function getZeroExUsdPrice(mint: string, decimals: number): Promise<string | null> {
-  if (!env.ZEROEX_API_KEY) return null;
-  const cacheKey = `0x:${mint}`;
-  const cached = priceCache.get(cacheKey);
-  if (cached) return cached;
-  const oneToken = new Decimal(10).pow(decimals).toFixed(0);
-  const quote = await getZeroExQuote({ tokenIn: mint, tokenOut: SOLANA_USDC_MINT, amountInBaseUnits: oneToken }).catch(
-    () => null,
-  );
-  if (!quote) return null;
-  const usdc = new Decimal(quote.amountOutBaseUnits).div(new Decimal(10).pow(SOLANA_USDC_DECIMALS));
-  if (!usdc.isFinite() || usdc.lte(0)) return null;
-  const price = usdc.toString();
-  priceCache.set(cacheKey, price);
-  return price;
 }

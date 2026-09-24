@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 export const solanaAddress = z.string().min(32).max(48);
-export const evmAddress = z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'invalid EVM address');
 export const symbolSchema = z.string().min(1).max(16);
 export const positiveDecimal = z
   .string()

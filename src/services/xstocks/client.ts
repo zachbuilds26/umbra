@@ -50,39 +50,36 @@ export class XstocksClient {
 
   // Display paths fail fast (6s, no retry): when Cloudflare blackholes us a retry
   // just doubles the stall. Route-level last-good caches cover the blips.
-  async getAsset(symbol: string): Promise<{ status: number; data?: XstocksAssetRaw; raw: string }> {
+  async getAsset(symbol: string): Promise<{ data?: XstocksAssetRaw }> {
     const url = `${this.baseUrl}/public/assets/${encodeURIComponent(symbol)}`;
     const res = await fetchJsonWithRetry<XstocksAssetRaw>(url, { timeoutMs: 6000 }, 0);
-    return { status: res.status, data: res.ok ? res.data : undefined, raw: res.rawText };
+    return { data: res.ok ? res.data : undefined };
   }
 
-  async getPrice(symbol: string): Promise<{ status: number; quote?: number; raw: string }> {
+  async getPrice(symbol: string): Promise<{ quote?: number }> {
     const url = `${this.baseUrl}/public/assets/${encodeURIComponent(symbol)}/price-data`;
     const res = await fetchJsonWithRetry<{ quote: number }>(url, { timeoutMs: 6000 }, 0);
-    return { status: res.status, quote: res.ok ? res.data?.quote : undefined, raw: res.rawText };
+    return { quote: res.ok ? res.data?.quote : undefined };
   }
 
-  async getMultiplier(
-    symbol: string,
-    network: string,
-  ): Promise<{ status: number; currentMultiplier?: number; raw: string }> {
+  async getMultiplier(symbol: string, network: string): Promise<{ currentMultiplier?: number }> {
     const url = `${this.baseUrl}/public/assets/${encodeURIComponent(symbol)}/multiplier?network=${encodeURIComponent(network)}`;
     const res = await fetchJsonWithRetry<{ currentMultiplier: number }>(url, { timeoutMs: 6000 }, 0);
-    return { status: res.status, currentMultiplier: res.ok ? res.data?.currentMultiplier : undefined, raw: res.rawText };
+    return { currentMultiplier: res.ok ? res.data?.currentMultiplier : undefined };
   }
 
   async getBridges(params: {
     destinationNetwork?: string;
     sourceNetwork?: string;
     network?: string;
-  } = {}): Promise<{ status: number; data?: XstocksBridgeRaw[]; raw: string }> {
+  } = {}): Promise<{ status: number; data?: XstocksBridgeRaw[] }> {
     const qs = new URLSearchParams();
     if (params.destinationNetwork) qs.set('destinationNetwork', params.destinationNetwork);
     if (params.sourceNetwork) qs.set('sourceNetwork', params.sourceNetwork);
     if (params.network) qs.set('network', params.network);
     const url = `${this.baseUrl}/public/bridges${qs.size ? `?${qs}` : ''}`;
     const res = await fetchJsonWithRetry<XstocksBridgeRaw[]>(url, { timeoutMs: 15_000 }, 1);
-    return { status: res.status, data: res.ok ? res.data : undefined, raw: res.rawText };
+    return { status: res.status, data: res.ok ? res.data : undefined };
   }
 }
 

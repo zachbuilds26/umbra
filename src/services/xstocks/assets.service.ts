@@ -65,7 +65,6 @@ export const SOLANA_USDC_LOGO =
 export const SOLANA_USDT_LOGO =
   'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg';
 export const STABLE_SYMBOLS = ['USDC', 'USDT'] as const;
-export type StableSymbol = (typeof STABLE_SYMBOLS)[number];
 // Solana xStocks use 8 scaled decimals (svmDecimals observed live).
 export const SOLANA_XSTOCK_DECIMALS = 8;
 
@@ -276,16 +275,6 @@ export async function getJupiterPriceFor(symbol: string): Promise<string | null>
   return String(jp.usdPrice);
 }
 
-/** 0x quoted USD price for a symbol's verified Solana mint (or null). */
-export async function getZeroExPriceFor(symbol: string): Promise<string | null> {
-  const { getZeroExUsdPrice } = await import('../zeroex/client.js');
-  const mint = await resolveMintForJupiter(symbol);
-  if (!mint) return null;
-  const found = await getSolanaMint(symbol).catch(() => null);
-  const decimals = found?.decimals ?? 8;
-  return getZeroExUsdPrice(mint, decimals).catch(() => null);
-}
-
 /** Jupiter's published liquidity USD for a symbol (or null when unindexed).
  * 11 of our 56 have no indexed liquidity anywhere (Jupiter and DexScreener
  * both) — callers must show '—', never invent. */
@@ -349,7 +338,6 @@ export async function getEquityMarketCapForAsset(asset: UmbraAsset): Promise<str
 export async function enrichAsset(symbol: string): Promise<UmbraAsset | null> {
   const asset = await getAsset(symbol);
   if (!asset) return null;
-  const underlying = asset.underlyingSymbol ?? asset.symbol.replace(/x$/i, '');
   const [price, multiplier, marketCap, liquidity] = await Promise.all([
     getPrice(symbol).catch(() => null),
     isStableSymbol(canonicalSymbol(symbol)) ? Promise.resolve('1') : getMultiplier(symbol).catch(() => null),

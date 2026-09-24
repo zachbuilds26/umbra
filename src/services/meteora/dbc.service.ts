@@ -12,7 +12,7 @@ import {
 } from '@meteora-ag/dynamic-bonding-curve-sdk';
 import { getConnection } from '../solana/connection.js';
 import { getDbcClient } from './dbc-client.js';
-import { DBC_QUOTE_DECIMALS, DBC_QUOTE_MINT, buildEquityConfig, getEquityPreset } from './dbc-presets.js';
+import { DBC_QUOTE_MINT, buildEquityConfig, getEquityPreset } from './dbc-presets.js';
 import { TtlCache } from '../../utils/cache.js';
 import { badRequest, notFound, upstream, sanitizeProviderMessage } from '../../utils/errors.js';
 import { isValidSolanaAddress, isValidSolanaPublicKey } from '../../utils/addresses.js';

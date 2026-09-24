@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { recordPrice, changePct, sparkline, getHistory } from '../src/services/prices/history.js';
+import { recordPrice, changePct, sparkline } from '../src/services/prices/history.js';
 import { toDisplayBalance } from '../src/services/solana/balances.js';
 import { canonicalAssetSymbol, getPrice } from '../src/services/xstocks/assets.service.js';
 
@@ -27,8 +27,8 @@ describe('price history ring', () => {
   it('same-price records extend freshness without inventing a point', () => {
     recordPrice('TESTC', '50', 1000);
     recordPrice('TESTC', '50', 2000);
-    assert.equal(getHistory('TESTC').length, 1); // one real point, timestamp moved
-    assert.equal(getHistory('TESTC')[0]?.t, 2000);
+    assert.equal(sparkline('TESTC').length, 1); // one real point, timestamp moved
+    assert.equal(sparkline('TESTC')[0]?.t, 2000);
     assert.equal(changePct('TESTC', 86_400_000, 2000), null);
   });
 

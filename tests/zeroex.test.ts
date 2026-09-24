@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseZeroExQuote, getZeroExQuote, getZeroExUsdPrice } from '../src/services/zeroex/client.js';
+import { parseZeroExQuote, getZeroExQuote } from '../src/services/zeroex/client.js';
 
 // Pure parser tests + disabled-leg behavior (no key in .env => null, never throws).
 describe('zeroex client', () => {
@@ -31,7 +31,5 @@ describe('zeroex client', () => {
       amountInBaseUnits: '1000000',
     });
     assert.equal(q, null);
-    const p = await getZeroExUsdPrice('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 6);
-    assert.equal(p, null);
   });
 });

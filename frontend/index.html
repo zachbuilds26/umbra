@@ -60,7 +60,6 @@
       --umbra-muted: #9aa0a6;
       --umbra-border: rgba(255, 255, 255, 0.08);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --umbra-font-display: "Cinzel", Georgia, serif;
     }
 
     * {
@@ -280,10 +279,6 @@
       display: block;
     }
 
-    .network-btn .chev {
-      color: var(--umbra-muted);
-    }
-
     .icon-btn {
       display: none;
       align-items: center;
@@ -300,12 +295,6 @@
     .icon-btn:hover {
       background: var(--umbra-secondary);
       color: var(--umbra-text);
-    }
-
-    @media (min-width: 640px) {
-      .icon-btn.settings {
-        display: inline-flex;
-      }
     }
 
     .connect-btn {
@@ -361,18 +350,6 @@
     [disabled] {
       cursor: not-allowed !important;
       opacity: 0.55;
-    }
-
-    .chev {
-      width: 16px;
-      height: 16px;
-      flex: none;
-    }
-
-    .chev-sm {
-      width: 14px;
-      height: 14px;
-      flex: none;
     }
 
     /* CSS-only chevron — paints everywhere, depends on nothing */
@@ -500,12 +477,6 @@
       white-space: nowrap;
     }
 
-    .mobile-connect img {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-
     .mobile-chain {
       display: inline-flex;
       align-items: center;
@@ -573,12 +544,8 @@
       body { display: flex; flex-direction: column; min-height: 100dvh; }
       main { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; }
       .page-section.active { flex: 1; display: flex; flex-direction: column; padding-bottom: 20px; }
-      /* Wrap must shrink-to-content — and these selectors MUST out-specify
-         the base .swap-wrap/.stocks-wrap rules below (same specificity loses
-         to later source order, which is exactly how the void survived). */
-      main .swap-wrap, main .stocks-wrap { flex: none; margin-top: auto; justify-content: flex-end; }
-      /* The wrap's own 48px bottom pad + 32px gap otherwise re-add the void */
-      main .swap-wrap { padding-bottom: 0; gap: 16px; }
+      .swap-wrap, .stocks-wrap { margin-top: auto; }
+      .swap-wrap { padding-bottom: 0; gap: 16px; }
       .site-footer { flex: none; }
     }
 
@@ -866,27 +833,7 @@
       background: var(--umbra-secondary-hover);
     }
 
-    .token-select .coin {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: var(--umbra-accent-soft);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      flex: none;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--umbra-accent);
-    }
-
-    .token-select .coin img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+    /* Token icons are .tk-* badges, not a .coin element */
 
     .amount-wrap {
       margin-left: auto;
@@ -1302,27 +1249,6 @@
       background: var(--umbra-secondary);
     }
 
-    .token-opt .coin {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--umbra-accent-soft);
-      color: var(--umbra-accent);
-      font-size: 13px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      flex: none;
-    }
-
-    .token-opt .coin img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
     .token-opt .meta {
       display: flex;
       flex-direction: column;
@@ -1383,7 +1309,6 @@
       background: var(--umbra-secondary);
       animation: shimmer 1.2s ease-in-out infinite;
     }
-    .skeleton.wide { width: 64px; }
     .skeleton.short { width: 32px; }
     .info-icon {
       display: inline-flex;
@@ -1441,11 +1366,6 @@
     }
     .stocks-search::placeholder {
       color: var(--umbra-muted);
-    }
-    .stocks-count {
-      font-size: 13px;
-      color: var(--umbra-muted);
-      white-space: nowrap;
     }
     .stocks-list {
       min-height: 320px;
@@ -1594,27 +1514,6 @@
     }
 
     /* ---------- Transactions (filter chips) ---------- */
-    .tx-tabs {
-      display: flex;
-      gap: 20px;
-      padding: 16px 16px 0;
-    }
-    .tx-tab {
-      background: none;
-      border: 0;
-      padding: 0 0 10px;
-      font-family: var(--umbra-font-body);
-      font-size: 15px;
-      font-weight: 500;
-      color: var(--umbra-muted);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-    }
-    .tx-tab.active {
-      color: var(--umbra-text);
-      font-weight: 700;
-      border-bottom-color: var(--umbra-accent);
-    }
     .tx-chips {
       display: flex;
       gap: 8px;
@@ -1780,20 +1679,6 @@
       background: var(--umbra-surface);
     }
 
-    .tape-chip .letter {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--umbra-accent-soft);
-      color: var(--umbra-accent);
-      font-size: 11px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: none;
-    }
-
     /* Badged token icon — main logo with Solana mark pinned bottom-right */
     .tk {
       position: relative;
@@ -1833,10 +1718,6 @@
     }
     .tk-20 { width: 20px; height: 20px; }
     .tk-20 .tk-letter { font-size: 11px; }
-    .tk-24 { width: 24px; height: 24px; }
-    .tk-24 .tk-letter { font-size: 12px; }
-    .tk-28 { width: 28px; height: 28px; }
-    .tk-28 .tk-letter { font-size: 13px; }
     .tk-36 { width: 36px; height: 36px; }
     .tk-36 .tk-letter { font-size: 14px; }
     .tk-48 { width: 48px; height: 48px; }
@@ -2507,14 +2388,6 @@
           if (_ab) _ab.title = 'Wallet module still loading — tap again in a second.';
         } catch (_) {}
       }
-      function disconnectWallet() {
-        try {
-          if (window.umbraReown && window.umbraReown.ready) window.umbraReown.disconnect();
-        } catch (e) {}
-        /* keep window.umbraReownSigner (live wrapper over solProvider) so a
-           later reconnect can sign without a page reload */
-        setDisconnected();
-      }
       on('connectBtn', 'click', function () {
         if (window.umbraWallet) openAccount();
         else connectWallet();
@@ -2691,7 +2564,6 @@
       var sellCoinEl = document.getElementById('sellCoin');
       var buyCoinEl = document.getElementById('buyCoin');
       var slipValEl = document.getElementById('slipVal');
-      var quickPickEl = document.getElementById('quickPick');
       var tokenModalEl = document.getElementById('tokenModal');
       var tokenSearchEl = document.getElementById('tokenSearch');
       var tokenListEl = document.getElementById('tokenList');
@@ -3104,7 +2976,6 @@
             receive: data.receive,
             rate: data.rate,
             minimumReceived: data.minimumReceived,
-            fairLine: null,
             at: Date.now(),
             // Terms the quote was priced for. executeSwap re-checks these, so
             // a swap can never be signed against a stale amount/pair/slippage.
@@ -3135,7 +3006,6 @@
                 var sign = bps > 0 ? '+' : '';
                 quoteLinesEl.innerHTML +=
                   '<div class="row"><span>Fair value (Pyth)</span><span class="' + cls + '">$' + esc(fair.equity.price) + ' (' + sign + bps + ' bps)</span></div>';
-                if (lastQuote) lastQuote.fairLine = '$' + fair.equity.price + ' (' + sign + bps + ' bps)';
               }
               // Receive-side 24h badge doubles as the deal pulse: fetch change
               try {
@@ -3304,7 +3174,7 @@
         swapRetryBtn.style.display = retry ? 'block' : 'none';
       }
 
-      async function pollTx(id, sig, wallet) {
+      async function pollTx(id, wallet) {
         var tries = 0;
         while (tries < 35) {
           await new Promise(function (r) { setTimeout(r, 2000); });
@@ -3405,7 +3275,7 @@
           if (!subRes.ok) throw new Error((subData.error && subData.error.message) || 'Submission rejected.');
           // 5) Poll to finality
           paintSwapTitle('Confirming on Solana…', '');
-          var final = await pollTx(subData.id, sig, wallet);
+          var final = await pollTx(subData.id, wallet);
           swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
           swapExplorerEl.style.display = 'block';
           if (final === 'confirmed') {
@@ -3440,28 +3310,6 @@
         return btoa(s);
       }
 
-      function bs58encode(bytes) {        var ALPH = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-        var zeros = 0;
-        while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
-        var digits = [0];
-        for (var i = zeros; i < bytes.length; i++) {
-          var carry = bytes[i];
-          for (var j = 0; j < digits.length; j++) {
-            carry += digits[j] * 256;
-            digits[j] = carry % 58;
-            carry = Math.floor(carry / 58);
-          }
-          while (carry > 0) {
-            digits.push(carry % 58);
-            carry = Math.floor(carry / 58);
-          }
-        }
-        var out = '';
-        for (var k = 0; k < zeros; k++) out += '1';
-        for (var l = digits.length - 1; l >= 0; l--) out += ALPH[digits[l]];
-        return out;
-      }
-
       on('actionBtn', 'click', function () {
         if (!window.umbraWallet) connectWallet();
         else executeSwap();
@@ -3490,9 +3338,13 @@
       }
       function stockRowHtml(a) {
         var icon = tkIcon(a.symbol, 'tk-36');
+        // Skeleton = still loading. "—" = the fetch finished with nothing, which
+        // is the honest answer for mints no venue indexes.
         var price = a.price
           ? '$' + Number(a.price.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : '<span class="skeleton short"></span>';
+          : a._priceChecked
+            ? '—'
+            : '<span class="skeleton short"></span>';
         var mcap = a.marketCap
           ? formatMcap(a.marketCap)
           : a._mcapChecked
@@ -3602,6 +3454,9 @@
                         td.ticker.forEach(function (t) { if (t.price) m[t.symbol] = t; });
                         stocksCache.forEach(function (a) {
                           var t = m[a.symbol];
+                          // These 20 were priced by this call: with no price, the
+                          // row is settled as unavailable, not still loading.
+                          a._priceChecked = true;
                           if (t) {
                             if (t.price) a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
                             // Lock mcap ONLY when a value arrives — the ticker never
@@ -3625,7 +3480,6 @@
               } else {
                 renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
               }
-              var listEl = document.getElementById('stocksList');
               if (stocksCache.length) {
                 var syms = stocksCache.map(function (a) { return a.symbol; });
                 var CHUNK = 50;
@@ -3645,7 +3499,9 @@
                           .then(function (d) {
                             var mc = d && (d.marketCap || (d.asset && d.asset.marketCap));
                             if (mc) { a.marketCap = mc; a._mcapChecked = true; return true; }
-                            // No value: stay skeleton (still loading), never "—".
+                            // The lookup came back with no valuation: that is a
+                            // real "not available here", not a pending request.
+                            a._mcapChecked = true;
                             return false;
                           })
                           .catch(function () { return false; });
@@ -3661,17 +3517,22 @@
                   fetch(API_BASE + '/api/assets/ticker?symbols=' + encodeURIComponent(slice))
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (td) {
+                      if (myReq !== stocksReq) { fetchChunk(i + CHUNK); return; }
                       if (td && td.ticker) {
                         var m = {};
                         td.ticker.forEach(function (t) { m[t.symbol] = t; });
                         var patched = false;
                         stocksCache.forEach(function (a) {
                           var t = m[a.symbol];
-                          if (t && t.price) {
-                            a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
+                          if (t) {
+                            // This chunk answered: no price means unavailable.
+                            a._priceChecked = true;
+                            if (t.price) {
+                              a.price = { value: t.price, timestamp: t.timestamp, currency: 'USD' };
+                              patched = true;
+                            }
                             if (t.marketCap) a.marketCap = t.marketCap;
                             if (t.liquidity) a.liquidity = t.liquidity;
-                            patched = true;
                           }
                         });
                         if (patched) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
@@ -3686,9 +3547,8 @@
             .catch(function () {});
         }
       var allTransactions = [];
-      var txView = { tab: 'all', range: '90', type: 'all', status: 'all' };
+      var txView = { range: '90', type: 'all', status: 'all' };
       function txMatches(tx) {
-        if (txView.tab !== 'all' && tx.type !== txView.tab) return false;
         if (txView.type !== 'all' && tx.type !== txView.type) return false;
         if (txView.range !== 'all') {
           var cutoff = Date.now() - Number(txView.range) * 86400000;
@@ -3965,7 +3825,7 @@
         document.getElementById('drawerTop').innerHTML = '<span class="skeleton" style="width:48px; height:8px;"></span>';
         document.getElementById('drawerHoldRow').style.display = 'none';
         document.getElementById('drawerHold').innerHTML = '<span class="skeleton short" style="width:40px; height:12px;"></span>';
-        document.getElementById('drawerLiquidity').textContent = '—';
+        document.getElementById('drawerLiquidity').innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
         var _sol0 = document.getElementById('drawerSolscan');
         if (_sol0) _sol0.style.display = 'none';
         drawerChartEl.textContent = 'Loading…';
@@ -4024,12 +3884,16 @@
             if (window.lucide) window.lucide.createIcons();
           }
           if (liqEl) {
-            // Liquidity: live summary first, cached ticker row second, '—' when
-            // no venue indexes the pool (11 of 56) — never invented.
+            // Loading = skeleton, not a dash: a dash claims we looked and found
+            // nothing. Only a completed summary without liquidity earns "—".
             var liqVal = (s.asset && s.asset.liquidity) || cachedLiq(symbol);
-            var liq = liqVal ? '$' + Number(liqVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
-            liqEl.textContent = liq;
+            if (liqVal) {
+              liqEl.textContent = '$' + Number(liqVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            } else {
+              liqEl.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
+            }
           }
+          if (liqEl) liqEl.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
           if (!price) {
             // Keep skeleton, don't flash the scary timeout message — price will arrive via Jupiter/last-good on retry
             drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
@@ -4044,6 +3908,8 @@
           drawerPriceEl.innerHTML = '<span class="skeleton" style="width:64px; height:14px;"></span>';
           drawerMcapEl.innerHTML = '<span class="skeleton" style="width:48px; height:10px;"></span>';
           drawerChangeEl.innerHTML = '<span class="skeleton short" style="width:32px; height:8px;"></span>';
+          var liqErr = document.getElementById('drawerLiquidity');
+          if (liqErr) liqErr.innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
           document.getElementById('drawerTop').innerHTML = '<span class="skeleton" style="width:48px; height:8px;"></span>';
           drawerNoteEl.style.display = 'none';
         }
@@ -4054,17 +3920,17 @@
         var fromChain = null;
         var bridgeAsset = null;
         var bridgeRoutesCache = null;
-        var bridgeFromBtn = document.getElementById('bridgeFromChainBtn') || document.getElementById('bridgeFromChainBtn2');
-        var bridgeFromName = document.getElementById('bridgeFromChainName') || document.getElementById('bridgeFromChainName2');
-        var bridgeFromIcon = document.getElementById('bridgeFromChainIcon') || document.getElementById('bridgeFromChainIcon2');
-        var bridgeAssetBtn = document.getElementById('bridgeAssetBtn') || document.getElementById('bridgeAssetBtn2');
-        var bridgeAssetCoin = document.getElementById('bridgeAssetCoin') || document.getElementById('bridgeAssetCoin2');
-        var bridgeAssetSymbol = document.getElementById('bridgeAssetSymbol') || document.getElementById('bridgeAssetSymbol2');
-        var bridgeAmount = document.getElementById('bridgeAmount') || document.getElementById('bridgeAmount2');
-        var bridgeUsd = document.getElementById('bridgeUsd');
-        var bridgeReceiver = document.getElementById('bridgeReceiver') || document.getElementById('bridgeReceiver2');
-        var bridgeLines = document.getElementById('bridgeLines') || document.getElementById('bridgeLines2');
-        var bridgeActionBtn = document.getElementById('bridgeActionBtn') || document.getElementById('bridgeActionBtn2');
+        // Only the flip-card bridge view exists (the standalone #bridge section
+        // was removed), so every lookup is the *2 id — no || fallbacks.
+        var bridgeFromBtn = document.getElementById('bridgeFromChainBtn2');
+        var bridgeFromName = document.getElementById('bridgeFromChainName2');
+        var bridgeAssetBtn = document.getElementById('bridgeAssetBtn2');
+        var bridgeAssetCoin = document.getElementById('bridgeAssetCoin2');
+        var bridgeAssetSymbol = document.getElementById('bridgeAssetSymbol2');
+        var bridgeAmount = document.getElementById('bridgeAmount2');
+        var bridgeReceiver = document.getElementById('bridgeReceiver2');
+        var bridgeLines = document.getElementById('bridgeLines2');
+        var bridgeActionBtn = document.getElementById('bridgeActionBtn2');
         if (!bridgeFromBtn) return;
 
         function chainIcon(name) {
@@ -4094,7 +3960,7 @@
             bridgeFromBtn.addEventListener('click', function () {
               var chains = [];
               routes.forEach(function (rt) { if (chains.indexOf(rt.sourceNetwork) === -1) chains.push(rt.sourceNetwork); });
-              var html = chains.map(function (ch) { return '<button class="token-opt" data-chain="'+ch+'">'+chainIcon(ch)+'<span class="meta"><b>'+ch+'</b><span>→ Solana via CCIP</span></span></button>'; }).join('');
+              var html = chains.map(function (ch) { return '<button class="token-opt" data-chain="'+esc(ch)+'">'+chainIcon(ch)+'<span class="meta"><b>'+esc(ch)+'</b><span>→ Solana via CCIP</span></span></button>'; }).join('');
               tokenListEl.innerHTML = html;
               tokenSearchEl.value = '';
               tokenSearchEl.placeholder = 'Search chains…';
@@ -4106,7 +3972,6 @@
                   if (bridgeFromName) bridgeFromName.textContent = fromChain;
                   var _ci = document.getElementById('bridgeChainImg2');
                   if (_ci) { _ci.src = chainIconImg(fromChain); _ci.style.display = 'block'; }
-                  else if (bridgeFromIcon) bridgeFromIcon.outerHTML = chainIcon(fromChain);
                   closeModal();
                   updateBridgeAction();
                 });
@@ -4145,8 +4010,6 @@
           });
         }
         if (bridgeAssetBtn) bridgeAssetBtn.addEventListener('click', openBridgeAssetPicker);
-        // patch closeModal to handle bridge pickers
-        var _origClose = window.closeModal || closeModal;
         // keep existing closeModal behaviour, just ensure search works for bridge
         tokenSearchEl.addEventListener('input', function () {
           var q = (tokenSearchEl.value || '').trim().toUpperCase();
@@ -4163,19 +4026,15 @@
           if (!fromChain || !bridgeAsset || !amt || Number(amt) <= 0 || !recv) {
             bridgeLines.hidden = true;
             bridgeLines.innerHTML = '';
-            var bl2 = document.getElementById('bridgeLines2');
-            if (bl2) { bl2.hidden = true; bl2.innerHTML = ''; }
             return;
           }
           bridgeLines.hidden = false;
           bridgeLines.innerHTML = '<div class="row"><span style="color:var(--umbra-muted);">Fetching bridge quote…</span></div>';
-          var bl2a = document.getElementById('bridgeLines2');
-          if (bl2a) { bl2a.hidden = false; bl2a.innerHTML = '<div class="row"><span style="color:var(--umbra-muted);">Fetching bridge quote…</span></div>'; }
           try {
             var r = await fetch(API_BASE + '/api/bridge/quote', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ sourceNetwork: fromChain, asset: bridgeAsset, amount: amt, destinationNetwork: 'Solana', destinationAddress: bridgeReceiver.value.trim() })
+              body: JSON.stringify({ sourceNetwork: fromChain, asset: bridgeAsset, amount: amt, destinationNetwork: 'Solana', destinationAddress: recv })
             });
             var j = await r.json();
             if (!r.ok) throw new Error((j.error && j.error.message) || 'Quote failed');
@@ -4184,33 +4043,22 @@
               '<div class="row"><span>Fee</span><span>'+esc(q.fee||'—')+'</span></div>' +
               '<div class="row"><span>Time</span><span>'+esc(q.estimatedTime||'—')+'</span></div>' +
               '<div class="row"><span>Route</span><span>'+esc(fromChain)+' → Solana</span></div>';
-            var bl2b = document.getElementById('bridgeLines2');
-            if (bl2b) bl2b.innerHTML = bridgeLines.innerHTML;
             var bf2 = document.getElementById('bridgeFee2');
             if (bf2) bf2.textContent = q.fee ? q.fee + ' USDC' : '—';
           } catch (e) {
             bridgeLines.innerHTML = '<div class="row"><span class="error">'+esc((e && e.message) || 'Quote failed')+'</span></div>';
-            var bl2c = document.getElementById('bridgeLines2');
-            if (bl2c) bl2c.innerHTML = bridgeLines.innerHTML;
           }
         }
         if (bridgeAmount) bridgeAmount.addEventListener('input', function () { updateBridgeAction(); refreshBridgeQuote(); });
         if (bridgeReceiver) bridgeReceiver.addEventListener('input', function () { updateBridgeAction(); refreshBridgeQuote(); });
-        // Wire the flip-card bridge view (inside swap card) to the same state
-        var bFrom2 = document.getElementById('bridgeFromChainBtn2');
+        // Mirror the shared bridge state into the flip-card view. The *2 nodes
+        // ARE the canonical ones (no second set of listeners on the same input).
         var bFromName2 = document.getElementById('bridgeFromChainName2');
         var bChainImg2 = document.getElementById('bridgeChainImg2');
-        var bAsset2 = document.getElementById('bridgeAssetBtn2');
         var bAssetSym2 = document.getElementById('bridgeAssetSymbol2');
         var bAssetCoin2 = document.getElementById('bridgeAssetCoin2');
-        var bAmt2 = document.getElementById('bridgeAmount2');
-        var bRecv2 = document.getElementById('bridgeReceiver2');
-        var bFee2 = document.getElementById('bridgeFee2');
         var bToSym = document.getElementById('bridgeToAssetSymbol');
         var bToIcon = document.getElementById('bridgeToAssetIcon');
-        if (bFrom2 && bFrom2 !== bridgeFromBtn) bFrom2.addEventListener('click', function () { if (bridgeFromBtn) bridgeFromBtn.click(); });
-        if (bAsset2 && bAsset2 !== bridgeAssetBtn) bAsset2.addEventListener('click', function () { if (bridgeAssetBtn) bridgeAssetBtn.click(); });
-        // Sync displays when fromChain/bridgeAsset change
         var _origUpdate = updateBridgeAction;
         updateBridgeAction = function () {
           _origUpdate();
@@ -4220,15 +4068,9 @@
           if (bAssetCoin2) bAssetCoin2.innerHTML = bridgeAsset ? coinHtml28(bridgeAsset) : '';
           if (bToSym) bToSym.textContent = bridgeAsset || 'USDC';
           if (bToIcon) bToIcon.innerHTML = bridgeAsset ? coinHtml28(bridgeAsset) : '';
-          var bAction2 = document.getElementById('bridgeActionBtn2');
-          if (bAction2) { bAction2.disabled = bridgeActionBtn ? bridgeActionBtn.disabled : true; bAction2.textContent = bridgeActionBtn ? bridgeActionBtn.textContent : 'Bridge to Solana'; }
         };
-        if (bAmt2) bAmt2.addEventListener('input', function () { if (bridgeAmount) bridgeAmount.value = bAmt2.value; updateBridgeAction(); refreshBridgeQuote(); });
-        if (bRecv2) bRecv2.addEventListener('input', function () { if (bridgeReceiver) bridgeReceiver.value = bRecv2.value; updateBridgeAction(); refreshBridgeQuote(); });
         var bAddRecv = document.getElementById('bridgeAddReceiverBtn');
-        if (bAddRecv && bRecv2) bAddRecv.addEventListener('click', function () { bRecv2.hidden = false; bRecv2.focus(); bAddRecv.style.display = 'none'; });
-        var bAction2El = document.getElementById('bridgeActionBtn2');
-        if (bAction2El && bAction2El !== bridgeActionBtn) bAction2El.addEventListener('click', function () { if (bridgeActionBtn) bridgeActionBtn.click(); });
+        if (bAddRecv && bridgeReceiver) bAddRecv.addEventListener('click', function () { bridgeReceiver.hidden = false; bridgeReceiver.focus(); bAddRecv.style.display = 'none'; });
         if (bridgeActionBtn) bridgeActionBtn.addEventListener('click', async function () {
           if (bridgeActionBtn.disabled) return;
           bridgeActionBtn.disabled = true;
@@ -4241,8 +4083,9 @@
             });
             var qj = await qr.json();
             if (!qr.ok) throw new Error((qj.error && qj.error.message) || 'Quote failed');
-            // 2) transaction (source = EVM wallet when connected, else Solana wallet / manual)
-            var srcWallet = window.umbraEvmWallet || window.umbraWallet || bridgeReceiver.value.trim();
+            // 2) transaction (source = the connected wallet; Bridge stays disabled
+            //    until an EVM source wallet is wired, so never guess a chain here)
+            var srcWallet = window.umbraWallet || bridgeReceiver.value.trim();
             var tr = await fetch(API_BASE + '/api/bridge/transaction', {
               method: 'POST', headers: { 'content-type': 'application/json' },
               body: JSON.stringify({ bridgeQuoteId: qj.bridgeQuoteId || qj.quoteId || qj.id, sourceWalletAddress: srcWallet, destinationSolanaAddress: bridgeReceiver.value.trim() })
@@ -4250,23 +4093,17 @@
             var tj = await tr.json();
             if (!tr.ok) throw new Error((tj.error && tj.error.message) || 'Bridge build failed');
             bridgeLines.hidden = false;
-            bridgeLines.innerHTML = '<div class="row"><span class="good">Bridge ready — tracking '+ (tj.trackingId || '') +'</span></div><div class="row"><span>Next: send source chain tx, then POST /api/bridge/transactions/'+(tj.trackingId||'')+'/source with hash</span></div>';
+            bridgeLines.innerHTML = '<div class="row"><span class="good">Bridge ready — tracking '+ esc(tj.trackingId || '') +'</span></div><div class="row"><span>Next: send source chain tx, then POST /api/bridge/transactions/'+esc(tj.trackingId||'')+'/source with hash</span></div>';
             bridgeActionBtn.textContent = 'Tracking '+ (tj.trackingId || '');
             if (typeof refreshActivity === 'function') refreshActivity();
           } catch (e) {
             bridgeLines.hidden = false;
-            bridgeLines.innerHTML = '<div class="row"><span class="error">'+((e && e.message)||'Bridge failed')+'</span></div>';
+            bridgeLines.innerHTML = '<div class="row"><span class="error">'+esc((e && e.message)||'Bridge failed')+'</span></div>';
             bridgeActionBtn.textContent = 'Bridge to Solana';
             bridgeActionBtn.disabled = false;
           }
         });
         loadBridgeRoutes();
-        // keep amount USD live like swap
-        if (bridgeAmount) bridgeAmount.addEventListener('input', async function () {
-          var v = bridgeAmount.value.trim();
-          if (!v || Number(v) <= 0 || !bridgeAsset) { if (bridgeUsd) bridgeUsd.textContent = '$0.00'; return; }
-          try { var pr = await fetch(API_BASE + '/api/assets/'+bridgeAsset+'/price'); if (pr.ok) { var pj = await pr.json(); if (bridgeUsd) bridgeUsd.textContent = '$'+(Number(pj.price)*Number(v)).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); } } catch (_) {}
-        });
       })();
 
       // Info tooltip handler — click the ⓘ to toggle, click outside to close
@@ -4281,11 +4118,9 @@
         }
         return el;
       }
-      var _infoAnchor = null;
       function showInfoTip(icon) {
         var tip = ensureInfoTip();
         tip.textContent = icon.getAttribute('data-tip') || '';
-        _infoAnchor = icon;
         var rect = icon.getBoundingClientRect();
         tip.classList.add('open');
         // Force layout so offsetWidth/Height are correct
@@ -4301,7 +4136,6 @@
       function hideInfoTip() {
         var t = document.getElementById('infoTip');
         if (t) t.classList.remove('open');
-        _infoAnchor = null;
       }
       // One click handler only (the old code had two and they fought each other)
       document.addEventListener('click', function (e) {

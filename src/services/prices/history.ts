@@ -9,7 +9,7 @@ Decimal.set({ precision: 40 });
 // Points sampled every SAMPLER_MS for the curated set; any on-demand price fetch
 // also records a point, so hovered assets self-populate.
 
-export interface PricePoint {
+interface PricePoint {
   t: number;
   p: string;
 }
@@ -44,10 +44,6 @@ export function recordPrice(symbol: string, price: string, at = Date.now()): voi
   const cutoff = at - RETENTION_MS;
   while (ring.length > 0 && (ring[0]?.t ?? 0) < cutoff) ring.shift();
   while (ring.length > MAX_POINTS) ring.shift();
-}
-
-export function getHistory(symbol: string): PricePoint[] {
-  return [...(rings.get(symbol.toUpperCase()) ?? [])];
 }
 
 /** % change between now (or latest point) and the oldest point within windowMs.
@@ -120,8 +116,4 @@ export function startSampler(sampleMs = 10 * 60 * 1000): void {
   };
   void tick();
   setInterval(() => void tick(), sampleMs);
-}
-
-export function samplerSymbols(): string[] {
-  return [...SAMPLE_SYMBOLS];
 }

@@ -43,5 +43,3 @@ export const env = {
   corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
   isProd: parsed.data.NODE_ENV === 'production',
 };
-
-export type AppEnv = typeof env;
