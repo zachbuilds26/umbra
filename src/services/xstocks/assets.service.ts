@@ -174,17 +174,25 @@ export async function getAsset(symbol: string, network = 'Solana'): Promise<Umbr
   return asset;
 }
 
-/** Dynamic discovery: supported xStocks come from the live bridge product list + direct lookup. */
-export async function listSolanaAssets(): Promise<UmbraAsset[]> {
-  const { listBridgeAssets } = await import('../bridge/bridge-config.service.js');
-  const symbols = await listBridgeAssets().catch(() => [] as string[]);
-  const { listPrestocks } = await import('../prestocks/assets.js');
-  const preList = await listPrestocks().catch(() => []);
-  const wanted = [
-    ...STABLE_SYMBOLS,
-    ...preList.map((p) => p.symbol),
-    ...symbols,
-  ];
+/** Dynamic discovery: supported xStocks come from the live bridge product list + direct lookup.
+ * When `only` is given, resolve just those symbols and skip bridge discovery
+ * entirely — the frontend's fixed 56-symbol shelf must not pay for 1000+
+ * stalled lookups on a throttled network. */
+export async function listSolanaAssets(only?: string[]): Promise<UmbraAsset[]> {
+  const wanted: string[] =
+    only && only.length
+      ? [...new Set(only.map((s) => s.trim()).filter(Boolean))].slice(0, 100)
+      : await (async () => {
+          const { listBridgeAssets } = await import('../bridge/bridge-config.service.js');
+          const symbols = await listBridgeAssets().catch(() => [] as string[]);
+          const { listPrestocks } = await import('../prestocks/assets.js');
+          const preList = await listPrestocks().catch(() => []);
+          return [
+            ...STABLE_SYMBOLS,
+            ...preList.map((p) => p.symbol),
+            ...symbols,
+          ];
+        })();
   // Bounded parallel fan-out: the old sequential loop made cold /api/assets take
   // ~40s+ (115 symbols × up-to-6s stalls). 12-way keeps worst case near one stall.
   const CONCURRENCY = 12;

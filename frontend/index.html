@@ -2654,7 +2654,9 @@
 
       async function loadDirectory() {
         try {
-          var res = await fetch(API_BASE + '/api/assets');
+          // Shelf-only fetch: 58 symbols, not 1000+ discovery lookups.
+          var shelf = ['USDC', 'USDT'].concat(ALLOWLIST, PREIPO).join(',');
+          var res = await fetch(API_BASE + '/api/assets?symbols=' + encodeURIComponent(shelf));
           if (!res.ok) return;
           var data = await res.json();
           // Picker shows EXACTLY the Stocks shelf: stables + ALLOWLIST + PREIPO.
@@ -3463,7 +3465,8 @@
               _listEl.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div>';
             }
           }
-          fetch(API_BASE + '/api/assets')
+          var shelf2 = ['USDC', 'USDT'].concat(ALLOWLIST, PREIPO).join(',');
+          fetch(API_BASE + '/api/assets?symbols=' + encodeURIComponent(shelf2))
             .then(function (r) { return r.ok ? r.json() : { assets: [] }; })
             .then(function (data) {
               var fresh = (data.assets || [])

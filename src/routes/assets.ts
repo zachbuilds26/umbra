@@ -16,7 +16,16 @@ let assetsInflight: Promise<UmbraAsset[]> | null = null;
 let lastGoodAssets: UmbraAsset[] | null = null;
 
 export async function assetRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/assets', async () => {
+  app.get('/api/assets', async (req) => {
+    // ?symbols=NVDAx,AAPLx,... — resolve only the requested shelf (fast path
+    // for the fixed frontend list; skips 1000+ discovery lookups). No param =
+    // full discovery (compat).
+    const q = z.object({ symbols: z.string().min(1).max(1200).optional() }).parse(req.query);
+    if (q.symbols) {
+      const only = [...new Set(q.symbols.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 100);
+      const assets = await listSolanaAssets(only);
+      return { assets };
+    }
     const cached = assetsCache.get('all');
     if (cached) return { assets: cached };
     if (assetsInflight) {
