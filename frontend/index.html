@@ -573,11 +573,12 @@
       body { display: flex; flex-direction: column; min-height: 100dvh; }
       main { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; }
       .page-section.active { flex: 1; display: flex; flex-direction: column; padding-bottom: 20px; }
-      /* Wrap must shrink-to-content (base sets flex:1, which fills the
-         section and strands the card at its top): no-grow + dock + end pack */
-      .swap-wrap, .stocks-wrap { flex: none; margin-top: auto; justify-content: flex-end; }
+      /* Wrap must shrink-to-content — and these selectors MUST out-specify
+         the base .swap-wrap/.stocks-wrap rules below (same specificity loses
+         to later source order, which is exactly how the void survived). */
+      main .swap-wrap, main .stocks-wrap { flex: none; margin-top: auto; justify-content: flex-end; }
       /* The wrap's own 48px bottom pad + 32px gap otherwise re-add the void */
-      .swap-wrap { padding-bottom: 0; gap: 16px; }
+      main .swap-wrap { padding-bottom: 0; gap: 16px; }
       .site-footer { flex: none; }
     }
 
