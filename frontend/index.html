@@ -573,6 +573,8 @@
       main { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; }
       .page-section.active { flex: 1; display: flex; flex-direction: column; padding-bottom: 20px; }
       .swap-wrap, .stocks-wrap { margin-top: auto; }
+      /* The wrap's own 48px bottom pad + 32px gap otherwise re-add the void */
+      .swap-wrap { padding-bottom: 0; gap: 16px; }
       .site-footer { flex: none; }
     }
 
@@ -2087,7 +2089,7 @@
               </div>
             </div>
           </div>
-          <div class="stocks-list" id="stocksList"></div>
+          <div class="stocks-list" id="stocksList"><div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div></div>
         </div>
       </div>
     </section>
