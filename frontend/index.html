@@ -2522,7 +2522,10 @@
       var track = document.getElementById('tapeTrack');
       var skeleton = document.getElementById('tapeSkeleton');
       var note = document.getElementById('tapeNote');
-      var manifest = {};
+      // Icon manifest baked in (was a blocking fetch): letters become logos on
+      // first paint instead of after a manifest round-trip. CDNSx/QCOMx/QQQx
+      // have no logo file and intentionally fall back to letters.
+      var manifest = {"TXNx":"TXNx.png","ADIx":"ADIx.png","AMZNx":"AMZNx.png","TMUSx":"TMUSx.png","USDC":"USDC.png","COINx":"COINx.png","NFLXx":"NFLXx.png","GLDx":"GLDx.png","POLYMARKET":"POLYMARKET.png","SPYx":"SPYx.png","MAx":"MAx.png","Vx":"Vx.png","FIGUREAI":"FIGUREAI.png","NVDAx":"NVDAx.png","AAPLx":"AAPLx.png","CMCSAx":"CMCSAx.png","UNHx":"UNHx.png","MSTRx":"MSTRx.png","AMDx":"AMDx.png","WMTx":"WMTx.png","BACx":"BACx.png","ANTHROPIC":"ANTHROPIC.png","METAx":"METAx.png","VZx":"VZx.png","DISx":"DISx.png","ANDURIL":"ANDURIL.png","AVGOx":"AVGOx.png","PGx":"PGx.png","CHTRx":"CHTRx.png","NVOx":"NVOx.png","ARMx":"ARMx.png","LLYx":"LLYx.png","GOOGLx":"GOOGLx.png","JNJx":"JNJx.png","INTCx":"INTCx.png","HOODx":"HOODx.png","OPENAI":"OPENAI.png","USDT":"USDT.svg","ORCLx":"ORCLx.png","KALSHI":"KALSHI.png","TSMx":"TSMx.png","SPACEX":"SPACEX.png","ASMLx":"ASMLx.png","NEURALINK":"NEURALINK.png","MSFTx":"MSFTx.png","PLTRx":"PLTRx.png","HDx":"HDx.png","PFEx":"PFEx.png","KOx":"KOx.png","TSLAx":"TSLAx.png","MUx":"MUx.png","MPWRx":"MPWRx.png","JPMx":"JPMx.png","CRMx":"CRMx.png","MRVLx":"MRVLx.png"};
 
       function fmtPrice(raw) {
         var n = Number(raw);
@@ -2574,21 +2577,11 @@
       }
 
       async function loadTape() {
-        // Manifest (icons) and prices fetch in parallel — neither blocks the other.
-        var manPromise = fetch('./assets/tokens/manifest.json')
-          .then(function (man) {
-            return man.ok ? man.json() : {};
-          })
-          .catch(function () {
-            return {};
-          });
-        var tickerPromise = fetch(url0()).then(function (res) {
+        // Icons are inline above; only live prices are fetched.
+        var data = await fetch(url0()).then(function (res) {
           if (!res.ok) throw new Error('ticker ' + res.status);
           return res.json();
         });
-        var results = await Promise.all([manPromise, tickerPromise]);
-        manifest = results[0] || {};
-        var data = results[1];
         var items = (data.ticker || []).filter(function (t) {
           return t.price !== null;
         });
@@ -2657,6 +2650,9 @@
         sellCoinEl.innerHTML = coinHtml(sellSym);
         buyCoinEl.innerHTML = coinHtml(buySym);
       }
+      // Paint real icons on the very first frame (preloaded files + inline
+      // manifest — no fetch needed), instead of waiting for the tape/directory.
+      try { refreshSelectors(); } catch (_) {}
 
       async function loadDirectory() {
         try {
