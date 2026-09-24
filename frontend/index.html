@@ -1772,7 +1772,10 @@
 <body>
   <header class="site-header">
     <div class="nav-left">
-      <a class="brand" href="#swap" aria-label="Umbra home">
+      <!-- Brand = a real page load at the site root, not a hash route. "/" keeps
+           it on the same origin (https://umbra-gwz9.onrender.com/ in production)
+           and drops any #swap left in the URL. -->
+      <a class="brand" href="/" aria-label="Umbra home">
         <!-- Umbra logo: white-bg mark (assets/logo-white.png), served copy here. -->
         <span class="brand-mark">
           <img src="./assets/logo-white.png" alt="Umbra logo" onerror="this.style.display='none'" />
