@@ -18,10 +18,12 @@ const MAX_POINTS = 1440; // 24h at 1/min
 const RETENTION_MS = 25 * 60 * 60 * 1000;
 
 // Curated sampler set: majors people put on a tape + full pre-IPO shelf + stables.
+// Which names the background sampler prices. Order mirrors the tape (pre-IPO
+// interleaved, not grouped) so nothing in the UI implies a ranking.
 const SAMPLE_SYMBOLS = [
-  'NVDAx', 'AAPLx', 'TSLAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'METAx', 'SPYx', 'QQQx',
-  'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
-  'SPACEX', 'OPENAI', 'ANTHROPIC', 'NEURALINK', 'ANDURIL', 'KALSHI', 'POLYMARKET', 'FIGUREAI',
+  'NVDAx', 'SPACEX', 'AAPLx', 'OPENAI', 'TSLAx', 'ANTHROPIC', 'MSFTx', 'NEURALINK',
+  'AMZNx', 'ANDURIL', 'GOOGLx', 'KALSHI', 'METAx', 'POLYMARKET', 'SPYx', 'FIGUREAI',
+  'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
 ];
 
 const rings = new Map<string, PricePoint[]>();

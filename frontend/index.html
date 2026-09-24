@@ -2240,10 +2240,12 @@
           return window.location.origin;
         } catch (_) { return window.location.origin; }
       })();
+      // Interleaved on purpose: pre-IPO names used to sit in one block at the
+      // end, which read like a second-class list. Same 26 names, mixed.
       var TAPE_SYMBOLS = [
-        'NVDAx', 'AAPLx', 'TSLAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'METAx', 'SPYx', 'QQQx',
-        'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
-        'SPACEX', 'OPENAI', 'ANTHROPIC', 'NEURALINK', 'ANDURIL', 'KALSHI', 'POLYMARKET', 'FIGUREAI',
+        'NVDAx', 'SPACEX', 'AAPLx', 'OPENAI', 'TSLAx', 'ANTHROPIC', 'MSFTx', 'NEURALINK',
+        'AMZNx', 'ANDURIL', 'GOOGLx', 'KALSHI', 'METAx', 'POLYMARKET', 'SPYx', 'FIGUREAI',
+        'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
       ];
       var btn = document.getElementById('menuBtn');
       var menu = document.getElementById('mobileMenu');
