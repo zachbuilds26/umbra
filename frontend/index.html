@@ -2017,8 +2017,8 @@
               <button class="connect-btn" onclick="document.getElementById('connectBtn').click()" style="margin-top:8px;"><span class="full">Connect Wallet</span><span class="short">Connect</span></button>
             </div>
             <div id="activityListWrap" style="display:none;">
-              <div class="stocks-list" id="activityList" style="max-height:420px;"></div>
-              <div id="activityEmpty" style="display:none; padding:32px 16px; text-align:center;">
+              <div class="stocks-list" id="activityList" style="max-height:420px; min-height:0;"></div>
+              <div id="activityEmpty" style="display:none; min-height:320px; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 16px;">
                 <div style="width:72px; height:72px; margin:0 auto 16px; border-radius:50%; background:var(--umbra-secondary); display:flex; align-items:center; justify-content:center; color:var(--umbra-muted);"><i data-lucide="inbox" width="32" height="32"></i></div>
                 <div id="activityEmptyText" style="font-size:14px; font-weight:600; margin-bottom:16px;">No records found in the last 90 days</div>
                 <a id="activityExplorer" href="#" target="_blank" rel="noreferrer" class="tx-explorer">Check on Explorer</a>
@@ -3665,15 +3665,19 @@
         if (!listEl) return;
         var filtered = (transactions || []).filter(txMatches);
         if (!filtered.length) {
+          // Hide the list entirely: an empty 320px list is what used to shove
+          // the message to the bottom of the card.
           listEl.innerHTML = '';
+          listEl.style.display = 'none';
           if (emptyEl) {
-            emptyEl.style.display = 'block';
+            emptyEl.style.display = 'flex';
             var rangeTxt = txView.range === 'all' ? '' : ' in the last ' + txView.range + ' days';
             document.getElementById('activityEmptyText').textContent = 'No records found' + rangeTxt;
           }
           return;
         }
         if (emptyEl) emptyEl.style.display = 'none';
+        listEl.style.display = '';
         listEl.innerHTML = filtered.map(function (tx) {
           var isSwap = tx.type === 'swap';
           var icon = isSwap ? '↔' : '⤳';
