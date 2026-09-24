@@ -62,7 +62,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
           )
         )
       : [];
-    const out: Array<{ symbol: string; price: string | null; marketCap: string | null; change24hPct: number | null; timestamp: string }> = [];
+    const out: Array<{ symbol: string; price: string | null; marketCap: string | null; liquidity: string | null; change24hPct: number | null; timestamp: string }> = [];
     // Bounded concurrency + per-symbol timeout: xStocks can stall (60s per
     // symbol when Cloudflare blocks us) — cap it so pre-IPO prices stay fast.
     // Pre-IPO symbols skip xStocks entirely (direct prestocks lookup is ~1ms).
@@ -86,10 +86,12 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
               recordPrice(symbol, pre.value);
               const { getPrestocksAsset } = await import('../services/prestocks/assets.js');
               const pa = await getPrestocksAsset(symbol).catch(() => null);
+              const { getJupiterLiquidity } = await import('../services/xstocks/assets.service.js');
               return {
                 symbol,
                 price: pre.value,
                 marketCap: pa?.marketCap ?? null,
+                liquidity: await getJupiterLiquidity(symbol).catch(() => null),
                 change24hPct: changePct(symbol),
                 timestamp: pre.timestamp,
               };
@@ -114,12 +116,15 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
           const mcap = null;
           // Change precedence (all measured, never invented): Jupiter's real 24h
           // window first, then our own history ring, then flat-0 for known prices.
-          const { getJupiterChange24h } = await import('../services/xstocks/assets.service.js');
+          const { getJupiterChange24h, getJupiterLiquidity } = await import('../services/xstocks/assets.service.js');
           const jupChange = await getJupiterChange24h(symbol).catch(() => null);
+          // Liquidity rides the same cached Jupiter object (warmed by the call above).
+          const jupLiq = await getJupiterLiquidity(symbol).catch(() => null);
           return {
             symbol,
             price: price?.value ?? null,
             marketCap: mcap,
+            liquidity: jupLiq,
             change24hPct: price ? (jupChange ?? changePct(symbol)) : null,
             timestamp: price?.timestamp ?? new Date().toISOString(),
           };

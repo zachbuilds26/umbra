@@ -286,6 +286,18 @@ export async function getZeroExPriceFor(symbol: string): Promise<string | null> 
   return getZeroExUsdPrice(mint, decimals).catch(() => null);
 }
 
+/** Jupiter's published liquidity USD for a symbol (or null when unindexed).
+ * 11 of our 56 have no indexed liquidity anywhere (Jupiter and DexScreener
+ * both) — callers must show '—', never invent. */
+export async function getJupiterLiquidity(symbol: string): Promise<string | null> {
+  const { getJupiterPrice } = await import('../jupiter/price.service.js');
+  const mint = await resolveMintForJupiter(symbol).catch(() => null);
+  if (!mint) return null;
+  const jp = await getJupiterPrice(mint).catch(() => null);
+  const v = (jp as unknown as { liquidity?: number } | null)?.liquidity;
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? String(v) : null;
+}
+
 /** Jupiter's measured 24h change for a symbol (or null when unpriced). */
 export async function getJupiterChange24h(symbol: string): Promise<number | null> {
   const { getJupiterPrice } = await import('../jupiter/price.service.js');
