@@ -2175,7 +2175,7 @@
     </div>
   </div>
 
-  <!-- Swap confirm modal: signed amounts, detail rows, Solscan link -->
+  <!-- Swap confirm modal: signed amounts, detail rows, explorer link -->
   <div class="modal-backdrop" id="swapModal">
     <div class="token-modal" role="dialog" aria-label="Swap status" style="max-width: 420px; padding: 24px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
@@ -2184,7 +2184,7 @@
       </div>
       <div id="swapPairHero" style="margin-bottom:4px;"></div>
       <div id="swapExplorer" style="margin-top:12px; text-align:center; display:none;">
-        <a id="swapExplorerLink" class="swap-explorer-btn" href="#" target="_blank" rel="noreferrer">View on Solscan ↗</a>
+        <a id="swapExplorerLink" class="swap-explorer-btn" href="#" target="_blank" rel="noreferrer">View on Explorer ↗</a>
       </div>
       <div id="swapError" style="display:none; margin-top:12px; padding:10px 12px; border-radius:8px; background:rgba(246,70,93,0.1); color:#f6465d; font-size:13px;"></div>
       <button id="swapRetryBtn" class="swap-action" style="display:none; margin-top:12px;">Try again</button>
@@ -2236,7 +2236,7 @@
             <span id="drawerLiquidity" style="font-size:13px;">—</span>
           </div>
           <div style="text-align:center; margin-top:8px;">
-            <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Solscan <i data-lucide="external-link" width="14" height="14"></i></a>
+            <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Explorer <i data-lucide="external-link" width="14" height="14"></i></a>
           </div>
           <div id="drawerChart" style="margin-top:8px; height:80px; background:var(--umbra-bg); border:1px solid var(--umbra-border); border-radius:12px; display:flex; align-items:center; justify-content:center; color:var(--umbra-muted); font-size:13px;">No chart data yet</div>
           <button id="drawerSwapBtn" class="swap-action" style="margin-top:8px;">Buy this stock</button>
@@ -3299,7 +3299,7 @@
           // 4) Poll to finality
           paintSwapTitle('Confirming on Solana…', '');
           var sig = subData.signature;
-          swapExplorerLink.href = 'https://solscan.io/tx/' + sig;
+          swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
           swapExplorerEl.style.display = 'block';
           var final = await pollTx(subData.id, sig);
           if (final === 'confirmed') {
@@ -3312,9 +3312,9 @@
           } else if (final === 'failed') {
             swapFail('Transaction landed but failed on-chain. Funds stay in your wallet (minus network fee).', false);
           } else if (final === 'expired') {
-            swapFail('Timed out waiting for confirmation — check Solscan; it may still confirm.', false);
+            swapFail('Timed out waiting for confirmation — check the explorer; it may still confirm.', false);
           } else {
-            swapFail('Lost track of the transaction — check Solscan with the link above.', false);
+            swapFail('Lost track of the transaction — check the explorer with the link above.', false);
           }
         } catch (e) {
           var msg = (e && e.message) || String(e);
@@ -3641,7 +3641,7 @@
         if (connectEl) connectEl.style.display = isConnected ? 'none' : 'flex';
         if (wrapEl) wrapEl.style.display = isConnected ? 'block' : 'none';
         var ex = document.getElementById('activityExplorer');
-        if (ex && isConnected) ex.href = 'https://solscan.io/account/' + window.umbraWallet;
+        if (ex && isConnected) ex.href = 'https://explorer.solana.com/address/' + window.umbraWallet;
         if (isConnected) refreshActivity();
       }
       function refreshActivity() {
@@ -3907,7 +3907,9 @@
           var solEl = document.getElementById('drawerSolscan');
           var liqEl = document.getElementById('drawerLiquidity');
           if (solEl && s.asset && s.asset.address) {
-            solEl.href = 'https://solscan.io/token/' + s.asset.address;
+            // Native explorer (not Solscan): resolves any on-chain mint, including
+            // small Pre-IPO tokens Solscan hasn't indexed ("Token not found").
+            solEl.href = 'https://explorer.solana.com/address/' + s.asset.address;
             solEl.style.display = 'inline-flex';
             if (window.lucide) window.lucide.createIcons();
           }
