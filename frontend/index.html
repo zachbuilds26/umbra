@@ -392,14 +392,14 @@
           top: 80px;
           left: 8px;
           right: 8px;
-          bottom: -2px;
+          bottom: auto;
           z-index: 49;
           background: var(--umbra-surface);
           border: 1px solid var(--umbra-border);
-          border-bottom: 0;
-          border-radius: 22px 22px 0 0;
-          padding: 10px;
+          border-radius: 22px;
+          padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
           flex-direction: column;
+          gap: 2px;
         }
 
     .mobile-menu.open {
@@ -470,8 +470,8 @@
     }
 
     .mobile-foot {
-      margin-top: auto;
-      padding: 10px 8px max(10px, env(safe-area-inset-bottom, 0px));
+      margin-top: 6px;
+      padding: 8px 8px max(10px, env(safe-area-inset-bottom, 0px));
       border-top: 0;
       display: flex;
       flex-direction: row;
@@ -564,6 +564,13 @@
     }
     .page-section.active {
       display: flex;
+    }
+    /* Phones: content sizes naturally so the footer follows the card
+       instead of a viewport-stretched void sitting between them. */
+    @media (max-width: 640px) {
+      main { min-height: 0; }
+      .page-section { flex: none; }
+      .page-section.active { padding-bottom: 20px; }
     }
 
     /* ---------- Swap card (their structure, our colour) ----------
@@ -1131,9 +1138,9 @@
       inset: 0;
       z-index: 60;
       background: rgba(0, 0, 0, 0.6);
-      align-items: flex-start;
+      align-items: center;
       justify-content: center;
-      padding: 100px 16px 16px;
+      padding: 16px;
     }
 
     .modal-backdrop.open {
@@ -1143,23 +1150,22 @@
     .token-modal {
       width: 100%;
       max-width: 400px;
-      max-height: 60vh;
+      max-height: calc(100dvh - 32px);
       display: flex;
       flex-direction: column;
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 16px;
       overflow: hidden;
-    }
-    /* Swap confirm card: taller + scrollable so nothing clips on small screens */
-    #swapModal .token-modal {
-      max-width: 420px;
-      max-height: calc(100dvh - 88px);
       overflow-y: auto;
     }
+    /* Swap confirm card width only — centering/sizing shared with all modals above */
+    #swapModal .token-modal {
+      max-width: 420px;
+    }
     @media (max-width: 640px) {
-      .modal-backdrop { padding: 40px 12px 12px; }
-      #swapModal .token-modal { max-height: calc(100dvh - 52px); border-radius: 14px; }
+      .modal-backdrop { padding: 12px; }
+      #swapModal .token-modal { border-radius: 14px; }
     }
 
     /* (removed: custom wallet modal styles — Reown AppKit renders its own modal) */
@@ -1230,7 +1236,7 @@
       background: var(--umbra-bg);
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
-      font-size: 14px;
+      font-size: 16px; /* 16px+ stops iOS auto-zoom when the field is tapped */
       outline: none;
     }
 
@@ -2681,7 +2687,8 @@
         tokenSearchEl.value = '';
         renderTokenList('');
         tokenModalEl.classList.add('open');
-        tokenSearchEl.focus();
+        // Tower parity: no autofocus — list first, keyboard only when the user
+        // taps the search field (auto-focus pops the keyboard over the list).
         // If the page loaded while the backend was down, directory is still
         // empty — refetch now instead of showing a blank list forever.
         if (!directory.length) {
@@ -3953,7 +3960,6 @@
               tokenSearchEl.placeholder = 'Search chains…';
               modalSide = 'bridgeChain';
               tokenModalEl.classList.add('open');
-              tokenSearchEl.focus();
               Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain]'), function (el) {
                 el.addEventListener('click', function () {
                   fromChain = el.getAttribute('data-chain');
@@ -3987,7 +3993,6 @@
           tokenSearchEl.placeholder = 'Search assets…';
           modalSide = 'bridgeAsset';
           tokenModalEl.classList.add('open');
-          tokenSearchEl.focus();
           Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-symbol]'), function (el) {
             el.addEventListener('click', function () {
               bridgeAsset = el.getAttribute('data-symbol');
