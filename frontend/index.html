@@ -2405,10 +2405,11 @@
         if (window.umbraWallet) {
           if (typeof swapBlocked !== 'undefined' && swapBlocked) {
             var blockedFunds = swapBlocked === 'INSUFFICIENT_BALANCE';
+            var blockedImpact = swapBlocked === 'HIGH_IMPACT';
             action.setAttribute('disabled', '');
-            action.textContent = blockedFunds ? 'Insufficient funds' : 'Unavailable';
-            action.title = blockedFunds ? 'Not enough SOL to open the accounts this swap needs' : 'This swap is not available right now';
-            action.setAttribute('aria-label', blockedFunds ? 'Insufficient funds for this swap' : 'Swap unavailable');
+            action.textContent = blockedFunds ? 'Insufficient funds' : (blockedImpact ? 'High impact' : 'Unavailable');
+            action.title = blockedFunds ? 'Not enough SOL to open the accounts this swap needs' : (blockedImpact ? 'Price impact too high — reduce the amount' : 'This swap is not available right now');
+            action.setAttribute('aria-label', blockedFunds ? 'Insufficient funds for this swap' : (blockedImpact ? 'Price impact too high' : 'Swap unavailable'));
           } else {
             action.removeAttribute('disabled');
             action.textContent = 'Swap';
@@ -3280,6 +3281,10 @@
             // Terms the quote was priced for. executeSwap re-checks these, so
             // a swap can never be signed against a stale amount/pair/slippage.
             key: amt + '|' + sellSym + '|' + buySym + '|' + slippageBps,
+            // Restated on the confirm card, like the big venues do.
+            slippageBps: slippageBps,
+            priceImpactBps: (data.priceImpactBps === null || data.priceImpactBps === undefined) ? null : Number(data.priceImpactBps),
+            routeVenue: data.routeVenue || null,
           };
           swapBlocked = null;
           var blockCode = data.blockReason && data.blockReason.code;
@@ -3291,12 +3296,33 @@
             swapBlocked = blockCode;
           }
           try { updateActionBtn(); } catch (_) {}
-          var impact = data.priceImpactBps === null || data.priceImpactBps === undefined ? '—' : (data.priceImpactBps / 100).toFixed(2) + '%';
+          var impactRaw = (data.priceImpactBps === null || data.priceImpactBps === undefined) ? null : Number(data.priceImpactBps);
+          var impactAbs = (impactRaw !== null && isFinite(impactRaw)) ? Math.abs(impactRaw) : null;
+          var impact = impactAbs === null ? '—' : (impactRaw / 100).toFixed(2) + '%';
+          // Top venues warn, then refuse, when a thin pool eats the trade:
+          // amber at 5%+, locked at 20%+. A balance block already set above
+          // wins — it names the exact top-up, which is more actionable.
+          var impactCls = '';
+          var impactNote = '';
+          if (impactAbs !== null && impactAbs >= 2000) {
+            impactCls = 'bad';
+            impactNote = 'Price impact too high — reduce the amount.';
+            if (!swapBlocked) {
+              lastQuote = null;
+              swapBlocked = 'HIGH_IMPACT';
+              try { updateActionBtn(); } catch (_) {}
+            }
+          } else if (impactAbs !== null && impactAbs >= 500) {
+            impactCls = 'warn';
+            impactNote = 'High price impact — thin liquidity on this size.';
+          }
           // No fee rows here: the wallet shows the network fee at signing time.
           var html =
             '<div class="row"><span>Rate</span><span>' + esc(fmtRate(data.rate)) + '</span></div>' +
-            '<div class="row"><span>Price impact</span><span>' + impact + '</span></div>' +
-            '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>';
+            '<div class="row"><span>Price impact</span><span class="' + impactCls + '">' + impact + '</span></div>' +
+            (data.routeVenue ? '<div class="row"><span>Route</span><span>via ' + esc(String(data.routeVenue)) + '</span></div>' : '') +
+            '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>' +
+            (impactNote ? '<div class="row"><span class="error">' + esc(impactNote) + '</span></div>' : '');
           quoteLinesEl.innerHTML = html;
           if (blockCode) {
             quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
@@ -3504,6 +3530,10 @@
           ? '<span class="usd">' + fmtMoney(recvUsd) + '</span>'
           : (typeof sellUsdPer === 'number' && sellUsdPer > 0 && isFinite(sellN))
             ? '<span class="usd">' + fmtMoney(sellN * sellUsdPer) + '</span>' : '';
+        var heroSlip = (typeof q.slippageBps === 'number' && isFinite(q.slippageBps)) ? fmtSlip(q.slippageBps) : '—';
+        var heroImpact = (q.priceImpactBps === null || q.priceImpactBps === undefined || !isFinite(Number(q.priceImpactBps)))
+          ? '—'
+          : (Number(q.priceImpactBps) / 100).toFixed(2) + '%';
         return (
           '<div class="swap-hero-row">' + tkIcon(q.sell.symbol, 'tk-36') +
           '<span class="neg">-' + esc(q.sell.amount) + '</span><span class="sym">' + esc(q.sell.symbol) + '</span>' + sellUsd + '</div>' +
@@ -3513,6 +3543,9 @@
           '<div class="swap-hero-hair"></div>' +
           '<div class="swap-hero-line"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>' +
           '<div class="swap-hero-line"><span>Rate</span><span class="val">1 ' + esc(q.sell.symbol) + ' ≈ ' + per + ' ' + esc(q.receive.symbol) + '</span></div>' +
+          '<div class="swap-hero-line"><span>Price impact</span><span class="val">' + esc(heroImpact) + '</span></div>' +
+          '<div class="swap-hero-line"><span>Slippage</span><span class="val">' + esc(heroSlip) + '</span></div>' +
+          (q.routeVenue ? '<div class="swap-hero-line"><span>Route</span><span class="val">via ' + esc(String(q.routeVenue)) + '</span></div>' : '') +
           '<div class="swap-hero-line"><span>Min to receive</span><span class="val">' + fmtAmt(Number(q.minimumReceived)) + ' ' + esc(q.receive.symbol) + '</span></div>'
         );
       }
