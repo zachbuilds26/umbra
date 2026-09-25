@@ -20,6 +20,11 @@ const envSchema = z.object({
   JUPITER_BASE_URL: httpsUrl.default('https://api.jup.ag/swap/v2'),
   JUPITER_PRICE_URL: httpsUrl.default('https://api.jup.ag/price/v3'),
 
+  // Tokens Assets API (Solana market data) — key from https://app.tokens.xyz;
+  // empty = Tokens leg disabled, everything else works.
+  TOKENS_API_KEY: z.string().optional().default(''),
+  TOKENS_BASE_URL: httpsUrl.default('https://api.tokens.xyz/v1'),
+
   // 0x Swap API (Solana, open beta) — quoter #2 behind Jupiter. Free key from
   // https://dashboard.0x.org; empty = 0x leg disabled, everything else works.
   ZEROEX_API_KEY: z.string().optional().default(''),
