@@ -2193,7 +2193,7 @@
             <b id="drawerPrice" style="font-size:20px;">—</b>
           </div>
           <div style="display:flex; justify-content:space-between;">
-            <span style="color:var(--umbra-muted); font-size:13px;">Market cap<span class="info-icon" data-tip="Market cap is total value — price × supply. For xStocks we show the underlying equity's own market cap (Finnhub company data), for Pre-IPO names the implied valuation."><i data-lucide="info" width="14" height="14"></i></span></span>
+            <span style="color:var(--umbra-muted); font-size:13px;">Market cap<span class="info-icon" data-tip="Market cap is total value — price × supply. For xStocks we show the token's own on-chain market cap, for Pre-IPO names the implied valuation."><i data-lucide="info" width="14" height="14"></i></span></span>
             <span id="drawerMcap" style="font-size:13px; color:var(--umbra-muted);">—</span>
           </div>
           <div style="display:flex; justify-content:space-between;">
@@ -2871,10 +2871,12 @@
         var emptyCopy = 'No matches found.';
         if (directoryState === 'error') {
           emptyCopy = 'Could not load the asset list. Check your connection and try again.';
-        } else if (!f && directoryState !== 'ready') {
-          emptyCopy = 'Loading assets…';
+          tokenListEl.innerHTML = '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + esc(emptyCopy) + '</div>';
+        } else if (!html && !f && directoryState !== 'ready') {
+          tokenListEl.innerHTML = stockSkeletonRows(6);
+        } else {
+          tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + esc(emptyCopy) + '</div>';
         }
-        tokenListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + esc(emptyCopy) + '</div>';
         Array.prototype.forEach.call(tokenListEl.querySelectorAll('.token-opt'), function (btn) {
           btn.addEventListener('click', function () {
             var sym = btn.getAttribute('data-symbol');
@@ -3818,6 +3820,21 @@
           '</a>'
         );
       }
+      // Shimmer rows shaped like the list while it loads (KyberSwap-style):
+      // layout first, numbers second. Never used for empty/error states.
+      function stockSkeletonRows(n) {
+        var rows = '';
+        for (var i = 0; i < (n || 6); i++) {
+          rows +=
+            '<div class="stock-row" style="cursor:default;" aria-hidden="true">' +
+            '<span class="stock-left"><span class="skeleton" style="width:36px;height:36px;border-radius:50%;flex:none;"></span>' +
+            '<span class="stock-meta"><span class="skeleton" style="width:72px;height:12px;"></span>' +
+            '<span class="skeleton" style="width:120px;height:8px;margin-top:6px;"></span></span></span>' +
+            '<span class="stock-right"><span class="skeleton" style="width:56px;height:12px;"></span>' +
+            '<span class="skeleton" style="width:40px;height:8px;"></span></span></div>';
+        }
+        return rows;
+      }
       var pythCovered = {};
       function loadPythCoverage(symbols) {
         if (!symbols.length) return;
@@ -3858,7 +3875,8 @@
           if (stocksLoadFailed) {
             emptyMsg = 'Could not load the stocks list. Check your connection and try again.';
           } else if (!stocksCache.length) {
-            emptyMsg = 'Loading stocks...';
+            el.innerHTML = stockSkeletonRows(8);
+            return;
           } else {
             emptyMsg = f ? 'No matches found.' : 'No stocks found';
           }
@@ -3909,7 +3927,7 @@
                 }
             } catch (_) {}
             if (!stocksCache.length && _listEl) {
-              _listEl.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">Loading stocks...</div>';
+              _listEl.innerHTML = stockSkeletonRows(8);
             }
           }
           // The shelf list is already being loaded for the picker by
@@ -4105,6 +4123,15 @@
         var wallet = window.umbraWallet;
         if (!wallet) { allTransactions = []; activityError = ''; renderActivity([]); return; }
         var mySeq = ++activitySeq;
+        // First load shows shimmer rows, not "No records yet": an empty
+        // message before the fetch lands reads as "you have no history".
+        // Existing rows stay put on refresh (same rule as the tape).
+        if (!allTransactions.length) {
+          var listEl0 = document.getElementById('activityList');
+          var emptyEl0 = document.getElementById('activityEmpty');
+          if (emptyEl0) emptyEl0.style.display = 'none';
+          if (listEl0) { listEl0.style.display = ''; listEl0.innerHTML = stockSkeletonRows(3); }
+        }
         fetch(API_BASE + '/api/transactions?limit=30&wallet=' + encodeURIComponent(wallet))
           .then(function (r) {
             if (!r.ok) throw new Error('ledger ' + r.status);
@@ -4390,7 +4417,7 @@
         document.getElementById('drawerPyth').innerHTML = '<span class="skeleton" style="width:88px; height:10px;"></span>';
         var _sol0 = document.getElementById('drawerSolscan');
         if (_sol0) _sol0.style.display = 'none';
-        drawerChartEl.textContent = 'Loading…';
+        drawerChartEl.innerHTML = '<span class="skeleton" style="display:block;width:100%;height:80px;border-radius:12px;"></span>';
         drawerNoteEl.style.display = 'none';
         drawerReturnFocus = document.activeElement;
         drawerEl.classList.add('open');

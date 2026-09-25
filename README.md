@@ -28,7 +28,7 @@ Key env vars:
 | `SOLANA_RPC_URL` | Solana RPC (default mainnet-beta) |
 | `JUPITER_API_KEY` | Jupiter Developer Platform key. Empty = keyless 0.5 RPS dev mode |
 | `JUPITER_PRICE_URL` | Jupiter Price V3 (default `https://api.jup.ag/price/v3`) |
-| `ZEROEX_API_KEY` / `PYTH_API_KEY` / `FINNHUB_API_KEY` | Optional legs; empty = that leg disabled |
+| `ZEROEX_API_KEY` / `PYTH_API_KEY` / `TOKENS_API_KEY` | Optional legs; empty = that leg disabled |
 | `XSTOCKS_API_BASE_URL` | `https://api.xstocks.fi/api/v2` |
 | `DATABASE_URL` | Render Postgres string. Set = persisted ledger (auto-migrated); unset = in-memory |
 | `PORT` | Listen port (Render injects its own) |

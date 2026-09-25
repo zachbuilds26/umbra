@@ -96,16 +96,15 @@ describe('SOL requirement for opening token accounts', () => {
 });
 
 describe('the message the trader actually reads', () => {
-  it('says insufficient funds and the amount to add, briefly', () => {
+  it('states the balance and the fix, briefly', () => {
     const req = computeSolRequirement({
       routeMintCount: 2, missingMints: [TSLAX], legacyRent: 0, token2022Rent: 1_666_240, availableLamports: 1_954_407,
     });
     const msg = describeSolShortfall(req, { buySymbol: 'TSLAx', solUsdPrice: '114.84' });
-    assert.match(msg, /insufficient funds/i);
-    assert.match(msg, /add about/i, 'must tell the trader what to do');
-    assert.match(msg, /\$/, 'must give a dollar figure when a price is known');
-    assert.match(msg, /SOL/);
-    assert.ok(msg.length <= 90, `must stay brief, got ${msg.length} chars: ${msg}`);
+    assert.match(msg, /isn't enough to cover fees/i);
+    assert.match(msg, /0\.001954 SOL/);
+    assert.match(msg, /add more and try again/i);
+    assert.ok(msg.length <= 110, `must stay brief, got ${msg.length} chars: ${msg}`);
   });
 
   it('does not accuse a wallet that already holds enough', () => {

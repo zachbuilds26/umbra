@@ -411,27 +411,15 @@ export async function getMultiplier(symbol: string, network = 'Solana'): Promise
   return task;
 }
 
-// Underlyings Finnhub would misattribute (Vx -> "V" = Visa Inc). Skipped there;
-// the Jupiter fallback below still applies.
-const FINNHUB_SKIP = new Set(['V']);
-
-/** Underlying equity market cap for display: Finnhub first (fast, complete
- * for single stocks), Jupiter fallback (covers ETFs like SPY/QQQ/GLD that
- * Finnhub profile2 doesn't return). Pre-IPO assets already carry theirs. */
-export async function getEquityMarketCapForAsset(asset: UmbraAsset): Promise<string | null> {
+/** Token market cap for display, from Tokens snapshots (on-chain asset value).
+ * Pre-IPO assets already carry theirs. */
+export async function getTokenMarketCapForAsset(asset: UmbraAsset): Promise<string | null> {
   if (asset.marketCap) return asset.marketCap;
-  const underlying = asset.underlyingSymbol ?? asset.symbol.replace(/x$/i, '');
-  if (underlying && !FINNHUB_SKIP.has(underlying.toUpperCase())) {
-    const { getFinnhubMarketCap } = await import('../marketcap/finnhub.js');
-    const mcap = await getFinnhubMarketCap(underlying).catch(() => null);
-    if (mcap) return mcap;
-  }
   if (!asset.address) return null;
-  const { getJupiterPrice } = await import('../jupiter/price.service.js');
-  const jp = await getJupiterPrice(asset.address).catch(() => null);
-  const m = (jp as unknown as { stockData?: { mcap?: number }; marketCap?: number } | null);
-  const v = m?.stockData?.mcap ?? m?.marketCap;
-  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? String(Math.round(v)) : null;
+  const { getTokensSnapshots } = await import('../tokens/market.js');
+  const snap = (await getTokensSnapshots([asset.address])).get(asset.address) ?? null;
+  if (!snap?.hasMarket || snap.marketCapUsd === null) return null;
+  return String(snap.marketCapUsd);
 }
 
 /** Attach live price + multiplier + marketCap to a base asset (GET /api/assets/:symbol). */
@@ -443,7 +431,7 @@ export async function enrichAsset(symbol: string): Promise<UmbraAsset | null> {
     isStableSymbol(canonicalSymbol(symbol)) ? Promise.resolve('1') : getMultiplier(symbol).catch(() => null),
     isStableSymbol(canonicalSymbol(symbol))
       ? Promise.resolve(null)
-      : getEquityMarketCapForAsset(asset).catch(() => null),
+      : getTokenMarketCapForAsset(asset).catch(() => null),
     isStableSymbol(canonicalSymbol(symbol))
       ? Promise.resolve(null)
       : import('../jupiter/price.service.js')

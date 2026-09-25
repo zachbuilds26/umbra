@@ -225,16 +225,5 @@ export function describeSolShortfall(
   if (requirement.shortfallLamports <= 0) {
     return 'Enough SOL for this swap.';
   }
-  const sol = new Decimal(requirement.shortfallLamports).div(new Decimal(10).pow(9));
-  const solText = sol.toFixed(6);
-  const price = opts.solUsdPrice ?? null;
-  if (!price) return `Insufficient funds — add about ${solText} SOL to swap.`;
-  let usd: string | null = null;
-  try {
-    usd = sol.mul(new Decimal(price)).toFixed(2);
-  } catch {
-    usd = null;
-  }
-  if (usd === null) return `Insufficient funds — add about ${solText} SOL to swap.`;
-  return `Insufficient funds — add about ${solText} SOL ($${usd}) to swap.`;
+  return `Your current balance of ${lamportsToSol(requirement.availableLamports)} SOL isn't enough to cover fees. Add more and try again.`;
 }

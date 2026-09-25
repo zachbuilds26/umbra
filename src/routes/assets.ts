@@ -114,8 +114,8 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
           }
           const mcap = null;
           // Change precedence (all measured, never invented): Tokens' real 24h
-          // window first, then our own history ring. No live Jupiter/Finnhub
-          // calls on this path — Tokens is the stocks page source.
+          // window first, then our own history ring. No live Jupiter calls
+          // on this path — Tokens is the stocks page source.
           const snap = symbolSnap(symbol);
           const snapPrice =
             snap?.hasMarket && snap.priceUsd !== null
@@ -195,8 +195,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/assets/marketcaps?symbols=A,B,C — one request for the whole shelf.
     //
   // Token market caps come from Tokens market snapshots (on-chain asset
-  // values, not equity valuations): one batched call, no per-symbol fan-out,
-  // no Finnhub quota burn.
+  // values, not equity valuations): one batched call, no per-symbol fan-out.
   app.get('/api/assets/marketcaps', async (req) => {
     const q = z.object({ symbols: z.string().min(1).max(600) }).parse(req.query);
     const wanted = [...new Set(q.symbols.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 60);

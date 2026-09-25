@@ -37,9 +37,6 @@ const envSchema = z.object({
   PYTH_PRO_URL: httpsUrl.default('https://pyth-lazer.dourolabs.app'),
   PYTH_SYMBOLOGY_URL: httpsUrl.default('https://pyth.dourolabs.app'),
 
-  // Finnhub for xStocks marketCap (free 60/min, https://finnhub.io). Empty = mcap stays null.
-  FINNHUB_API_KEY: z.string().optional().default(''),
-
   DATABASE_URL: z.string().optional().default(''),
 
   CORS_ORIGINS: z.string().default('http://localhost:3000'),

@@ -24,7 +24,7 @@ services:
         sync: false
       - key: PYTH_API_KEY
         sync: false
-      - key: FINNHUB_API_KEY
+      - key: TOKENS_API_KEY
         sync: false
       - key: CORS_ORIGINS
         value: https://umbra-gwz9.onrender.com # service URL; no localhost in prod
