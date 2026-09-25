@@ -1,8 +1,7 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { getPrice as getXstocksPrice } from '../xstocks/assets.service.js';
 import { getPrestocksPrice } from '../prestocks/assets.js';
 
-Decimal.set({ precision: 40 });
 
 // In-memory price history ring per symbol: [{ t, p }]. Powers the ticker tape's
 // 24h change and the hover-card sparkline — no chart infra, no new providers.
@@ -38,7 +37,9 @@ const rings = new Map<string, PricePoint[]>();
 function sweepRings(now: number): void {
   for (const [symbol, ring] of rings) {
     const last = ring[ring.length - 1];
-    if (!last || now - last.seen > SYMBOL_TTL_MS) {
+    // `>=` so a symbol expires exactly at the TTL, matching TtlCache. A ring
+    // that survived on the boundary was never actually expired.
+    if (!last || now - last.seen >= SYMBOL_TTL_MS) {
       rings.delete(symbol);
       continue;
     }
@@ -48,9 +49,20 @@ function sweepRings(now: number): void {
     }
   }
   while (rings.size > MAX_SYMBOLS) {
-    const oldest = rings.keys().next();
-    if (oldest.done) break;
-    rings.delete(oldest.value);
+    // Evict the least recently SEEN symbol, not the first inserted. Insertion
+    // order let a long-lived symbol be dropped while a just-created one stayed,
+    // destroying real history.
+    let oldestKey: string | null = null;
+    let oldestSeen = Infinity;
+    for (const [symbol, ring] of rings) {
+      const seen = ring[ring.length - 1]?.seen ?? 0;
+      if (seen < oldestSeen) {
+        oldestSeen = seen;
+        oldestKey = symbol;
+      }
+    }
+    if (!oldestKey) break;
+    rings.delete(oldestKey);
   }
 }
 
@@ -90,12 +102,17 @@ export function changePct(symbol: string, windowMs = 24 * 60 * 60 * 1000, now = 
   const ring = rings.get(symbol.toUpperCase()) ?? [];
   if (ring.length === 0) return null;
   const cutoff = now - windowMs;
-  const inWindow = ring.filter((pt) => pt.t >= cutoff);
+  // A point dated in the future is not an observation we can reason about — it
+  // comes from a clock skew or a bad upstream timestamp. Ignoring it stops a
+  // future point from being read as the "oldest" price and inventing a swing.
+  const inWindow = ring.filter((pt) => pt.t >= cutoff && pt.t <= now);
   if (inWindow.length < 2) return null;
   const first = inWindow[0];
   const last = inWindow[inWindow.length - 1];
   if (!first || !last) return null;
-  if (first.t === last.t) return 0;
+  // Two different prices observed at the same instant tell us nothing about a
+  // change over time, so this is unknown rather than 0%.
+  if (first.t === last.t) return null;
   try {
     const base = new Decimal(first.p);
     if (base.isZero()) return null;

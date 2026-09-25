@@ -47,25 +47,29 @@ const inflights = new Map<string, Promise<Map<string, JupiterPrice>>>();
 
 /** Refresh the cached price map for exactly these mints (batched, single-flight per mint set). */
 export async function refreshJupiterPrices(mints: string[]): Promise<Map<string, JupiterPrice>> {
+  const unique = [...new Set(mints)].filter(Boolean);
+  if (unique.length === 0) return new Map();
   const cached = priceCache.get(CACHE_KEY);
-  if (cached && wantedMints && mints.every((m) => wantedMints?.includes(m))) {
+  // Only serve from cache when EVERY requested mint is actually present.
+  // Returning a partial subset made a caller silently price one asset and see
+  // nothing for the rest.
+  if (cached && unique.every((m) => cached.has(m))) {
     const subset = new Map<string, JupiterPrice>();
-    for (const m of mints) {
+    for (const m of unique) {
       const v = cached.get(m);
       if (v) subset.set(m, v);
     }
-    if (subset.size > 0) return subset;
+    return subset;
   }
   // Keyed by the requested set: a shared global promise handed an NVDAx caller
   // whatever AAPLx request happened to be in flight.
-  const key = [...new Set(mints)].sort().join(',');
+  const key = [...unique].sort().join(',');
   const existing = inflights.get(key);
   if (existing) return existing;
-  const unique = [...new Set(mints)];
   const promise = (async () => {
     try {
-      // Start from the cached map so a partial batch never drops known prices.
-      const out = new Map<string, JupiterPrice>(priceCache.get(CACHE_KEY) ?? []);
+      // Collect only what THIS request actually fetched...
+      const fetched = new Map<string, JupiterPrice>();
       for (let i = 0; i < unique.length; i += 50) {
         const batch = unique.slice(i, i + 50);
         await pace();
@@ -73,18 +77,21 @@ export async function refreshJupiterPrices(mints: string[]): Promise<Map<string,
         const res = await fetchJsonWithRetry<Record<string, JupiterPrice>>(url, { headers: headers(), timeoutMs: 10_000 }, 0);
         if (res.data) {
           for (const [mint, v] of Object.entries(res.data)) {
-            if (v && typeof v.usdPrice === 'number') out.set(mint, v);
+            if (v && typeof v.usdPrice === 'number') fetched.set(mint, v);
           }
         }
       }
-      // Merge into the live cache only after the fetch, and only the mints this
-      // request actually returned. Seeding from a snapshot taken before the
-      // await meant two concurrent batches each wrote back the whole map they
-      // started with, so whichever finished last silently discarded the other's
-      // newly fetched prices.
-      priceCache.set(CACHE_KEY, out);
-      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])];
-      return out;
+      // ...and merge it into the cache as it stands NOW, not into a snapshot
+      // taken before the awaits. Two concurrent batches each wrote back the whole
+      // map they started with, so whichever finished last silently discarded the
+      // other's newly fetched prices.
+      const live = new Map<string, JupiterPrice>(priceCache.get(CACHE_KEY) ?? []);
+      for (const [mint, v] of fetched) live.set(mint, v);
+      priceCache.set(CACHE_KEY, live);
+      // Bounded: this set only decides which mints may be served from cache, and
+      // an unbounded list would let any caller pin a growing set in memory.
+      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])].slice(0, 500);
+      return new Map([...live].filter(([mint]) => unique.includes(mint)));
     } finally {
       inflights.delete(key);
     }

@@ -1,9 +1,8 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { TtlCache } from '../../utils/cache.js';
 import { fetchPrestocks, type PrestocksRaw } from './client.js';
 import type { UmbraAsset } from '../../domain/models.js';
 
-Decimal.set({ precision: 40 });
 
 // PreStocks directory: 5 min TTL. Solana-native, so no bridge leg —
 // bridgeSupported is always false and no cross-chain config is consulted.

@@ -1,17 +1,18 @@
-import Decimal from 'decimal.js';
+import DecimalJs from 'decimal.js';
+import type { Decimal as DecimalInstance } from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 
 // Mandatory multiplier math (plan §10). Exact decimal arithmetic only — never floats.
 // Solana xStocks are Token-2022 Scaled-UI: displayed = raw × multiplier.
 //
-// Rounding is specified per operation rather than set globally on the Decimal
-// singleton: that global mutated every other Decimal user in the process (Pyth
-// spreads, price history) depending on module import order.
-const PRECISION = 40;
-const FLOOR = Decimal.ROUND_FLOOR;
+// Rounding is specified per operation rather than set globally: the Decimal
+// singleton is shared process-wide, and a global `set()` changed how every other
+// Decimal user (Pyth spreads, price history) rounded depending on import order.
+const FLOOR = DecimalJs.ROUND_FLOOR;
 /** An SPL token amount is a u64; conversions must stay inside it. */
 const U64_MAX = '18446744073709551615';
 
-function assertFinite(value: Decimal, what: string): void {
+function assertFinite(value: DecimalInstance, what: string): void {
   if (!value.isFinite()) throw new Error(`${what} is not a finite number`);
 }
 

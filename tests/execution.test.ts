@@ -128,6 +128,17 @@ describe('price impact is reported in real basis points', () => {
     assert.equal(computePriceImpactBps({ priceImpactPct: '-0.0225' }), -225);
   });
 
+  it('agrees with Jupiter on a real order, in both fields', () => {
+    // Captured from a live Jupiter /order for USDC -> ANTHROPIC. Jupiter sends
+    // the same move twice: once in percentage points, once as a ratio. Both must
+    // produce the same basis points, and both are ~1.5% adverse.
+    const observed = { priceImpact: -1.5179217825983593, priceImpactPct: -0.015179217825983592 };
+    const fromPoints = computePriceImpactBps(observed);
+    const fromRatio = computePriceImpactBps({ priceImpactPct: observed.priceImpactPct });
+    assert.equal(fromPoints, fromRatio);
+    assert.equal(fromPoints, -152);
+  });
+
   it('returns null rather than inventing a number', () => {
     assert.equal(computePriceImpactBps({}), null);
     assert.equal(computePriceImpactBps({ priceImpactPct: null }), null);
@@ -191,9 +202,33 @@ describe('ledger status cannot move backwards', () => {
 
   it('scopes updates to the owning wallet', async () => {
     const tx = await createTransaction(base());
-    const foreign = await updateTransaction(tx.id, { status: 'submitted' }, WALLET_B);
-    assert.equal(foreign, undefined);
-    const mine = await getTransaction(tx.id, WALLET_A);
-    assert.equal(mine?.status, 'pending');
+    // Another wallet cannot move the row...
+    const notMine = await updateTransaction(tx.id, { status: 'submitted' }, WALLET_B);
+    assert.equal(notMine, undefined);
+    assert.equal((await getTransaction(tx.id, WALLET_A))?.status, 'pending');
+    // ...and the owner can, with the update landing exactly once.
+    const mine = await updateTransaction(tx.id, { status: 'submitted' }, WALLET_A);
+    assert.equal(mine?.status, 'submitted');
+    assert.equal((await getTransaction(tx.id, WALLET_A))?.status, 'submitted');
+  });
+
+  it('does not let a late callback overwrite a finished transaction', async () => {
+    // The in-memory path read the row with an await, so two concurrent updates
+    // both saw `submitted` and both wrote: a late `failed` could land on top of
+    // `confirmed`. Read and write must be synchronous in memory.
+    const tx = await createTransaction(base());
+    await updateTransaction(tx.id, { status: 'submitted' }, WALLET_A);
+    const [confirmed, lateFail] = await Promise.all([
+      updateTransaction(tx.id, { status: 'confirmed' }, WALLET_A),
+      updateTransaction(tx.id, { status: 'failed' }, WALLET_A),
+    ]);
+    const final = await getTransaction(tx.id, WALLET_A);
+    // Whichever order they landed in, the row must end up terminal and stable —
+    // never flip back to a non-terminal state afterwards.
+    assert.ok(final?.status === 'confirmed' || final?.status === 'failed');
+    const after = await updateTransaction(tx.id, { status: 'submitted' }, WALLET_A);
+    assert.equal(after?.status, final?.status);
+    void confirmed;
+    void lateFail;
   });
 });

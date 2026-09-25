@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { newQuoteId } from '../../utils/ids.js';
 import { quoteStore } from '../quotes.store.js';
 import { getSolanaBridgeEntry } from './bridge-config.service.js';

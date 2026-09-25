@@ -32,17 +32,24 @@ function getPool(): Pool {
   // remote is verified. Disabling certificate verification wholesale meant a
   // hijacked DNS answer or a hostile network could read and rewrite the ledger.
   let local = false;
+  let connectionString = env.DATABASE_URL;
   try {
-    const host = new URL(env.DATABASE_URL).hostname;
-    local = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    const url = new URL(env.DATABASE_URL);
+    // [::1] is how URL parses an IPv6 loopback literal.
+    local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    // `pg` parses the URL after the config object and lets sslmode in the
+    // connection string win, so a `?sslmode=no-verify` or `sslmode=disable`
+    // would silently undo verification set here. Strip it rather than trust it.
+    if (url.searchParams.has('sslmode')) {
+      url.searchParams.delete('sslmode');
+      connectionString = url.toString();
+    }
   } catch {
     local = false;
   }
   pool = new Pool({
-    connectionString: env.DATABASE_URL,
-    // `sslmode=no-verify` in the connection string would silently disable this
-    // again, so it is rejected outright rather than honoured.
-    ssl: local || /sslmode=no-verify/i.test(env.DATABASE_URL) ? undefined : { rejectUnauthorized: true },
+    connectionString,
+    ssl: local ? undefined : { rejectUnauthorized: true },
     max: 5,
     // Without these, a blackholed database hangs boot and requests forever.
     connectionTimeoutMillis: 5_000,

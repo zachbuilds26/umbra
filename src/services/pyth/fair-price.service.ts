@@ -1,9 +1,8 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { TtlCache } from '../../utils/cache.js';
 import { getSymbols, getLatestPrices, type ProSymbol } from './client.js';
 import { getPrice as getXstocksPrice, canonicalSymbol } from '../xstocks/assets.service.js';
 
-Decimal.set({ precision: 40 });
 
 // Entitled catalog: 24h TTL (entitlements change only when the plan changes).
 const catalogCache = new TtlCache<ProSymbol[]>(24 * 60 * 60 * 1000);

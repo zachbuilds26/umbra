@@ -1,5 +1,5 @@
 import { env } from '../../config/env.js';
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { fetchJsonWithRetry } from '../../utils/http.js';
 import { TtlCache } from '../../utils/cache.js';
 

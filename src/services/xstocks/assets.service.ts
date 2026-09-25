@@ -39,8 +39,18 @@ function loadLastGoodMultipliers(): void {
   lastGoodMultLoaded = true;
   try {
     const obj = JSON.parse(readFileSync(MULT_LAST_GOOD_FILE, 'utf-8')) as Record<string, { value: string; timestamp: string }>;
+    const now = Date.now();
     for (const [k, v] of Object.entries(obj)) {
-      if (v && typeof v.value === 'string' && Number(v.value) > 0) lastGoodMult.set(k, v);
+      if (!v || typeof v.value !== 'string') continue;
+      // "Infinity" and friends satisfy a naive `> 0` check and would poison every
+      // later conversion, so the value must be a finite positive number.
+      const num = Number(v.value);
+      if (!Number.isFinite(num) || num <= 0) continue;
+      const at = Date.parse(v.timestamp);
+      // A timestamp in the future would make any age check pass forever, so a
+      // small clock skew is tolerated and anything beyond it is discarded.
+      if (!Number.isFinite(at) || at > now + CLOCK_SKEW_MS) continue;
+      lastGoodMult.set(k, { value: v.value, timestamp: v.timestamp });
     }
   } catch {
     // first boot / no file yet
@@ -336,14 +346,22 @@ export async function getJupiterChange24h(symbol: string): Promise<number | null
  * refusing rather than using it.
  */
 const MAX_MULTIPLIER_AGE_MS = 24 * 60 * 60 * 1000;
+/** Tolerated clock skew when judging a persisted timestamp. */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function multiplierFromLastGood(key: string, now: number): string | null {
   const last = lastGoodMult.get(key);
   if (!last) return null;
   const at = Date.parse(last.timestamp);
-  if (!Number.isFinite(at) || now - at > MAX_MULTIPLIER_AGE_MS) return null;
+  if (!Number.isFinite(at) || at > now + CLOCK_SKEW_MS) return null;
+  if (now - at > MAX_MULTIPLIER_AGE_MS) return null;
+  const num = Number(last.value);
+  if (!Number.isFinite(num) || num <= 0) return null;
   return last.value;
 }
+
+/** In-flight multiplier fetches, so N callers cause one provider call. */
+const multInflight = new Map<string, Promise<string | null>>();
 
 export async function getMultiplier(symbol: string, network = 'Solana'): Promise<string | null> {
   const canonical = canonicalSymbol(symbol);
@@ -351,29 +369,46 @@ export async function getMultiplier(symbol: string, network = 'Solana'): Promise
   const cached = multCache.get(key);
   if (cached) return cached;
   loadLastGoodMultipliers();
-  const last = multiplierFromLastGood(key, Date.now());
-  let res: { currentMultiplier?: number } | null = null;
-  try {
-    // xStocks can stall for the full fetch timeout. A swap must not hang behind
-    // it, and a raw transport error must never surface as a quote failure.
-    res = await Promise.race([
-      xstocksClient.getMultiplier(canonical, network).catch(() => null),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000)),
-    ]);
-  } catch {
-    res = null;
-  }
-  if (res?.currentMultiplier === undefined || !Number.isFinite(res.currentMultiplier) || res.currentMultiplier <= 0) {
-    // Upstream is down. The persisted value is only usable while it is young
-    // enough to be trustworthy for a conversion; past that we return null so the
-    // quote fails closed instead of trading a stale ratio.
-    return last;
-  }
-  const value = String(res.currentMultiplier);
-  multCache.set(key, value);
-  lastGoodMult.set(key, { value, timestamp: new Date().toISOString() });
-  saveLastGoodMultipliers();
-  return value;
+  const running = multInflight.get(key);
+  if (running) return running;
+
+  const task = (async (): Promise<string | null> => {
+    const last = multiplierFromLastGood(key, Date.now());
+    let res: { currentMultiplier?: number } | null = null;
+    try {
+      // xStocks can stall for the full fetch timeout. A swap must not hang behind
+      // it, and a raw transport error must never surface as a quote failure.
+      res = await Promise.race([
+        xstocksClient.getMultiplier(canonical, network).catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000)),
+      ]);
+    } catch {
+      res = null;
+    }
+    if (res?.currentMultiplier === undefined || !Number.isFinite(res.currentMultiplier) || res.currentMultiplier <= 0) {
+      // Upstream is down. The persisted value is only usable while it is young
+      // enough to be trustworthy for a conversion; past that we return null so the
+      // quote fails closed instead of trading a stale ratio.
+      return last;
+    }
+    const value = String(res.currentMultiplier);
+    // Only publish if nothing newer landed while this request was in flight. Two
+    // callers racing here could otherwise let a slow, older response overwrite a
+    // newer multiplier — a real split ratio change would be silently reverted.
+    const existing = lastGoodMult.get(key);
+    const existingAt = existing ? Date.parse(existing.timestamp) : 0;
+    if (!Number.isFinite(existingAt) || Date.now() >= existingAt) {
+      const timestamp = new Date().toISOString();
+      multCache.set(key, value);
+      lastGoodMult.set(key, { value, timestamp });
+      saveLastGoodMultipliers();
+    }
+    return value;
+  })().finally(() => {
+    multInflight.delete(key);
+  });
+  multInflight.set(key, task);
+  return task;
 }
 
 // Underlyings Finnhub would misattribute (Vx -> "V" = Visa Inc). Skipped there;

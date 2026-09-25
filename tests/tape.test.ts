@@ -52,6 +52,22 @@ describe('price history ring', () => {
     assert.equal(changePct('TESTG', 86_400_000, 7_200_000), null);
   });
 
+  it('ignores observations dated in the future', () => {
+    // Only the second point is inside the observable past; the future one must
+    // not be used as the newest price, which would report a +400% swing that
+    // has not happened.
+    recordPrice('TESTI', '100', 1_000);
+    recordPrice('TESTI', '500', 2_000_000);
+    assert.equal(changePct('TESTI', 86_400_000, 1_000_000), null);
+  });
+
+  it('reports no change for two prices seen at the same instant', () => {
+    recordPrice('TESTJ', '100', 5_000);
+    recordPrice('TESTJ', '110', 5_000);
+    // Same timestamp: no elapsed time, so no change can be measured.
+    assert.equal(changePct('TESTJ', 86_400_000, 10_000), null);
+  });
+
   it('sparkline downsamples but always keeps the last point', () => {
     for (let i = 0; i < 100; i++) recordPrice('TESTD', String(100 + i), i * 1000);
     const sp = sparkline('TESTD', 10);

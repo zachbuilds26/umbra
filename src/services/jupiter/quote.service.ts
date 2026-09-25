@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
 import { getConnection } from '../solana/connection.js';
@@ -10,7 +10,6 @@ import { quoteStore } from '../quotes.store.js';
 import { badRequest, upstream, HttpError, type ErrorCode } from '../../utils/errors.js';
 import type { UmbraQuote } from '../../domain/models.js';
 
-Decimal.set({ precision: 40 });
 
 const QUOTE_TTL_S = 60;
 const DEFAULT_SLIPPAGE_BPS = 50;
@@ -729,21 +728,39 @@ async function broadcastSignedSwapOnce(
     throw badRequest('VALIDATION_ERROR', 'Transaction signer does not match userPublicKey.');
   }
   const signature = base58(vtx.signatures[0] as Uint8Array);
-  try {
-    await getConnection().sendRawTransaction(raw, { maxRetries: 3 });
-  } catch (err) {
-    const msg = String((err as Error)?.message ?? err);
-    // Only a genuinely duplicate submission counts as success. BlockhashNotFound
-    // means the transaction was rejected (expired or unknown blockhash), and
-    // reporting it as sent would leave a phantom signature in the ledger.
-    if (!/already processed|alreadyprocessed|transaction already/i.test(msg)) {
-      if (/blockhash/i.test(msg)) {
-        throw badRequest('TRANSACTION_EXPIRED', 'This transaction expired before it was submitted. Request a fresh quote.');
+  // A wallet may broadcast inside signTransaction and still hand us the signed
+  // bytes. Ask the chain before sending: if this signature is already known the
+  // transaction is on its way and must not be relayed again. This also replaces
+  // the old "does the error text look familiar" heuristic with a real check.
+  const conn = getConnection();
+  const alreadyKnown = await conn
+    .getSignatureStatuses([signature], { searchTransactionHistory: true })
+    .then((res) => Boolean(res.value[0]))
+    .catch(() => false);
+  if (!alreadyKnown) {
+    try {
+      await conn.sendRawTransaction(raw, { maxRetries: 3 });
+    } catch (err) {
+      const msg = String((err as Error)?.message ?? err);
+      // Only a genuinely duplicate submission counts as success. BlockhashNotFound
+      // means the transaction was rejected (expired or unknown blockhash), and
+      // reporting it as sent would leave a phantom signature in the ledger.
+      if (!/already processed|alreadyprocessed|transaction already/i.test(msg)) {
+        if (/blockhash/i.test(msg)) {
+          throw badRequest('TRANSACTION_EXPIRED', 'This transaction expired before it was submitted. Request a fresh quote.');
+        }
+        throw upstream('SWAP_UNAVAILABLE', 'We could not submit this swap to Solana. Try again in a moment.');
       }
-      throw upstream('SWAP_UNAVAILABLE', 'We could not submit this swap to Solana. Try again in a moment.');
     }
   }
-  quoteStore.bindSwapSignature(quoteId, userPublicKey, signature);
+  // The swap is on the network from here on, so a failure to file it must be
+  // loud rather than silent — otherwise a trade executes and simply never
+  // appears in the ledger.
+  if (!quoteStore.bindSwapSignature(quoteId, userPublicKey, signature)) {
+    console.error(
+      `[swap] broadcast succeeded but the signature could not be filed quoteId=${quoteId} signature=${signature}`,
+    );
+  }
   return { signature };
 }
 

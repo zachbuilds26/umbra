@@ -30,6 +30,13 @@ import { walletRoutes } from './routes/wallet.js';
  */
 const trustOneProxyHop = (_address: string, hop: number): boolean => hop === 0;
 
+/**
+ * Detail keys the API itself defines and can therefore return verbatim. Anything
+ * else in `HttpError.details` is treated as provider text and logged instead of
+ * being sent to a client.
+ */
+const SAFE_DETAIL_KEYS = new Set(['quoteId', 'bridgeQuoteId', 'symbol', 'issues']);
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -68,11 +75,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setErrorHandler((err, req, reply) => {
     const requestId = req.id;
     if (err instanceof HttpError) {
-      // `details` can carry a provider's own words (a Jupiter/RPC message, an
-      // upstream URL). Those are logged, not returned: clients get our message
-      // and the request id, and nothing about our providers' internals.
+      // `details` may carry a provider's own words (a Jupiter/RPC message, an
+      // upstream URL). Those are logged, never returned. Details the API defines
+      // itself — a quoteId, a symbol — are safe and part of the documented
+      // error contract, so they survive.
       if (err.details && Object.keys(err.details).length > 0) {
-        req.log.warn({ err: err.message, details: err.details, requestId }, 'upstream failure');
+        const safe: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(err.details)) {
+          if (SAFE_DETAIL_KEYS.has(key)) safe[key] = value;
+        }
+        req.log.warn({ err: err.message, details: err.details, requestId }, 'request failed with details');
+        return reply.status(err.statusCode).send(
+          apiError(err.code, err.message, Object.keys(safe).length > 0 ? { ...safe, requestId } : { requestId }),
+        );
       }
       return reply.status(err.statusCode).send(apiError(err.code, err.message, { requestId }));
     }
@@ -145,6 +160,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   // static only answers paths no route claimed.
   const frontendDir = join(process.cwd(), 'frontend');
   if (existsSync(join(frontendDir, 'index.html'))) {
+    // Only the app shell and its curated assets are public. @fastify/static's
+    // `globIgnore` is ignored in its default wildcard mode, so the allowlist is
+    // enforced here: a .log, .map, .bak or .env dropped into frontend/ would
+    // otherwise be downloadable by URL even though .gitignore hides it.
+    const PUBLIC_FILE = /\.(?:html?|js|mjs|css|json|png|jpe?g|gif|svg|webp|avif|ico|woff2?|txt|webmanifest)$/i;
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.url.startsWith('/api/') || req.url.startsWith('/health')) return;
+      const pathOnly = req.url.split('?')[0] ?? '';
+      const lastSegment = pathOnly.slice(pathOnly.lastIndexOf('/') + 1);
+      if (!lastSegment) return; // directory request -> index.html
+      if (PUBLIC_FILE.test(lastSegment)) return;
+      return reply.status(404).send(apiError('NOT_FOUND', 'Not found'));
+    });
     await app.register(fastifyStatic, {
       root: frontendDir,
       prefix: '/',
@@ -152,10 +180,6 @@ export async function buildApp(): Promise<FastifyInstance> {
       // Never publish dotfiles: a .env or editor backup dropped in frontend/
       // is downloadable by URL regardless of .gitignore.
       dotfiles: 'deny',
-      // The whole directory was served, so anything that ever lands in
-      // frontend/ — a local dev log, a source map, a .bak — is public. Only the
-      // app shell and the curated asset folders are meant to be.
-      globIgnore: ['**/*.log', '**/*.map', '**/*.bak', '**/*.tmp', '**/*.ts', '**/*.md'],
       // Asset filenames are stable, not fingerprinted, so a year-long
       // immutable cache would pin visitors to last deploy's logo/script.
       // One day is a real win and still revalidates on every deploy after.

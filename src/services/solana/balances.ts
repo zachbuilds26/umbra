@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import Decimal from '../../utils/decimal.js';
 import { PublicKey } from '@solana/web3.js';
 import { getConnection } from './connection.js';
 import { getMultiplier, SOLANA_USDC_MINT, SOLANA_USDT_MINT } from '../xstocks/assets.service.js';
@@ -10,7 +10,6 @@ import { HttpError } from '../../utils/errors.js';
 import { badRequest } from '../../utils/errors.js';
 import { isValidSolanaAddress } from '../../utils/addresses.js';
 
-Decimal.set({ precision: 40 });
 
 // Mint directory: mint -> { symbol, kind }. Rebuilt every 10 min (new listings flow in).
 const dirCache = new TtlCache<Map<string, { symbol: string; kind: 'stable' | 'xstock' | 'pre' }>>(10 * 60 * 1000);
@@ -163,8 +162,14 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
   // Native SOL is not an SPL token, so it never appears in the account lists —
   // read it directly or the balance line would claim you hold none.
   let nativeSol: WalletBalance | null = null;
+  let solUnknown = false;
   try {
-    const lamports = await conn.getBalance(owner, 'confirmed');
+    // Bounded like every other RPC call here: without a deadline one stalled
+    // provider holds the whole wallet request open indefinitely.
+    const lamports = await Promise.race([
+      conn.getBalance(owner, 'confirmed'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('rpc timeout')), 8_000)),
+    ]);
     if (lamports > 0) {
       nativeSol = {
         symbol: 'SOL',
@@ -176,7 +181,9 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
       };
     }
   } catch {
-    // RPC hiccup: omit SOL rather than claim a zero balance.
+    // RPC hiccup: omit SOL rather than claim a zero balance, and mark the
+    // response partial so the UI shows "unknown", not "0.00".
+    solUnknown = true;
   }
   // Multipliers resolve in parallel but bounded: a wallet holding many xStocks
   // otherwise fans out one unreliable upstream call per holding at once. Keyed by
@@ -196,6 +203,10 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
   }
   const rowsByMint = aggregateByMint(rows);
   const out: WalletBalance[] = [];
+  // A holding we could not price is a holding we could not check, which is just
+  // as "unknown" as a directory we could not load. Both must surface as partial,
+  // or the client reads the missing row as a confirmed zero.
+  let unresolved = false;
   rowsByMint.forEach((r) => {
     const entry = dir.get(r.mint);
     if (!entry) return;
@@ -206,12 +217,16 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
         // An xStock without its live multiplier cannot be converted to display
         // units. Showing the raw amount would overstate the holding by orders of
         // magnitude, so omit it instead of guessing.
-        if (!multByMint.has(r.mint)) return;
+        if (!multByMint.has(r.mint)) {
+          unresolved = true;
+          return;
+        }
         display = toDisplayBalance(entry.kind, r.amount, r.decimals, multByMint.get(r.mint) ?? null);
       } else {
         display = toDisplayBalance(entry.kind, r.amount, r.decimals, null);
       }
     } catch {
+      unresolved = true;
       return; // unconvertible holding: skip rather than print NaN
     }
     out.push({
@@ -224,8 +239,7 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
   });
   if (nativeSol) out.push(nativeSol);
   out.sort((a, b) => a.symbol.localeCompare(b.symbol));
-  // `partial` tells the client that assets may be missing from this list because
-  // the mint directory could not be loaded, so an absent row means "unknown",
-  // not "you hold none".
-  return { balances: out, partial: !directoryComplete };
+  // `partial` tells the client that assets may be missing from this list, so an
+  // absent row means "unknown", not "you hold none".
+  return { balances: out, partial: !directoryComplete || unresolved || solUnknown };
 }

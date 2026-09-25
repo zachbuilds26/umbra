@@ -203,28 +203,39 @@ export async function updateTransaction(
   patch: Partial<Pick<UmbraTransaction, 'status' | 'destinationTxHash' | 'destinationAmount' | 'ccipMessageId' | 'errorCode' | 'errorMessage' | 'sourceTxHash' | 'providerReference'>>,
   ownerWallet?: string,
 ): Promise<UmbraTransaction | undefined> {
+  // The in-memory path must stay synchronous from read to write. Awaiting the
+  // current row first let two concurrent updates both observe `submitted` and
+  // both write, so a late `failed` could overwrite a `confirmed`. Postgres gets
+  // the same guarantee from the compare-and-set in its UPDATE.
+  if (!isPg()) {
+    const existing = mem.get(id);
+    if (!existing) return undefined;
+    if (ownerWallet && !owns(existing, ownerWallet)) return undefined;
+    const nextStatus = patch.status === undefined
+      ? existing.status
+      : normalizeStatus(existing.type, patch.status);
+    // Reject an illegal move: a late confirmation callback must not overwrite a
+    // finished transaction, and a retry must not resurrect one.
+    if (!canTransition(existing.type, existing.status, nextStatus)) {
+      return { ...existing };
+    }
+    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    const updated: UmbraTransaction = {
+      ...existing,
+      ...defined,
+      status: nextStatus,
+      updatedAt: now(),
+    };
+    mem.set(id, updated);
+    return { ...updated };
+  }
   const current = await getTransaction(id, ownerWallet);
   if (!current) return undefined;
-  // Reject an illegal move before touching storage: a late confirmation callback
-  // must not overwrite a finished transaction, and a retry must not resurrect one.
   if (patch.status !== undefined) {
     const next = normalizeStatus(current.type, patch.status);
     if (!canTransition(current.type, current.status, next)) {
       return current;
     }
-  }
-  if (!isPg()) {
-    const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-    const updated: UmbraTransaction = {
-      ...current,
-      ...defined,
-      status: patch.status === undefined
-        ? current.status
-        : normalizeStatus(current.type, patch.status),
-      updatedAt: now(),
-    };
-    mem.set(id, updated);
-    return { ...updated };
   }
   const sets: string[] = [];
   const vals: unknown[] = [];

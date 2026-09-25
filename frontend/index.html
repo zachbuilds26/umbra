@@ -3589,23 +3589,34 @@
           if (!walletProvider || !walletProvider.signTransaction) throw new Error('Connected wallet cannot sign.');
           var signed = await walletProvider.signTransaction(vtx);
           if (window.umbraWallet !== wallet) throw new Error('Wallet changed — nothing was sent.');
-          // 3) Send it. A signed transaction that is never broadcast can never
-          //    confirm, so the wallet's sign-only result is relayed over our
-          //    RPC here; wallets that already broadcast report __sig instead.
-          var sig = signed.__sig || null;
-          if (!sig) {
-            paintSwapTitle('Submitting…', '');
-            var bcRes = await fetch(API_BASE + '/api/swap/broadcast', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                quoteId: q.quoteId,
-                userPublicKey: wallet,
-                signedTransaction: bs64encode(signed.serialize()),
-              }),
-            });
-            var bcData = await bcRes.json();
-            if (!bcRes.ok) throw new Error((bcData.error && bcData.error.message) || 'Could not submit the swap.');
+          // 3) Always tell the backend which transaction was signed.
+          //
+          // Some providers broadcast inside signTransaction and hand back only
+          // {__sig}. Skipping this call for those meant the backend never learned
+          // the signature, so the ledger could not record a swap that had already
+          // executed — the user saw a failure for a trade that went through.
+          // The backend checks the chain first and only relays when the
+          // transaction is not already there, so this is safe either way.
+          paintSwapTitle('Submitting…', '');
+          var bcRes = await fetch(API_BASE + '/api/swap/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quoteId: q.quoteId,
+              userPublicKey: wallet,
+              signedTransaction: bs64encode(signed.serialize()),
+            }),
+          });
+          var bcData = await bcRes.json();
+          if (!bcRes.ok) {
+            // A wallet that already broadcast and then failed this call must not
+            // be told the swap did not happen: it may well have executed.
+            if (signed.__sig) {
+              sig = signed.__sig;
+            } else {
+              throw new Error((bcData.error && bcData.error.message) || 'Could not submit the swap.');
+            }
+          } else {
             sig = bcData.signature;
           }
           // 4) Backend records + confirms
@@ -3615,7 +3626,26 @@
             body: JSON.stringify({ quoteId: q.quoteId, signature: sig, wallet: wallet }),
           });
           var subData = await subRes.json();
-          if (!subRes.ok) throw new Error((subData.error && subData.error.message) || 'Submission rejected.');
+          if (!subRes.ok) {
+            // The transaction is already on chain at this point. A failed ledger
+            // write is a backend problem, not a failed swap, so say exactly that
+            // and show the signature instead of inviting a retry that would
+            // trade a second time.
+            if (sig) {
+              swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
+              swapExplorerEl.style.display = 'block';
+              executing = false;
+              paintSwapTitle('Swap submitted — not yet recorded', '');
+              swapErrorEl.style.display = 'flex';
+              swapErrorEl.classList.remove('shake', 'tone-bad');
+              swapErrorEl.textContent = 'Your transaction was sent. Umbra could not save it to your activity yet — check the explorer link for its status.';
+              swapRetryBtn.style.display = 'none';
+              if (typeof refreshActivity === 'function') refreshActivity();
+              if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+              return;
+            }
+            throw new Error((subData.error && subData.error.message) || 'Submission rejected.');
+          }
           // 5) Poll to finality
           paintSwapTitle('Confirming on Solana…', '');
           var final = await pollTx(subData.id, wallet);
