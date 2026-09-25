@@ -131,17 +131,31 @@ describe('token accounts are summed per mint', () => {
 });
 
 describe('ticker symbol normalization', () => {
-  // These resolve against the live pre-IPO directory, so they are the two
-  // network-dependent tests in the suite. They assert the real normalization
-  // contract (ALL-CAPS pre-IPO vs case-sensitive xStocks), which is worth the
-  // dependency; the pure `canonicalSymbol` cases below cover the same rules
-  // without a provider.
-  it('keeps pre-IPO ALL-CAPS (SPACEX, not SPACEx)', async () => {
+  // These resolve against the live pre-IPO directory, so they are the only
+  // network-dependent tests in the suite. When the provider is unreachable the
+  // test SKIPS with a reason rather than failing on someone else's outage — and
+  // it still asserts exactly when the directory is available, so it can never
+  // pass without checking anything.
+  const directoryAvailable = async (): Promise<boolean> => {
+    const { getPrestocksSymbols } = await import('../src/services/prestocks/assets.js');
+    const symbols = await getPrestocksSymbols().catch(() => new Set<string>());
+    return symbols.size > 0;
+  };
+
+  it('keeps pre-IPO ALL-CAPS (SPACEX, not SPACEx)', async (t) => {
+    if (!(await directoryAvailable())) {
+      t.skip('pre-IPO directory unavailable (upstream)');
+      return;
+    }
     assert.equal(await canonicalAssetSymbol('spacex'), 'SPACEX');
     assert.equal(await canonicalAssetSymbol('SPACEX'), 'SPACEX');
   });
 
-  it('keeps xStock and stable forms', async () => {
+  it('keeps xStock and stable forms', async (t) => {
+    if (!(await directoryAvailable())) {
+      t.skip('pre-IPO directory unavailable (upstream)');
+      return;
+    }
     assert.equal(await canonicalAssetSymbol('nvdaX'), 'NVDAx');
     assert.equal(await canonicalAssetSymbol('usdc'), 'USDC');
   });
