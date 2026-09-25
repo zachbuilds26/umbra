@@ -2,6 +2,7 @@ import Decimal from '../../utils/decimal.js';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
 import { getConnection, withRpcDeadline } from '../solana/connection.js';
+import { collectRouteMints, estimateSolRequirement, describeSolShortfall } from '../solana/preflight.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
 import { displayToBaseUnits, baseUnitsToDisplay } from '../solana/multiplier.js';
 import { isValidSolanaAddress } from '../../utils/addresses.js';
@@ -180,12 +181,65 @@ export function classifyJupiterFailure(input: {
   };
 }
 
+/**
+ * When Jupiter declines a taker order, find out whether the wallet can actually
+ * pay before blaming the route.
+ *
+ * The decline is opaque: HTTP 400 with "Failed to get quotes" is what a wallet
+ * that cannot open the token accounts the route needs looks like, and reporting
+ * that as "no executable route" told users their pair was broken when their
+ * balance was the problem. A quote-only order for the same pair still succeeds,
+ * so it yields the real route, and the missing accounts can be priced on chain.
+ *
+ * Returns null whenever the answer is not certain, so the caller keeps its
+ * original classification rather than replacing a real reason with a guess.
+ */
+async function walletCannotPayError(args: {
+  inputMint: string;
+  outputMint: string;
+  amountBaseUnits: string;
+  slippageBps: number;
+  taker?: string;
+  buySymbol?: string | null;
+}): Promise<HttpError | null> {
+  if (!args.taker) return null;
+  try {
+    const quoteOnly = await getJupiterOrder({
+      inputMint: args.inputMint,
+      outputMint: args.outputMint,
+      amountBaseUnits: args.amountBaseUnits,
+      slippageBps: args.slippageBps,
+    });
+    const mints = collectRouteMints(quoteOnly.data?.routePlan);
+    if (mints.length === 0) mints.push(args.inputMint, args.outputMint);
+    const requirement = await estimateSolRequirement({ owner: args.taker, mints });
+    if (!requirement || requirement.shortfallLamports <= 0) return null;
+    const solPrice = await getPrice('SOL').catch(() => null);
+    return upstream(
+      'INSUFFICIENT_BALANCE',
+      describeSolShortfall(requirement, {
+        buySymbol: args.buySymbol ?? null,
+        solUsdPrice: solPrice?.value ?? null,
+      }),
+      {
+        shortfallLamports: requirement.shortfallLamports,
+        requiredLamports: requirement.requiredLamports,
+        availableLamports: requirement.availableLamports,
+        missingAccounts: requirement.missingMints.length,
+      },
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function fetchOrder(args: {
   inputMint: string;
   outputMint: string;
   amountBaseUnits: string;
   taker?: string;
   slippageBps: number;
+  buySymbol?: string | null;
 }): Promise<JupiterOrderResponse> {
   let res;
   try {
@@ -203,6 +257,8 @@ async function fetchOrder(args: {
     if (res.status === 429) {
       throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
     }
+    const shortfall = await walletCannotPayError({ ...args, buySymbol: args.buySymbol });
+    if (shortfall) throw shortfall;
     const classified = classifyJupiterFailure({ status: res.status, hasTaker });
     throw upstream(classified.code, classified.message, { reason: classified.reason });
   }
@@ -211,6 +267,8 @@ async function fetchOrder(args: {
   // back without one is a failure: either Jupiter flagged it, or it silently
   // declined. Both must be classified, never passed on as a usable order.
   if (order.errorCode || (hasTaker && !order.transaction)) {
+    const shortfall = await walletCannotPayError({ ...args, buySymbol: args.buySymbol });
+    if (shortfall) throw shortfall;
     const classified = classifyJupiterFailure({
       status: res.status,
       errorCode: order.errorCode,
@@ -343,6 +401,7 @@ export async function buildSwapQuote(params: {
     amountBaseUnits,
     taker,
     slippageBps,
+    buySymbol: buySide.symbol,
   });
   logSwapAttempt({
     stage: 'quote',
@@ -572,6 +631,7 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
     amountBaseUnits: stored.amountBaseUnits,
     taker: userPublicKey,
     slippageBps: stored.slippageBps,
+    buySymbol: stored.buySymbol,
   });
   if (!order.transaction) {
     logSwapAttempt({
