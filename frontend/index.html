@@ -4764,16 +4764,33 @@
         return null;
       };
       var normalizeSigned = function (out) {
-        if (out && out.signatures) return out;
-        var raw = null;
-        if (out instanceof Uint8Array) raw = out;
-        else if (out && out.signedTransaction instanceof Uint8Array) raw = out.signedTransaction;
-        else if (Array.isArray(out) && out.length) {
-          var f = out[0];
-          raw = f instanceof Uint8Array ? f : (f && f.signedTransaction instanceof Uint8Array ? f.signedTransaction : null);
+        var tx = null;
+        if (out && out.signatures) tx = out;
+        else {
+          var raw = null;
+          if (out instanceof Uint8Array) raw = out;
+          else if (out && out.signedTransaction instanceof Uint8Array) raw = out.signedTransaction;
+          else if (Array.isArray(out) && out.length) {
+            var f = out[0];
+            raw = f instanceof Uint8Array ? f : (f && f.signedTransaction instanceof Uint8Array ? f.signedTransaction : null);
+          }
+          if (raw && raw.length) tx = VersionedTransaction.deserialize(raw);
         }
-        if (raw && raw.length) return VersionedTransaction.deserialize(raw);
-        throw new Error('Wallet returned an unusable signature.');
+        if (!tx) throw new Error('Wallet returned an unusable signature.');
+        // A provider that resolves without signing (passes the unsigned bytes
+        // back through) must count as a failure, not a signature: otherwise an
+        // unsigned transaction reaches the backend and dies there as "not
+        // fully signed". Only the taker's own slot is checked — JupiterZ routes
+        // leave the market-maker slot empty until /execute co-signs.
+        try {
+          var s0 = tx.signatures && tx.signatures[0];
+          if (s0 && s0.length) {
+            for (var i = 0; i < s0.length; i++) {
+              if (s0[i] !== 0) return tx;
+            }
+          }
+        } catch (_) {}
+        throw new Error('Wallet returned an unsigned transaction.');
       };
       var injectedCandidates = function () {
         var c = [];
@@ -4781,6 +4798,7 @@
           if (window.phantom && window.phantom.solana) c.push({ name: 'Phantom', p: window.phantom.solana });
           if (window.solflare && window.solflare.isSolflare) c.push({ name: 'Solflare', p: window.solflare });
           if (window.backpack) c.push({ name: 'Backpack', p: window.backpack });
+          if (window.okxwallet && window.okxwallet.solana) c.push({ name: 'OKX', p: window.okxwallet.solana });
           if (window.braveSolana) c.push({ name: 'Brave', p: window.braveSolana });
           if (window.glow) c.push({ name: 'Glow', p: window.glow });
           if (window.solana) c.push({ name: 'injected', p: window.solana });
@@ -4852,9 +4870,12 @@
               }
               var pk = c.publicKey ? c.publicKey.toString() : '';
               if (addr && pk && pk !== addr) continue;
-              var signed = await c.signTransaction(vtx);
-              if (signed && signed.signatures) return signed;
-              notes.push(entry.name + ': empty result');
+              try {
+                return normalizeSigned(await c.signTransaction(vtx));
+              } catch (e) {
+                if (rejected(e)) throw e;
+                notes.push(entry.name + ': ' + shortErr(e));
+              }
             } catch (e) {
               if (rejected(e)) throw e;
               notes.push(entry.name + ': ' + shortErr(e));

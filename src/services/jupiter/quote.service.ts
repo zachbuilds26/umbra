@@ -1,6 +1,6 @@
 import Decimal from '../../utils/decimal.js';
 import { Transaction, VersionedTransaction, PublicKey } from '@solana/web3.js';
-import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
+import { getJupiterOrder, postJupiterExecute, type JupiterOrderResponse } from './client.js';
 import { getConnection, withRpcDeadline } from '../solana/connection.js';
 import { collectRouteMints, estimateSolRequirement, describeSolShortfall, readInputBalanceBaseUnits, describeInputShortfall, coversAmount } from '../solana/preflight.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
@@ -769,6 +769,30 @@ export async function broadcastSignedSwap(
   return task;
 }
 
+/** Submit wallet-signed bytes to Jupiter's managed landing pipeline and return
+ * the landed signature. JupiterZ routes must go this way: the market maker
+ * co-signs inside /execute, so our own RPC could never land them. */
+async function executeViaJupiter(signedTransactionB64: string, requestId: string): Promise<string> {
+  let res: { status: number; data?: import('./client.js').JupiterExecuteResponse };
+  try {
+    res = await postJupiterExecute({ signedTransaction: signedTransactionB64, requestId });
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw upstream('SWAP_UNAVAILABLE', 'We could not submit this swap. Try again in a moment.');
+  }
+  if (res.status === 429) {
+    throw new HttpError(429, 'RATE_LIMITED', 'Quote provider is rate limiting us — retry in a moment.');
+  }
+  const body = res.data;
+  if (body?.status === 'Success' && typeof body.signature === 'string' && body.signature) {
+    return body.signature;
+  }
+  const reason = `jupiter execute status=${body?.status ?? 'none'} code=${body?.code ?? 'none'} http=${res.status}`;
+  throw upstream('TRANSACTION_FAILED', 'The swap could not land. Request a fresh quote and try again.', {
+    reason,
+  });
+}
+
 async function broadcastSignedSwapOnce(
   quoteId: string,
   input: { signedTransaction?: string; signature?: string },
@@ -851,11 +875,21 @@ async function broadcastSignedSwapOnce(
   }
 
   // Every required signature slot must be filled. Checking only the first slot
-  // let a partially signed transaction through.
+  // let a partially signed transaction through. JupiterZ routes are the one
+  // exception: the market maker co-signs inside /execute, so only the taker's
+  // own slot can be filled at this point — demanding the rest would reject
+  // every JupiterZ swap as "not fully signed".
   const required = vtx.message.header?.numRequiredSignatures ?? 0;
-  for (let i = 0; i < required; i++) {
-    if (isZeroSig(vtx.signatures[i])) {
-      throw badRequest('VALIDATION_ERROR', 'Transaction is not fully signed.');
+  const isJupiterZ = (stored.routeVenue ?? '').toLowerCase() === 'jupiterz';
+  if (isJupiterZ) {
+    if (required === 0 || isZeroSig(vtx.signatures[0])) {
+      throw badRequest('VALIDATION_ERROR', 'Wallet did not sign the transaction.');
+    }
+  } else {
+    for (let i = 0; i < required; i++) {
+      if (isZeroSig(vtx.signatures[i])) {
+        throw badRequest('VALIDATION_ERROR', 'Transaction is not fully signed.');
+      }
     }
   }
   // web3.js 1.x keeps signatures as raw bytes: the signer is the message's
@@ -875,18 +909,28 @@ async function broadcastSignedSwapOnce(
     .then((res) => Boolean(res.value[0]))
     .catch(() => false);
   if (!alreadyKnown) {
-    try {
-      await conn.sendRawTransaction(raw, { maxRetries: 3 });
-    } catch (err) {
-      const msg = String((err as Error)?.message ?? err);
-      // Only a genuinely duplicate submission counts as success. BlockhashNotFound
-      // means the transaction was rejected (expired or unknown blockhash), and
-      // reporting it as sent would leave a phantom signature in the ledger.
-      if (!/already processed|alreadyprocessed|transaction already/i.test(msg)) {
-        if (/blockhash/i.test(msg)) {
-          throw badRequest('TRANSACTION_EXPIRED', 'This transaction expired before it was submitted. Request a fresh quote.');
+    if (isJupiterZ) {
+      if (!stored.jupiterRequestId) {
+        throw badRequest('QUOTE_EXPIRED', 'This quote is too old to execute. Request a fresh quote.');
+      }
+      const landed = await executeViaJupiter(signedTransactionB64, stored.jupiterRequestId);
+      if (landed !== signature) {
+        throw upstream('SWAP_UNAVAILABLE', 'The swap landed under a different signature. Check the explorer before retrying.');
+      }
+    } else {
+      try {
+        await conn.sendRawTransaction(raw, { maxRetries: 3 });
+      } catch (err) {
+        const msg = String((err as Error)?.message ?? err);
+        // Only a genuinely duplicate submission counts as success. BlockhashNotFound
+        // means the transaction was rejected (expired or unknown blockhash), and
+        // reporting it as sent would leave a phantom signature in the ledger.
+        if (!/already processed|alreadyprocessed|transaction already/i.test(msg)) {
+          if (/blockhash/i.test(msg)) {
+            throw badRequest('TRANSACTION_EXPIRED', 'This transaction expired before it was submitted. Request a fresh quote.');
+          }
+          throw upstream('SWAP_UNAVAILABLE', 'We could not submit this swap to Solana. Try again in a moment.');
         }
-        throw upstream('SWAP_UNAVAILABLE', 'We could not submit this swap to Solana. Try again in a moment.');
       }
     }
   }

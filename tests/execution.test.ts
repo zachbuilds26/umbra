@@ -1,6 +1,7 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { Keypair, PublicKey, SystemProgram, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
+import { Keypair, PublicKey, SystemProgram, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { quoteStore } from '../src/services/quotes.store.js';
 import { broadcastSignedSwap, computePriceImpactBps } from '../src/services/jupiter/quote.service.js';
 import { createTransaction, updateTransaction, getTransaction } from '../src/db/transactions.store.js';
@@ -144,6 +145,111 @@ describe('broadcast only accepts this quote\'s own transaction', () => {
     await assert.rejects(
       () => broadcastSignedSwap(quoteId, { signature: '4'.repeat(88) }, kp.publicKey.toBase58()),
       /not visible on Solana|not the transaction for this quote/,
+    );
+  });
+});
+
+describe('jupiterz routes land through /execute, not our RPC', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  function stubExecute(reply: unknown, status = 200): void {
+    globalThis.fetch = (async () => ({
+      status,
+      ok: status >= 200 && status < 300,
+      text: async () => JSON.stringify(reply),
+    })) as typeof fetch;
+  }
+
+  // A message with two required signers (taker + market maker), like a real
+  // JupiterZ order. The wallet can only ever fill the first slot.
+  function jupiterzUnsigned(payer: PublicKey, marketMaker: PublicKey): string {
+    const message = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: BLOCKHASH,
+      instructions: [
+        new TransactionInstruction({
+          keys: [{ pubkey: marketMaker, isSigner: true, isWritable: false }],
+          programId: SystemProgram.programId,
+          data: Buffer.alloc(0),
+        }),
+      ],
+    }).compileToV0Message();
+    assert.equal(message.header.numRequiredSignatures, 2);
+    return Buffer.from(new VersionedTransaction(message).serialize()).toString('base64');
+  }
+
+  it('accepts the taker signature alone and lands via /execute', async () => {
+    const payer = Keypair.generate();
+    const unsigned = jupiterzUnsigned(payer.publicKey, Keypair.generate().publicKey);
+    const vtx = VersionedTransaction.deserialize(Buffer.from(unsigned, 'base64'));
+    vtx.sign([payer]);
+    const expectedSig = bs58.encode(Buffer.from(vtx.signatures[0] as Uint8Array));
+    stubExecute({ status: 'Success', signature: expectedSig, code: 0 });
+    const quoteId = putQuote({
+      taker: payer.publicKey.toBase58(),
+      transaction: unsigned,
+      routeVenue: 'jupiterz',
+      jupiterRequestId: 'req-jup',
+    });
+    const out = await broadcastSignedSwap(
+      quoteId,
+      { signedTransaction: Buffer.from(vtx.serialize()).toString('base64') },
+      payer.publicKey.toBase58(),
+    );
+    assert.equal(out.signature, expectedSig);
+    assert.equal(quoteStore.getSwap(quoteId)?.signature, expectedSig);
+  });
+
+  it('still rejects a jupiterz transaction the wallet did not sign', async () => {
+    const payer = Keypair.generate();
+    const unsigned = jupiterzUnsigned(payer.publicKey, Keypair.generate().publicKey);
+    const quoteId = putQuote({
+      taker: payer.publicKey.toBase58(),
+      transaction: unsigned,
+      routeVenue: 'jupiterz',
+    });
+    await assert.rejects(
+      () => broadcastSignedSwap(quoteId, { signedTransaction: unsigned }, payer.publicKey.toBase58()),
+      /did not sign/,
+    );
+  });
+
+  it('reports an /execute failure without filing a signature', async () => {
+    const payer = Keypair.generate();
+    const unsigned = jupiterzUnsigned(payer.publicKey, Keypair.generate().publicKey);
+    const vtx = VersionedTransaction.deserialize(Buffer.from(unsigned, 'base64'));
+    vtx.sign([payer]);
+    stubExecute({ status: 'Failed', code: -1003, error: 'Transaction not fully signed' });
+    const quoteId = putQuote({
+      taker: payer.publicKey.toBase58(),
+      transaction: unsigned,
+      routeVenue: 'jupiterz',
+      jupiterRequestId: 'req-jup',
+    });
+    await assert.rejects(
+      () =>
+        broadcastSignedSwap(
+          quoteId,
+          { signedTransaction: Buffer.from(vtx.serialize()).toString('base64') },
+          payer.publicKey.toBase58(),
+        ),
+      /could not land/,
+    );
+    assert.equal(quoteStore.getSwap(quoteId)?.signature, null);
+  });
+
+  it('keeps aggregator routes on our own RPC path', async () => {
+    // routeVenue metis with an unsigned tx must fail exactly as before —
+    // the jupiterz exception must not leak into the default path.
+    const kp = Keypair.generate();
+    const unsigned = unsignedTxB64(new PublicKey(ANTHROPIC), 1, kp.publicKey);
+    const quoteId = putQuote({ taker: kp.publicKey.toBase58(), transaction: unsigned, routeVenue: 'metis' });
+    await assert.rejects(
+      () => broadcastSignedSwap(quoteId, { signedTransaction: unsigned }, kp.publicKey.toBase58()),
+      /not fully signed/,
     );
   });
 });
