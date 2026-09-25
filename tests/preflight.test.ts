@@ -4,6 +4,7 @@ import {
   collectRouteMints,
   computeSolRequirement,
   coversAmount,
+  describeInputShortfall,
   describeSolShortfall,
   lamportsToSol,
 } from '../src/services/solana/preflight.js';
@@ -148,5 +149,20 @@ describe('input token coverage', () => {
     assert.equal(coversAmount('-1', '0'), false);
     assert.equal(coversAmount(null, '70000'), false);
     assert.equal(coversAmount('70000', undefined), false);
+  });
+});
+
+describe('input shortfall message', () => {
+  it('names the token and the balance, briefly', () => {
+    const msg = describeInputShortfall('USDC', '0.070019');
+    assert.match(msg, /insufficient usdc/i);
+    assert.match(msg, /0\.070019/);
+    assert.ok(msg.length <= 60, `must stay brief, got ${msg.length} chars: ${msg}`);
+  });
+
+  it('stays brief when the balance cannot be displayed', () => {
+    const msg = describeInputShortfall('NVDAx', null);
+    assert.match(msg, /insufficient nvda/i);
+    assert.ok(msg.length <= 60, `must stay brief, got ${msg.length} chars: ${msg}`);
   });
 });

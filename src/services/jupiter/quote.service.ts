@@ -1,8 +1,8 @@
 import Decimal from '../../utils/decimal.js';
-import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Transaction, VersionedTransaction, PublicKey } from '@solana/web3.js';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
 import { getConnection, withRpcDeadline } from '../solana/connection.js';
-import { collectRouteMints, estimateSolRequirement, describeSolShortfall } from '../solana/preflight.js';
+import { collectRouteMints, estimateSolRequirement, describeSolShortfall, readInputBalanceBaseUnits, describeInputShortfall, coversAmount } from '../solana/preflight.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
 import { displayToBaseUnits, baseUnitsToDisplay } from '../solana/multiplier.js';
 import { isValidSolanaAddress } from '../../utils/addresses.js';
@@ -398,6 +398,23 @@ export async function buildSwapQuote(params: {
   // could carry — reject it here rather than let the provider return nonsense.
   if (BigInt(amountBaseUnits) > U64_MAX) {
     throw badRequest('VALIDATION_ERROR', 'Amount is too large for Solana. Reduce the amount.');
+  }
+
+  if (taker) {
+    try {
+      const held = await readInputBalanceBaseUnits(new PublicKey(taker), sellSide.mint);
+      if (held !== null && !coversAmount(held, amountBaseUnits)) {
+        let display: string | null = null;
+        try {
+          display = await fromBaseUnits(sellSide.symbol, held);
+        } catch {
+          display = null;
+        }
+        throw upstream('INSUFFICIENT_BALANCE', describeInputShortfall(sellSide.symbol, display));
+      }
+    } catch (err) {
+      if (err instanceof HttpError && err.code === 'INSUFFICIENT_BALANCE') throw err;
+    }
   }
 
   const order = await fetchOrder({

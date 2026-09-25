@@ -91,11 +91,10 @@ export function coversAmount(heldAtomic: unknown, neededAtomic: unknown): boolea
   }
 }
 
-async function inputBalanceCovers(
+export async function readInputBalanceBaseUnits(
   owner: PublicKey,
   inputMint: string,
-  inputAmountBaseUnits: string,
-): Promise<boolean | null> {
+): Promise<string | null> {
   let mint: PublicKey;
   try {
     mint = new PublicKey(inputMint);
@@ -117,15 +116,28 @@ async function inputBalanceCovers(
   } catch {
     return null;
   }
-  if (!info) return false;
+  if (!info) return '0';
   if (info.data.length < 72) return null;
-  let held: bigint;
   try {
-    held = info.data.readBigUInt64LE(64);
+    return info.data.readBigUInt64LE(64).toString();
   } catch {
     return null;
   }
-  return coversAmount(held.toString(), inputAmountBaseUnits);
+}
+
+async function inputBalanceCovers(
+  owner: PublicKey,
+  inputMint: string,
+  inputAmountBaseUnits: string,
+): Promise<boolean | null> {
+  const held = await readInputBalanceBaseUnits(owner, inputMint);
+  if (held === null) return null;
+  return coversAmount(held, inputAmountBaseUnits);
+}
+
+export function describeInputShortfall(symbol: string, heldDisplay: string | null): string {
+  if (heldDisplay === null) return `Insufficient ${symbol} for this swap.`;
+  return `Insufficient ${symbol} — balance ${heldDisplay}.`;
 }
 
 export async function estimateSolRequirement(args: {
