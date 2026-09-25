@@ -147,7 +147,7 @@ export function classifyJupiterFailure(input: {
     return {
       code: 'INSUFFICIENT_BALANCE',
       message:
-        'Your wallet cannot cover this swap yet. It needs the token you are selling plus a little SOL for the network fee and to open the destination account.',
+        'Insufficient funds — your wallet needs the token plus a little SOL for fees.',
       reason,
     };
   }

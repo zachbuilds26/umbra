@@ -135,33 +135,24 @@ export function lamportsToSol(lamports: number): string {
   return new Decimal(lamports).div(new Decimal(10).pow(9)).toFixed(6);
 }
 
-function withUsd(lamports: number, solUsdPrice: string | null): string {
-  const sol = new Decimal(lamports).div(new Decimal(10).pow(9));
-  if (!solUsdPrice) return `${sol.toFixed(6)} SOL`;
-  let usd: string;
-  try {
-    usd = sol.mul(new Decimal(solUsdPrice)).toFixed(2);
-  } catch {
-    return `${sol.toFixed(6)} SOL`;
-  }
-  return `${sol.toFixed(6)} SOL ($${usd})`;
-}
-
 export function describeSolShortfall(
   requirement: SolRequirement,
   opts: { buySymbol?: string | null; solUsdPrice?: string | null } = {},
 ): string {
-  const price = opts.solUsdPrice ?? null;
-  const accounts = requirement.missingMints.length;
-  const dest = opts.buySymbol ? ` to receive ${opts.buySymbol}` : '';
-  const opening =
-    accounts === 0
-      ? 'no new accounts'
-      : `${accounts} new token account${accounts === 1 ? '' : 's'}${dest}`;
-  const target = withUsd(requirement.requiredLamports, price);
-  const held = withUsd(requirement.availableLamports, price);
+  void opts;
   if (requirement.shortfallLamports <= 0) {
-    return `This route needs ${opening}. Keeping ${target} in SOL covers it, and this wallet holds ${held}.`;
+    return 'Enough SOL for this swap.';
   }
-  return `This route needs ${opening}. We recommend keeping ${target} in SOL for the account rent, network fee and routing margin, and this wallet holds only ${held} — add about ${withUsd(requirement.shortfallLamports, price)} before swapping.`;
+  const sol = new Decimal(requirement.shortfallLamports).div(new Decimal(10).pow(9));
+  const solText = sol.toFixed(6);
+  const price = opts.solUsdPrice ?? null;
+  if (!price) return `Insufficient funds — add about ${solText} SOL to swap.`;
+  let usd: string | null = null;
+  try {
+    usd = sol.mul(new Decimal(price)).toFixed(2);
+  } catch {
+    usd = null;
+  }
+  if (usd === null) return `Insufficient funds — add about ${solText} SOL to swap.`;
+  return `Insufficient funds — add about ${solText} SOL ($${usd}) to swap.`;
 }

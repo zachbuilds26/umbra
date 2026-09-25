@@ -2403,10 +2403,17 @@
       function updateActionBtn() {
         var action = document.getElementById('actionBtn');
         if (window.umbraWallet) {
-          action.removeAttribute('disabled');
-          action.textContent = 'Swap';
-          action.title = 'Sign and submit this swap';
-          action.setAttribute('aria-label', 'Swap now');
+          if (typeof swapBlocked !== 'undefined' && swapBlocked === 'INSUFFICIENT_BALANCE') {
+            action.setAttribute('disabled', '');
+            action.textContent = 'Insufficient funds';
+            action.title = 'Not enough SOL to open the accounts this swap needs';
+            action.setAttribute('aria-label', 'Insufficient funds for this swap');
+          } else {
+            action.removeAttribute('disabled');
+            action.textContent = 'Swap';
+            action.title = 'Sign and submit this swap';
+            action.setAttribute('aria-label', 'Swap now');
+          }
         } else {
           action.setAttribute('disabled', '');
           action.textContent = 'Connect Wallet';
@@ -3034,6 +3041,7 @@
         // Invalidate instantly. Leaving the old quoteId around let a swap sign
         // a transaction for terms the UI had already changed.
         lastQuote = null;
+        swapBlocked = null;
         window.umbraLastReceive = null;
         var amt = (sellAmountEl.value || '').trim();
         if (amt && Number(amt) > 0) {
@@ -3099,7 +3107,7 @@
         // problem into "thin liquidity — try a smaller amount", which sent people
         // to shrink an amount that was never the cause.
         if (code === 'INSUFFICIENT_BALANCE') {
-          return msg || 'Your wallet cannot cover this swap — it needs the token you are selling plus a little SOL for fees.';
+          return msg || 'Insufficient funds — top up SOL to swap.';
         }
         if (code === 'NO_ROUTE') {
           return msg || 'No executable route is currently available for this pair.';
@@ -3124,6 +3132,8 @@
         return 'Quote unavailable right now — try again in a moment.';
       }
       function quoteError(msg, code) {
+        swapBlocked = code === 'INSUFFICIENT_BALANCE' ? code : null;
+        try { updateActionBtn(); } catch (_) {}
         msg = friendlyQuoteError(code, msg);
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
@@ -3187,6 +3197,8 @@
           quoteLinesEl.hidden = true;
           quoteLinesEl.innerHTML = '';
           lastQuote = null;
+          swapBlocked = null;
+          try { updateActionBtn(); } catch (_) {}
           window.umbraLastReceive = null;
           resetQuoteSummary();
           paintDetailToggle();
@@ -3268,6 +3280,8 @@
             // a swap can never be signed against a stale amount/pair/slippage.
             key: amt + '|' + sellSym + '|' + buySym + '|' + slippageBps,
           };
+          swapBlocked = null;
+          try { updateActionBtn(); } catch (_) {}
           var impact = data.priceImpactBps === null || data.priceImpactBps === undefined ? '—' : (data.priceImpactBps / 100).toFixed(2) + '%';
           // No fee rows here: the wallet shows the network fee at signing time.
           var html =
@@ -3423,6 +3437,7 @@
 
       /* ---------- Swap execution + status modal ---------- */
       var lastQuote = null;
+      var swapBlocked = null;
       var swapModalEl = document.getElementById('swapModal');
       var swapTitleEl = document.getElementById('swapModalTitle');
       var swapExplorerEl = document.getElementById('swapExplorer');
@@ -3538,6 +3553,7 @@
       async function executeSwap() {
         if (executing) return;
         if (!window.umbraWallet) { resetRetryBtn(); connectWallet(); return; }
+        if (swapBlocked === 'INSUFFICIENT_BALANCE') { resetRetryBtn(); return; }
         var amt = (sellAmountEl.value || '').trim();
         if (!amt || Number(amt) <= 0) { resetRetryBtn(); return; }
         // Snapshot the wallet: switching accounts mid-flow must never build,

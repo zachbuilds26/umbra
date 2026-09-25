@@ -117,7 +117,7 @@ describe('routing failure classification', () => {
     });
     assert.equal(r.code, 'INSUFFICIENT_BALANCE');
     assert.notEqual(r.code, 'INSUFFICIENT_LIQUIDITY');
-    assert.match(r.message, /wallet cannot cover/i);
+    assert.match(r.message, /insufficient funds/i);
     assert.match(r.message, /SOL/, 'must name the fee currency the wallet is short of');
   });
 
