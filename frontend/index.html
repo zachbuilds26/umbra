@@ -745,28 +745,16 @@
     #buyChange.up { color: var(--umbra-accent); }
     #buyChange.down { color: #f6465d; }
 
-    .details-toggle {
+    .details-label {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
       width: 100%;
-      background: none;
-      border: 0;
-      color: var(--umbra-accent);
+      color: var(--umbra-muted);
       font-family: var(--umbra-font-body);
       font-size: 13px;
       font-weight: 600;
       padding: 12px 0 0;
-      cursor: pointer;
-    }
-
-    .details-toggle svg {
-      transition: transform 0.15s ease;
-    }
-
-    .details-toggle[aria-expanded="true"] svg {
-      transform: rotate(180deg);
     }
 
     .swap-tools {
@@ -987,11 +975,6 @@
     @keyframes dot-bounce {
       0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
       30% { transform: translateY(-4px); opacity: 1; }
-    }
-
-    .details-toggle[disabled] {
-      opacity: 0.4;
-      cursor: not-allowed;
     }
 
     .swap-action {
@@ -1434,7 +1417,7 @@
       .swap-tab { font-size: 14px; }
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
-      .details-toggle { font-size: 14px; }
+      .details-label { font-size: 14px; }
 
       /* Tape chips scale with the card so the strip doesn't look like a
          different product sitting above it. */
@@ -1959,10 +1942,7 @@
             </div>
           </div>
 
-          <button class="details-toggle" id="detailToggle" aria-expanded="false" disabled>
-            <span>Show details</span>
-            <i data-lucide="chevron-down" width="14" height="14"></i>
-          </button>
+          <div class="details-label" id="detailsLabel" hidden>Details</div>
 
           <div class="quote-lines" id="quoteLines" hidden></div>
 
@@ -2211,10 +2191,6 @@
           <div style="display:flex; justify-content:space-between;">
             <span style="color:var(--umbra-muted); font-size:13px;">Liquidity</span>
             <span id="drawerLiquidity" style="font-size:13px;">—</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-            <span style="color:var(--umbra-muted); font-size:13px;">Pyth reference<span class="info-icon" data-tip="Pyth's feed for this underlying (equity, gold, FX) and how far the token trades from it."><i data-lucide="info" width="14" height="14"></i></span></span>
-            <span id="drawerPyth" style="font-size:13px;">—</span>
           </div>
           <div style="text-align:center; margin-top:8px;">
             <a id="drawerSolscan" href="#" target="_blank" rel="noreferrer" style="font-size:13px; color:var(--umbra-accent); text-decoration:none; display:none; align-items:center; justify-content:center; gap:4px;">View on Explorer <i data-lucide="external-link" width="14" height="14"></i></a>
@@ -3081,26 +3057,6 @@
         return parts[0] + '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
-      // The stock side of the pair. A Pyth line on a USDC leg would print a
-      // stablecoin peg next to a stock rate, which reads as nonsense.
-      function pythSubject() {
-        var bases = { USDC: 1, USDT: 1 };
-        if (!bases[String(buySym || '').toUpperCase()]) return buySym;
-        if (!bases[String(sellSym || '').toUpperCase()]) return sellSym;
-        return buySym;
-      }
-      // Pyth feed names say what they benchmark: "TSLA equity" for stocks,
-      // "Gold spot" for metals, "USDC peg" for stablecoins. Nobody should have
-      // to guess which asset class a reference price belongs to.
-      function pythLabel(feed, subject) {
-        var f = String(feed || '');
-        var who = String(subject || '').replace(/x$/i, '');
-        if (f.indexOf('Equity.') === 0) return (who || 'Equity') + ' equity (Pyth)';
-        if (f.indexOf('Metal.') === 0) return 'Gold spot (Pyth)';
-        if (f.indexOf('FX.') === 0) return 'FX rate (Pyth)';
-        if (f.indexOf('Crypto.') === 0) return (who || 'Token') + ' peg (Pyth)';
-        return 'Reference (Pyth)';
-      }
       // Every failure the user can see, in language a trader can act on. Raw
       // provider text (timeouts, aborts, upstream payloads) is never shown.
       function friendlyQuoteError(code, msg, sym) {
@@ -3140,8 +3096,7 @@
         msg = friendlyQuoteError(code, msg);
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
-        // An error must be visible even if the user had collapsed the panel.
-        applyDetails(true);
+        setDetailsVisible(true);
         setBuyDots(false);
       }
 
@@ -3162,26 +3117,13 @@
         setBuyChange(null);
       }
 
-      var detailToggleEl = document.getElementById('detailToggle');
-      // null = no choice yet (auto-open on the first quote). Once the user opens
-      // or closes it themselves, that choice sticks: a background price refresh
-      // must not re-open a panel they deliberately closed.
-      var detailsUserChoice = null;
-      function applyDetails(open) {
-        quoteLinesEl.hidden = !open;
-        paintDetailToggle();
+      // Details are always shown — no toggle. The whole section hides only
+      // when there is nothing to show (no amount typed yet).
+      function setDetailsVisible(v) {
+        quoteLinesEl.hidden = !v;
+        var lbl = document.getElementById('detailsLabel');
+        if (lbl) lbl.hidden = !v;
       }
-      function paintDetailToggle() {
-        var open = !quoteLinesEl.hidden;
-        detailToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
-        detailToggleEl.querySelector('span').textContent = open ? 'Hide details' : 'Show details';
-        detailToggleEl.toggleAttribute('disabled', !lastQuote);
-      }
-      detailToggleEl.addEventListener('click', function () {
-        if (detailToggleEl.hasAttribute('disabled')) return;
-        detailsUserChoice = quoteLinesEl.hidden;
-        applyDetails(detailsUserChoice);
-      });
 
       async function runQuote() {
         var mySeq = ++quoteSeq;
@@ -3197,14 +3139,13 @@
           buyUsdEl.textContent = '$0.00';
           if (buyLoadingEl) buyLoadingEl.style.display = 'none';
           setBuyDots(false);
-          quoteLinesEl.hidden = true;
           quoteLinesEl.innerHTML = '';
+          setDetailsVisible(false);
           lastQuote = null;
           swapBlocked = null;
           try { updateActionBtn(); } catch (_) {}
           window.umbraLastReceive = null;
           resetQuoteSummary();
-          paintDetailToggle();
           return;
         }
         try {
@@ -3328,51 +3269,19 @@
           if (blockCode) {
             quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
           }
-          // Auto-open so the first price is never a mystery, but respect a
-          // manual close afterwards: a background refresh must not fight the user.
-          // A blocked quote always opens: the reason must be visible, not hidden.
-          applyDetails(blockCode ? true : (detailsUserChoice === null ? true : detailsUserChoice));
+          // Details always show: no toggle, no hidden state to fight.
+          setDetailsVisible(true);
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
-          // Pyth comparison: the reference feed for the STOCK side of this pair
-          // (TSLAx → USDC must compare TSLAx against TSLA, never against USDC's
-          // peg). Only feeds our key is entitled to are ever returned, so a
-          // missing leg means "not covered", never "broken".
+          // Receive-side 24h badge doubles as the deal pulse: fetch change
           try {
-            var fairRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(pythSubject()) + '/fair-price');
-            if (mySeq !== quoteSeq) return;
-            if (fairRes.ok) {
-              var fair = await fairRes.json();
-              // Re-check after the await: a superseded quote must not append.
-              if (mySeq !== quoteSeq) return;
-              var bps = fair.tokenVsEquityBps !== null && fair.tokenVsEquityBps !== undefined ? fair.tokenVsEquityBps : fair.equityVsReferenceBps;
-              var leg = fair.equity || fair.token;
-              if (leg) {
-                var subject = fair.symbol || pythSubject();
-                var hasBps = bps !== null && bps !== undefined;
-                var cls = hasBps && Math.abs(bps) <= 50 ? 'good' : (hasBps ? 'bad' : '');
-                var sign = bps > 0 ? '+' : '';
-                var stale = leg.stalenessSeconds;
-                quoteLinesEl.innerHTML +=
-                  '<div class="row"><span>' + esc(pythLabel(leg.feed, subject)) + '</span><span class="' + cls + '">$' + esc(leg.price) +
-                  (hasBps ? ' · ' + esc(subject) + ' ' + sign + bps + ' bps' : '') + '</span></div>' +
-                  (fair.note
-                    ? '<div class="row"><span class="pyth-note">' + esc(fair.note) + '</span></div>'
-                    : (stale !== null && stale !== undefined
-                        ? '<div class="row"><span>Feed age</span><span>' + esc(stale < 90 ? 'live' : Math.round(stale / 60) + ' min old') + '</span></div>'
-                        : ''));
-              }
-              // Receive-side 24h badge doubles as the deal pulse: fetch change
-              try {
-                var sumRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(buySym) + '/summary');
-                if (mySeq === quoteSeq && sumRes.ok) {
-                  var sum = await sumRes.json();
-                  if (mySeq === quoteSeq) setBuyChange(sum.summary ? sum.summary.change24hPct : null);
-                }
-              } catch (e2) { /* badge optional */ }
+            var sumRes = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(buySym) + '/summary');
+            if (mySeq === quoteSeq && sumRes.ok) {
+              var sum = await sumRes.json();
+              if (mySeq === quoteSeq) setBuyChange(sum.summary ? sum.summary.change24hPct : null);
             }
           } catch (e) {
-            /* deal line is a bonus, never blocks the quote */
+            /* badge is a bonus, never blocks the quote */
           }
         } catch (e) {
           if (mySeq !== quoteSeq) return;
@@ -3807,15 +3716,9 @@
           : a._mcapChecked
             ? '—'
             : '<span class="skeleton"></span>';
-        // "Pyth" marks the names our Pyth key actually has a reference feed for
-        // (equity or gold). It is a coverage fact from the API, not a claim about
-        // every ticker, so uncovered rows stay unmarked.
-        var pythTag = pythCovered[a.symbol.toUpperCase()]
-          ? ' <span class="pyth-tag" title="Pyth has a reference feed for this underlying">Pyth</span>'
-          : '';
         return (
           '<a class="stock-row" href="#swap" data-symbol="' + esc(a.symbol) + '">' +
-          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + pythTag + '</b><span>' + esc(a.name || '') + '</span></span></span>' +
+          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + '</b><span>' + esc(a.name || '') + '</span></span></span>' +
           '<span class="stock-right"><span class="stock-price">' + price + '</span><span class="stock-mcap">' + mcap + '</span></span>' +
           '</a>'
         );
@@ -3834,18 +3737,6 @@
             '<span class="skeleton" style="width:40px;height:8px;"></span></span></div>';
         }
         return rows;
-      }
-      var pythCovered = {};
-      function loadPythCoverage(symbols) {
-        if (!symbols.length) return;
-        fetch(API_BASE + '/api/pyth/coverage?symbols=' + encodeURIComponent(symbols.join(',')))
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (j) {
-            if (!j || !j.covered) return;
-            j.covered.forEach(function (c) { pythCovered[c.symbol] = c.feed; });
-            renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
-          })
-          .catch(function () { /* coverage is an annotation, never a blocker */ });
       }
       // Every symbol here was live quote-verified (USDC pair). 37 deep + 11 thin + 8 Pre-IPO = 56.
       // Removed as unquotable: 26 junk entries (bad tickers like "T", "KO", "MCHP", "BRK.Bx")
@@ -3942,8 +3833,6 @@
               // Only update if fresh is not empty — keep cached if fetch is slow
               if (fresh.length) {
                 stocksCache = fresh;
-                // Which of these our Pyth key covers — an annotation, fetched once.
-                loadPythCoverage(ALLOWLIST.concat(PREIPO));
                 // Don't render yet — fetch first 20 prices so the first paint already has data like the drawer
                 var first20 = fresh.slice(0, 20).map(function (a) { return a.symbol; }).join(',');
                 if (first20) {
@@ -4352,50 +4241,6 @@
           if (typeof data.top10Pct === 'number') el.textContent = 'hold ' + data.top10Pct.toFixed(1) + '%';
         } catch (e) { /* concentration is a bonus */ }
       }
-      // Pyth reference in the drawer: the feed price plus the live gap to the
-      // token's own price. A ticker with no entitled feed says so outright.
-      async function paintDrawerPyth(symbol, myReq) {
-        var el = document.getElementById('drawerPyth');
-        if (!el) return;
-        el.innerHTML = '<span class="skeleton" style="width:88px; height:10px;"></span>';
-        try {
-          var res = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(symbol) + '/fair-price');
-          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
-          if (!res.ok) throw new Error('fair-price');
-          var j = await res.json();
-          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
-          var leg = j.equity || j.token;
-          var bps = j.tokenVsEquityBps !== null && j.tokenVsEquityBps !== undefined ? j.tokenVsEquityBps : j.equityVsReferenceBps;
-          if (!leg) {
-            el.textContent = 'not on our Pyth feed';
-            return;
-          }
-          var txt = '$' + Number(leg.price).toLocaleString('en-US', { maximumFractionDigits: 2 });
-          if (j.note) {
-            el.textContent = txt + ' (context only)';
-            el.title = j.note;
-          } else if (bps !== null && bps !== undefined) {
-            txt += '  (' + (bps > 0 ? '+' : '') + bps.toFixed(1) + ' bps)';
-            el.style.color = Math.abs(bps) <= 50 ? 'var(--umbra-accent)' : '#f6465d';
-            el.textContent = txt;
-            el.title = leg.feed + (leg.stalenessSeconds !== null ? ' · ' + leg.stalenessSeconds + 's old' : '');
-          } else {
-            el.textContent = txt;
-            el.title = leg.feed;
-          }
-        } catch (e) {
-          if (myReq !== drawerReq || drawerCurrent !== symbol) return;
-          el.textContent = '—';
-        }
-      }
-      // Cached ticker-row liquidity for the drawer fallback (same shape as summary).
-      function cachedLiq(symbol) {
-        try {
-          var hit = null;
-          stocksCache.forEach(function (a) { if (a.symbol === symbol && a.liquidity) hit = a.liquidity; });
-          return hit;
-        } catch (_) { return null; }
-      }
       async function openStockDrawer(symbol) {
         drawerCurrent = symbol;
         var myReq = ++drawerReq;
@@ -4414,7 +4259,6 @@
         document.getElementById('drawerHoldRow').style.display = 'none';
         document.getElementById('drawerHold').innerHTML = '<span class="skeleton short" style="width:40px; height:12px;"></span>';
         document.getElementById('drawerLiquidity').innerHTML = '<span class="skeleton" style="width:72px; height:10px;"></span>';
-        document.getElementById('drawerPyth').innerHTML = '<span class="skeleton" style="width:88px; height:10px;"></span>';
         var _sol0 = document.getElementById('drawerSolscan');
         if (_sol0) _sol0.style.display = 'none';
         drawerChartEl.innerHTML = '<span class="skeleton" style="display:block;width:100%;height:80px;border-radius:12px;"></span>';
@@ -4464,7 +4308,6 @@
           renderSparkline(s.sparkline || [], chg, symbol);
           paintDrawerHoldings(symbol);
           paintDrawerTop(symbol);
-          paintDrawerPyth(symbol, myReq);
           // Solscan link — proves it's the real on-chain mint
           var solEl = document.getElementById('drawerSolscan');
           var liqEl = document.getElementById('drawerLiquidity');

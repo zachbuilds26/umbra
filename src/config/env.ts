@@ -32,11 +32,6 @@ const envSchema = z.object({
 
   XSTOCKS_API_BASE_URL: httpsUrl.default('https://api.xstocks.fi/api/v2'),
 
-  // Pyth Pro (Lazer) key — demo keys cover a limited feed set (see /v1/symbols?entitled_only=true).
-  PYTH_API_KEY: z.string().optional().default(''),
-  PYTH_PRO_URL: httpsUrl.default('https://pyth-lazer.dourolabs.app'),
-  PYTH_SYMBOLOGY_URL: httpsUrl.default('https://pyth.dourolabs.app'),
-
   DATABASE_URL: z.string().optional().default(''),
 
   CORS_ORIGINS: z.string().default('http://localhost:3000'),

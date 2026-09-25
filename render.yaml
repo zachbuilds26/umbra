@@ -22,8 +22,6 @@ services:
         sync: false
       - key: ZEROEX_API_KEY
         sync: false
-      - key: PYTH_API_KEY
-        sync: false
       - key: TOKENS_API_KEY
         sync: false
       - key: CORS_ORIGINS

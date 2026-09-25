@@ -7,7 +7,7 @@ import Decimal from '../../utils/decimal.js';
 //
 // Rounding is specified per operation rather than set globally: the Decimal
 // singleton is shared process-wide, and a global `set()` changed how every other
-// Decimal user (Pyth spreads, price history) rounded depending on import order.
+// Decimal user (spreads, price history) rounded depending on import order.
 const FLOOR = DecimalJs.ROUND_FLOOR;
 /** An SPL token amount is a u64; conversions must stay inside it. */
 const U64_MAX = '18446744073709551615';

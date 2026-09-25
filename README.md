@@ -28,7 +28,7 @@ Key env vars:
 | `SOLANA_RPC_URL` | Solana RPC (default mainnet-beta) |
 | `JUPITER_API_KEY` | Jupiter Developer Platform key. Empty = keyless 0.5 RPS dev mode |
 | `JUPITER_PRICE_URL` | Jupiter Price V3 (default `https://api.jup.ag/price/v3`) |
-| `ZEROEX_API_KEY` / `PYTH_API_KEY` / `TOKENS_API_KEY` | Optional legs; empty = that leg disabled |
+| `ZEROEX_API_KEY` / `TOKENS_API_KEY` | Optional legs; empty = that leg disabled |
 | `XSTOCKS_API_BASE_URL` | `https://api.xstocks.fi/api/v2` |
 | `DATABASE_URL` | Render Postgres string. Set = persisted ledger (auto-migrated); unset = in-memory |
 | `PORT` | Listen port (Render injects its own) |
@@ -42,9 +42,8 @@ Key env vars:
 | GET | `/api/assets` | USDC + all Solana xStocks (live discovery) |
 | GET | `/api/assets/:symbol` | Enriched asset (price + multiplier) |
 | GET | `/api/assets/:symbol/price` | USD reference price (display only) |
-| GET | `/api/assets/:symbol/fair-price` | Pyth equity + xStock legs, reference, token-vs-equity spread (needs `PYTH_API_KEY`) |
 | GET | `/api/assets/ticker?symbols=NVDAx,…` | One-call tape prices + 24h change (max 50) |
-| GET | `/api/assets/:symbol/summary` | Hover-card bundle: asset, change, sparkline, fair spreads, flags |
+| GET | `/api/assets/:symbol/summary` | Hover-card bundle: asset, change, sparkline, flags |
 | GET | `/api/wallet/:address/balances` | Umbra-token balances, display amounts (powers MAX) |
 | GET | `/api/swap/quote?sell=USDC&buy=NVDAx&amount=500[&userPublicKey=…][&slippageBps=50]` | Executable quote, provider-neutral route |
 | POST | `/api/swap/transaction` `{quoteId, userPublicKey}` | Unsigned base64 tx for the wallet to sign |

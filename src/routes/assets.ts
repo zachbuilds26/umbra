@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { listSolanaAssets, enrichAsset, getPrice, getLastGoodPrice, getAsset, getSolanaMint, canonicalSymbol, canonicalAssetSymbol } from '../services/xstocks/assets.service.js';
-import { getFairPrice } from '../services/pyth/fair-price.service.js';
 import { recordPrice, changePct, sparkline } from '../services/prices/history.js';
 import { getPrestocksPrice, getPrestocksSymbols } from '../services/prestocks/assets.js';
 import { notFound, upstream } from '../utils/errors.js';
@@ -149,7 +148,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /api/assets/:symbol/summary — everything the hover card needs in one call:
-  // asset, price, 24h change, sparkline points, fair-price spreads, swap/bridge flags.
+  // asset, price, 24h change, sparkline points, swap/bridge flags.
   app.get('/api/assets/:symbol/summary', async (req) => {
     const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
     const symbol = await canonicalAssetSymbol(params.symbol);
@@ -158,7 +157,6 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     const asset = (await withTimeout(enrichAsset(symbol), 4000)) ?? (await getAsset(symbol).catch(() => null) as any);
     if (!asset) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
     if (asset.price) recordPrice(symbol, asset.price.value);
-    const fair = await withTimeout(getFairPrice(symbol).catch(() => null), 3000);
     const { getTokensSnapshots } = await import('../services/tokens/market.js');
     const foundMint = await getSolanaMint(symbol).catch(() => null);
     const snap = foundMint ? (await getTokensSnapshots([foundMint.mint])).get(foundMint.mint) ?? null : null;
@@ -167,22 +165,8 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
         asset,
         change24hPct: (snap?.hasMarket ? snap.change24hPct : null) ?? changePct(symbol),
         sparkline: sparkline(symbol),
-        fair: fair
-          ? { tokenVsEquityBps: fair.tokenVsEquityBps, equityVsReferenceBps: fair.equityVsReferenceBps }
-          : null,
       },
     };
-  });
-
-  // GET /api/pyth/coverage?symbols=… — which of these symbols this Pyth key
-  // actually has a reference feed for. The UI uses it to say "covered" or
-  // "not on our feed" instead of rendering an empty panel.
-  app.get('/api/pyth/coverage', async (req) => {
-    const q = z.object({ symbols: z.string().min(1).max(600) }).parse(req.query);
-    const symbols = q.symbols.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 60);
-    const { getCoverage } = await import('../services/pyth/fair-price.service.js');
-    const covered = await getCoverage(symbols).catch(() => [] as never[]);
-    return { covered };
   });
 
   app.get('/api/assets/:symbol', async (req) => {
@@ -245,12 +229,6 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     const pre = await getPrestocksPrice(symbol).catch(() => null);
     if (pre) return { symbol, price: pre.value, currency: 'USD' as const, timestamp: pre.timestamp };
     throw notFound('QUOTE_UNAVAILABLE', `No price available for ${symbol}.`);
-  });
-
-  // GET /api/assets/:symbol/fair-price — Pyth equity + token legs + token-vs-equity spread.
-  app.get('/api/assets/:symbol/fair-price', async (req) => {
-    const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
-    return getFairPrice(canonicalSymbol(params.symbol));
   });
 
   // GET /api/assets/:symbol/holders — supply + largest accounts from standard
