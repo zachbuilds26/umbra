@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   collectRouteMints,
   computeSolRequirement,
+  coversAmount,
   describeSolShortfall,
   lamportsToSol,
 } from '../src/services/solana/preflight.js';
@@ -128,5 +129,24 @@ describe('the message the trader actually reads', () => {
     assert.equal(lamportsToSol(1_954_407), '0.001954');
     assert.equal(lamportsToSol(0), '0.000000');
     assert.equal(lamportsToSol(1_000_000_000), '1.000000');
+  });
+});
+
+describe('input token coverage', () => {
+  it('compares atomic units exactly, never through floats', () => {
+    assert.equal(coversAmount('70019', '70000'), true);
+    assert.equal(coversAmount('70000', '70000'), true);
+    assert.equal(coversAmount('69999', '70000'), false);
+    assert.equal(coversAmount('0', '1'), false);
+    assert.equal(coversAmount('4228277238345956038', '70000'), true);
+  });
+
+  it('treats malformed amounts as uncovered, never as covered', () => {
+    assert.equal(coversAmount('', '70000'), false);
+    assert.equal(coversAmount('70000', ''), false);
+    assert.equal(coversAmount('6.5', '6'), false);
+    assert.equal(coversAmount('-1', '0'), false);
+    assert.equal(coversAmount(null, '70000'), false);
+    assert.equal(coversAmount('70000', undefined), false);
   });
 });

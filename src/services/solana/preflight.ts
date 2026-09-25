@@ -81,13 +81,72 @@ export function computeSolRequirement(args: {
   };
 }
 
+export function coversAmount(heldAtomic: unknown, neededAtomic: unknown): boolean {
+  try {
+    if (typeof heldAtomic !== 'string' || typeof neededAtomic !== 'string') return false;
+    if (!/^\d+$/.test(heldAtomic) || !/^\d+$/.test(neededAtomic)) return false;
+    return BigInt(heldAtomic) >= BigInt(neededAtomic);
+  } catch {
+    return false;
+  }
+}
+
+async function inputBalanceCovers(
+  owner: PublicKey,
+  inputMint: string,
+  inputAmountBaseUnits: string,
+): Promise<boolean | null> {
+  let mint: PublicKey;
+  try {
+    mint = new PublicKey(inputMint);
+  } catch {
+    return null;
+  }
+  const kind = await tokenProgramKind(mint);
+  if (!kind) return null;
+  const program = kind === '2022' ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  const [ata] = PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), program.toBuffer(), mint.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  let info;
+  try {
+    info = await withRpcDeadline('preflight getAccountInfo(input)', RPC_DEADLINE_MS, () =>
+      getConnection().getAccountInfo(ata),
+    );
+  } catch {
+    return null;
+  }
+  if (!info) return false;
+  if (info.data.length < 72) return null;
+  let held: bigint;
+  try {
+    held = info.data.readBigUInt64LE(64);
+  } catch {
+    return null;
+  }
+  return coversAmount(held.toString(), inputAmountBaseUnits);
+}
+
 export async function estimateSolRequirement(args: {
   owner: string;
   mints: string[];
+  inputMint?: string | null;
+  inputAmountBaseUnits?: string | null;
 }): Promise<SolRequirement | null> {
   const unique = args.mints.filter((mint) => mint !== NATIVE_MINT);
   if (unique.length === 0) return null;
   const owner = new PublicKey(args.owner);
+
+  if (args.inputMint && args.inputAmountBaseUnits) {
+    let covered: boolean | null = null;
+    try {
+      covered = await inputBalanceCovers(owner, args.inputMint, args.inputAmountBaseUnits);
+    } catch {
+      covered = null;
+    }
+    if (covered === false) return null;
+  }
 
   const available = await withRpcDeadline('preflight getBalance', RPC_DEADLINE_MS, () =>
     getConnection().getBalance(owner),
@@ -95,29 +154,40 @@ export async function estimateSolRequirement(args: {
   if (available === null) return null;
 
   const conn = getConnection();
+  const checks = await Promise.all(
+    unique.map(async (mint) => {
+      let parsed: PublicKey;
+      try {
+        parsed = new PublicKey(mint);
+      } catch {
+        return null;
+      }
+      const kind = await tokenProgramKind(parsed);
+      if (!kind) return null;
+      const owned = await ownsTokenAccount(owner, parsed, kind);
+      return { mint, kind, owned };
+    }),
+  );
+
   let legacyRent = 0;
   let token2022Rent = 0;
   const missing: string[] = [];
   let resolvedAny = false;
-
-  for (const mint of unique) {
-    let parsed: PublicKey;
-    try {
-      parsed = new PublicKey(mint);
-    } catch {
-      continue;
-    }
-    const kind = await tokenProgramKind(parsed);
-    if (!kind) continue;
+  for (const check of checks) {
+    if (!check) continue;
     resolvedAny = true;
-    if (await ownsTokenAccount(owner, parsed, kind)) continue;
-    missing.push(mint);
-    if (kind === 'legacy') {
+    if (check.owned) continue;
+    missing.push(check.mint);
+    if (check.kind === 'legacy') {
       if (!legacyRent) {
-        legacyRent = await conn.getMinimumBalanceForRentExemption(LEGACY_ACCOUNT_BYTES).catch(() => 0);
+        legacyRent = await withRpcDeadline('preflight rent(legacy)', RPC_DEADLINE_MS, () =>
+          conn.getMinimumBalanceForRentExemption(LEGACY_ACCOUNT_BYTES),
+        );
       }
     } else if (!token2022Rent) {
-      token2022Rent = await conn.getMinimumBalanceForRentExemption(TOKEN_2022_ACCOUNT_BYTES).catch(() => 0);
+      token2022Rent = await withRpcDeadline('preflight rent(2022)', RPC_DEADLINE_MS, () =>
+        conn.getMinimumBalanceForRentExemption(TOKEN_2022_ACCOUNT_BYTES),
+      );
     }
   }
 

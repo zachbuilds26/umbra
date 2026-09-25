@@ -2925,7 +2925,7 @@
         return (Number.isInteger(pct) ? pct.toString() : pct.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')) + '%';
       }
       function applySlippage(bps) {
-        slippageBps = Math.max(0, Math.min(10000, Math.round(bps)));
+        slippageBps = Math.max(0, Math.min(500, Math.round(bps)));
         var label = fmtSlip(slippageBps);
         slipValEl.textContent = label;
         paintSlipModal();
@@ -3508,13 +3508,15 @@
         if (hero) hero.innerHTML = swapHeroHtml(q);
       }
 
-      function swapFail(msg, retry) {
+      function swapFail(msg, retry, code) {
         executing = false;
         // 429 is always rate-limiting (Jupiter free tier) — never show the raw code.
         if (/429/.test(msg || '')) msg = 'Quoting is busy right now — wait a moment and try again.';
         // "Invalid request" from the wallet on a $0 balance means the network
         // can't execute it (no SOL for gas) — say so instead of the raw code.
-        else if (/invalid request/i.test(msg || '')) msg = 'Wallet refused: with nothing in it, there is no SOL for gas. Fund a little SOL and try again.';
+        // Backend validation errors carry a code and must never be rewritten
+        // into a funding message: a malformed request is not an empty wallet.
+        else if (!code && /invalid request/i.test(msg || '')) msg = 'Wallet refused: with nothing in it, there is no SOL for gas. Fund a little SOL and try again.';
         // Transport/provider text ("This operation was aborted", upstream
         // payloads) means nothing to the user — never surface it.
         else if (/abort|upstream request failed|fetch failed|network|socket|timeout|ECONN|ETIMEDOUT|provider did not respond/i.test(msg || '')) {
@@ -3600,7 +3602,11 @@
             body: JSON.stringify({ quoteId: q.quoteId, userPublicKey: wallet }),
           });
           var txData = await txRes.json();
-          if (!txRes.ok) throw new Error((txData.error && txData.error.message) || 'Could not build transaction.');
+          if (!txRes.ok) {
+            var txErr = new Error((txData.error && txData.error.message) || 'Could not build transaction.');
+            txErr.umbraCode = txData.error && txData.error.code;
+            throw txErr;
+          }
           // 2) Wallet signs
           var raw = Uint8Array.from(atob(txData.transaction), function (c) { return c.charCodeAt(0); });
           var vtx = window.solanaWeb3.VersionedTransaction.deserialize(raw);
@@ -3645,7 +3651,9 @@
             // Never report that as a failed swap, and never invite a retry.
             sig = signed.__sig;
           } else {
-            throw new Error((bcData && bcData.error && bcData.error.message) || 'Could not submit the swap.');
+            var bcErr = new Error((bcData && bcData.error && bcData.error.message) || 'Could not submit the swap.');
+            bcErr.umbraCode = bcData && bcData.error && bcData.error.code;
+            throw bcErr;
           }
           // 4) Backend records + confirms
           var subRes = await fetch(API_BASE + '/api/transactions/swap', {
@@ -3672,10 +3680,11 @@
               if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
               return;
             }
-            throw new Error((subData.error && subData.error.message) || 'Submission rejected.');
+            var subErr = new Error((subData.error && subData.error.message) || 'Submission rejected.');
+            subErr.umbraCode = subData.error && subData.error.code;
+            throw subErr;
           }
-          // 5) Poll to finality
-          paintSwapTitle('Confirming on Solana…', '');
+          // 5) Poll to finality          paintSwapTitle('Confirming on Solana…', '');
           var final = await pollTx(subData.id, wallet);
           swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
           swapExplorerEl.style.display = 'block';
@@ -3698,7 +3707,7 @@
           if (/rejected|denied|declin|closed|cancel/i.test(msg) || (e && e.code === 4001)) {
             swapFail('Signature rejected in wallet — nothing was sent.', true);
           } else {
-            swapFail(msg, true);
+            swapFail(msg, true, e && e.umbraCode);
           }
         }
       }

@@ -212,7 +212,12 @@ async function walletCannotPayError(args: {
     });
     const mints = collectRouteMints(quoteOnly.data?.routePlan);
     if (mints.length === 0) mints.push(args.inputMint, args.outputMint);
-    const requirement = await estimateSolRequirement({ owner: args.taker, mints });
+    const requirement = await estimateSolRequirement({
+      owner: args.taker,
+      mints,
+      inputMint: args.inputMint,
+      inputAmountBaseUnits: args.amountBaseUnits,
+    });
     if (!requirement || requirement.shortfallLamports <= 0) return null;
     const solPrice = await getPrice('SOL').catch(() => null);
     return upstream(
@@ -645,6 +650,15 @@ export async function getSwapTransaction(quoteId: string, userPublicKey: string)
       routeAvailable: false,
       rejectReason: order.errorMessage ?? 'no transaction returned',
     });
+    const shortfall = await walletCannotPayError({
+      inputMint: stored.inputMint,
+      outputMint: stored.outputMint,
+      amountBaseUnits: stored.amountBaseUnits,
+      slippageBps: stored.slippageBps,
+      taker: userPublicKey,
+      buySymbol: stored.buySymbol,
+    });
+    if (shortfall) throw shortfall;
     throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
   }
   logSwapAttempt({
