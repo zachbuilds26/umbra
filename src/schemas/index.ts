@@ -45,11 +45,18 @@ export const swapTransactionBody = z.object({
   userPublicKey: solanaAddress,
 });
 
-export const swapBroadcastBody = z.object({
-  quoteId: z.string().min(1).max(64),
-  userPublicKey: solanaAddress,
-  signedTransaction: z.string().min(80).max(20_000),
-});
+export const swapBroadcastBody = z
+  .object({
+    quoteId: z.string().min(1).max(64),
+    userPublicKey: solanaAddress,
+    // Either the signed bytes to relay, or the signature of a transaction the
+    // wallet already broadcast itself. Exactly one is required.
+    signedTransaction: z.string().min(80).max(20_000).optional(),
+    signature: z.string().min(80).max(96).optional(),
+  })
+  .refine((v) => Boolean(v.signedTransaction) !== Boolean(v.signature), {
+    message: 'Provide either signedTransaction or signature, not both.',
+  });
 
 export const swapSubmitBody = z.object({
   quoteId: z.string().min(1).max(64),

@@ -1,7 +1,7 @@
 import Decimal from '../../utils/decimal.js';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { getJupiterOrder, type JupiterOrderResponse } from './client.js';
-import { getConnection } from '../solana/connection.js';
+import { getConnection, withRpcDeadline } from '../solana/connection.js';
 import { getSolanaMint, getMultiplier, getPrice, canonicalSymbol, isStableSymbol } from '../xstocks/assets.service.js';
 import { displayToBaseUnits, baseUnitsToDisplay } from '../solana/multiplier.js';
 import { isValidSolanaAddress } from '../../utils/addresses.js';
@@ -652,19 +652,26 @@ function isZeroSig(bytes: Uint8Array | null | undefined): boolean {
 const inFlightBroadcasts = new Map<string, Promise<{ signature: string }>>();
 
 /**
- * POST /api/swap/broadcast — submit the wallet-signed swap.
- * The wallet signs; the backend broadcasts over our RPC and records the
- * signature. Signed-but-unsent transactions can never confirm, so this step
- * is mandatory before the ledger records anything.
+ * POST /api/swap/broadcast — submit the wallet-signed swap, or record one the
+ * wallet already broadcast itself.
+ *
+ * Two shapes reach this function:
+ *  - `signedTransaction`: the wallet returned the signed bytes without sending.
+ *    We verify the message matches this quote and relay it.
+ *  - `signature`: the wallet broadcast internally and returned only a signature.
+ *    We fetch that transaction from the chain and verify it the same way.
+ *
+ * Signed-but-unsent transactions can never confirm, so this step is mandatory
+ * before the ledger records anything.
  */
 export async function broadcastSignedSwap(
   quoteId: string,
-  signedTransactionB64: string,
+  input: { signedTransaction?: string; signature?: string },
   userPublicKey: string,
 ): Promise<{ signature: string }> {
   const running = inFlightBroadcasts.get(quoteId);
   if (running) return running;
-  const task = broadcastSignedSwapOnce(quoteId, signedTransactionB64, userPublicKey).finally(() => {
+  const task = broadcastSignedSwapOnce(quoteId, input, userPublicKey).finally(() => {
     inFlightBroadcasts.delete(quoteId);
   });
   inFlightBroadcasts.set(quoteId, task);
@@ -673,14 +680,23 @@ export async function broadcastSignedSwap(
 
 async function broadcastSignedSwapOnce(
   quoteId: string,
-  signedTransactionB64: string,
+  input: { signedTransaction?: string; signature?: string },
   userPublicKey: string,
 ): Promise<{ signature: string }> {
   if (!isValidSolanaAddress(userPublicKey)) {
     throw badRequest('INVALID_ADDRESS', 'userPublicKey is not a valid Solana address.');
   }
-  if (!/^[A-Za-z0-9+/]{80,}={0,2}$/.test(signedTransactionB64)) {
+  const signedTransactionB64 = input.signedTransaction ?? '';
+  if (signedTransactionB64 && !/^[A-Za-z0-9+/]{80,}={0,2}$/.test(signedTransactionB64)) {
     throw badRequest('VALIDATION_ERROR', 'signedTransaction must be base64.');
+  }
+  if (!signedTransactionB64 && !input.signature) {
+    throw badRequest('VALIDATION_ERROR', 'Provide either the signed transaction or its signature.');
+  }
+  if (signedTransactionB64 && input.signature) {
+    // Enforced again here, not only by the route schema: this function is the
+    // trust boundary, and two sources for one submission are ambiguous.
+    throw badRequest('VALIDATION_ERROR', 'Provide either the signed transaction or its signature, not both.');
   }
   const stored = quoteStore.getSwap(quoteId);
   if (!stored) {
@@ -694,6 +710,41 @@ async function broadcastSignedSwapOnce(
     throw badRequest('VALIDATION_ERROR', 'This quote has no transaction to sign yet. Request the transaction first.');
   }
 
+  // Either shape must resolve to this quote's own transaction. Comparing the
+  // message bytes (not the signatures) is what makes this safe: any different
+  // amount, mint, route or destination produces a different message, so neither a
+  // correctly-signed unrelated transaction nor someone else's already-landed
+  // transaction can ride a live quote.
+  const expected = messageBytesOf(Buffer.from(stored.transaction, 'base64'));
+  if (!expected) {
+    throw badRequest('VALIDATION_ERROR', 'The transaction for this quote could not be read.');
+  }
+  const conn = getConnection();
+
+  if (input.signature) {
+    // The wallet broadcast it itself, so the only copy of the message is on chain.
+    const onChain = await withRpcDeadline('getTransaction', 10_000, () =>
+      conn.getTransaction(input.signature as string, { maxSupportedTransactionVersion: 0 }),
+    ).catch(() => null);
+    if (!onChain) {
+      throw badRequest('VALIDATION_ERROR', 'That transaction is not visible on Solana yet. Try again in a moment.');
+    }
+    const fetched = onChain.transaction as unknown;
+    let fetchedBytes: Buffer | null = null;
+    if (fetched && typeof (fetched as { serialize: () => Uint8Array }).serialize === 'function') {
+      try {
+        fetchedBytes = messageBytesOf(Buffer.from((fetched as { serialize: () => Uint8Array }).serialize()));
+      } catch {
+        fetchedBytes = null;
+      }
+    }
+    if (!fetchedBytes || !expected.equals(fetchedBytes)) {
+      throw badRequest('VALIDATION_ERROR', 'That transaction is not the transaction for this quote.');
+    }
+    quoteStore.bindSwapSignature(quoteId, userPublicKey, input.signature);
+    return { signature: input.signature };
+  }
+
   let raw: Uint8Array;
   let vtx: VersionedTransaction;
   try {
@@ -703,13 +754,8 @@ async function broadcastSignedSwapOnce(
     throw badRequest('VALIDATION_ERROR', 'signedTransaction could not be decoded.');
   }
 
-  // The signed payload must be the quote's own transaction. Comparing the
-  // message bytes (not the signatures) is what makes this safe: any different
-  // amount, mint, route or destination produces a different message, so a
-  // correctly-signed but unrelated transaction can never ride a live quote.
-  const expected = messageBytesOf(Buffer.from(stored.transaction, 'base64'));
   const actual = messageBytesOf(Buffer.from(signedTransactionB64, 'base64'));
-  if (!expected || !actual || !expected.equals(actual)) {
+  if (!actual || !expected.equals(actual)) {
     throw badRequest('VALIDATION_ERROR', 'Signed transaction does not match the transaction for this quote.');
   }
 
@@ -732,9 +778,9 @@ async function broadcastSignedSwapOnce(
   // bytes. Ask the chain before sending: if this signature is already known the
   // transaction is on its way and must not be relayed again. This also replaces
   // the old "does the error text look familiar" heuristic with a real check.
-  const conn = getConnection();
-  const alreadyKnown = await conn
-    .getSignatureStatuses([signature], { searchTransactionHistory: true })
+  const alreadyKnown = await withRpcDeadline('getSignatureStatuses', 10_000, () =>
+    conn.getSignatureStatuses([signature], { searchTransactionHistory: true }),
+  )
     .then((res) => Boolean(res.value[0]))
     .catch(() => false);
   if (!alreadyKnown) {

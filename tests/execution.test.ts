@@ -81,7 +81,7 @@ describe('broadcast only accepts this quote\'s own transaction', () => {
       taker: kp.publicKey.toBase58(),
     });
     await assert.rejects(
-      () => broadcastSignedSwap(quoteId, foreign, kp.publicKey.toBase58()),
+      () => broadcastSignedSwap(quoteId, { signedTransaction: foreign }, kp.publicKey.toBase58()),
       /does not match the transaction for this quote/,
     );
   });
@@ -92,7 +92,7 @@ describe('broadcast only accepts this quote\'s own transaction', () => {
     const unsigned = unsignedTxB64(new PublicKey(ANTHROPIC), 1, kp.publicKey);
     const quoteId = putQuote({ taker: kp.publicKey.toBase58(), transaction: unsigned });
     await assert.rejects(
-      () => broadcastSignedSwap(quoteId, unsigned, kp.publicKey.toBase58()),
+      () => broadcastSignedSwap(quoteId, { signedTransaction: unsigned }, kp.publicKey.toBase58()),
       /not fully signed/,
     );
   });
@@ -101,7 +101,7 @@ describe('broadcast only accepts this quote\'s own transaction', () => {
     const quoteId = putQuote({ taker: WALLET_A });
     const kp = Keypair.generate();
     await assert.rejects(
-      () => broadcastSignedSwap(quoteId, 'A'.repeat(88), WALLET_B),
+      () => broadcastSignedSwap(quoteId, { signature: 'A'.repeat(88) }, WALLET_B),
       /different wallet/,
     );
   });
@@ -110,8 +110,40 @@ describe('broadcast only accepts this quote\'s own transaction', () => {
     const kp = Keypair.generate();
     const quoteId = putQuote({ taker: kp.publicKey.toBase58(), transaction: null });
     await assert.rejects(
-      () => broadcastSignedSwap(quoteId, unsignedTxB64(new PublicKey(ANTHROPIC), 1, kp.publicKey), kp.publicKey.toBase58()),
+      () => broadcastSignedSwap(
+        quoteId,
+        { signedTransaction: unsignedTxB64(new PublicKey(ANTHROPIC), 1, kp.publicKey) },
+        kp.publicKey.toBase58(),
+      ),
       /no transaction to sign/,
+    );
+  });
+
+  it('requires either signed bytes or a signature, never neither or both', async () => {
+    const kp = Keypair.generate();
+    const quoteId = putQuote({ taker: kp.publicKey.toBase58() });
+    await assert.rejects(
+      () => broadcastSignedSwap(quoteId, {}, kp.publicKey.toBase58()),
+      /either the signed transaction or its signature/,
+    );
+    await assert.rejects(
+      () => broadcastSignedSwap(
+        quoteId,
+        { signedTransaction: unsignedTxB64(new PublicKey(ANTHROPIC), 1, kp.publicKey), signature: 'A'.repeat(88) },
+        kp.publicKey.toBase58(),
+      ),
+      /either the signed transaction or its signature/,
+    );
+  });
+
+  it('refuses a self-broadcast signature that is not on chain', async () => {
+    // The wallet claims it already broadcast. Until that transaction is visible
+    // on Solana there is nothing to verify against the quote.
+    const kp = Keypair.generate();
+    const quoteId = putQuote({ taker: kp.publicKey.toBase58() });
+    await assert.rejects(
+      () => broadcastSignedSwap(quoteId, { signature: '4'.repeat(88) }, kp.publicKey.toBase58()),
+      /not visible on Solana|not the transaction for this quote/,
     );
   });
 });

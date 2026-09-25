@@ -20,7 +20,6 @@ export interface JupiterPrice {
 const PRICE_TTL_MS = 60 * 1000;
 const priceCache = new TtlCache<Map<string, JupiterPrice>>(PRICE_TTL_MS);
 const CACHE_KEY = 'v3';
-let wantedMints: string[] | null = null;
 
 function headers(): Record<string, string> {
   const h: Record<string, string> = { Accept: 'application/json' };
@@ -88,9 +87,6 @@ export async function refreshJupiterPrices(mints: string[]): Promise<Map<string,
       const live = new Map<string, JupiterPrice>(priceCache.get(CACHE_KEY) ?? []);
       for (const [mint, v] of fetched) live.set(mint, v);
       priceCache.set(CACHE_KEY, live);
-      // Bounded: this set only decides which mints may be served from cache, and
-      // an unbounded list would let any caller pin a growing set in memory.
-      wantedMints = [...new Set([...(wantedMints ?? []), ...unique])].slice(0, 500);
       return new Map([...live].filter(([mint]) => unique.includes(mint)));
     } finally {
       inflights.delete(key);

@@ -94,7 +94,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (err instanceof ZodError) {
       return reply
         .status(400)
-        .send(apiError('VALIDATION_ERROR', 'Invalid request.', { issues: err.issues.slice(0, 8) }));
+        .send(apiError('VALIDATION_ERROR', 'Invalid request.', { issues: err.issues.slice(0, 8), requestId }));
     }
     // Fastify's own client errors (malformed JSON, unsupported media type,
     // body over the limit) arrive with only a statusCode. Without this they
@@ -102,10 +102,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (typeof err === 'object' && err !== null && 'statusCode' in err && typeof err.statusCode === 'number') {
       const status = err.statusCode;
       if (status === 413) {
-        return reply.status(413).send(apiError('VALIDATION_ERROR', 'Request body is too large.'));
+        return reply.status(413).send(apiError('VALIDATION_ERROR', 'Request body is too large.', { requestId }));
       }
       if (status === 415) {
-        return reply.status(415).send(apiError('VALIDATION_ERROR', 'Unsupported content type.'));
+        return reply.status(415).send(apiError('VALIDATION_ERROR', 'Unsupported content type.', { requestId }));
       }
       if (status >= 400 && status < 500) {
         return reply.status(status).send(apiError('VALIDATION_ERROR', 'Invalid request.'));

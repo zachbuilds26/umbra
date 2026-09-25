@@ -42,15 +42,21 @@ export async function swapRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // POST /api/swap/broadcast { quoteId, userPublicKey, signedTransaction } -> send it
+  // POST /api/swap/broadcast { quoteId, userPublicKey, signedTransaction | signature }
   // The wallet signs; we broadcast over our own RPC. A signed-but-unsent swap can
-  // never confirm, so this runs before anything is written to the ledger.
+  // never confirm, so this runs before anything is written to the ledger. A
+  // wallet that broadcasts internally sends only the signature, which we verify
+  // against the quote by fetching the transaction from the chain.
   app.post(
     '/api/swap/broadcast',
     { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
     async (req) => {
       const body = swapBroadcastBody.parse(req.body);
-      return broadcastSignedSwap(body.quoteId, body.signedTransaction, body.userPublicKey);
+      return broadcastSignedSwap(
+        body.quoteId,
+        { signedTransaction: body.signedTransaction, signature: body.signature },
+        body.userPublicKey,
+      );
     },
   );
 

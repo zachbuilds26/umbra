@@ -88,8 +88,11 @@ interface RawTokenRow {
  * instead of the real 3044 USDC. Amounts are summed as BigInt, so no precision
  * is lost, and malformed rows are dropped instead of poisoning the total.
  */
+/** Drop a known mint we could not read, and report the response as partial. */
+let unresolvedRows = 0;
 export function aggregateByMint(rows: RawTokenRow[]): Array<{ mint: string; amount: string; decimals: number }> {
   const byMint = new Map<string, { mint: string; amount: bigint; decimals: number }>();
+  let dropped = 0;
   for (const r of rows) {
     const mint = r.mint;
     const amountRaw = r.amount;
@@ -97,22 +100,39 @@ export function aggregateByMint(rows: RawTokenRow[]): Array<{ mint: string; amou
     if (!mint || amountRaw === undefined || decimals === undefined) continue;
     // Provider amounts must be exact non-negative integers; anything else is
     // malformed input, not a balance.
-    if (!/^\d+$/.test(amountRaw)) continue;
-    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) continue;
+    if (!/^\d+$/.test(amountRaw)) {
+      dropped++;
+      continue;
+    }
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+      dropped++;
+      continue;
+    }
     const existing = byMint.get(mint);
     const amount = BigInt(amountRaw);
     if (existing) {
-      if (existing.decimals !== decimals) continue; // conflicting metadata: skip
+      if (existing.decimals !== decimals) {
+        dropped++;
+        continue; // conflicting metadata: skip
+      }
       existing.amount += amount;
     } else {
       byMint.set(mint, { mint, amount, decimals });
     }
   }
+  // A row we had to throw away is a holding we could not check. The caller turns
+  // this into `partial`, so the UI shows "unknown" instead of a false zero.
+  unresolvedRows = dropped;
   return [...byMint.values()].map((e) => ({
     mint: e.mint,
     amount: e.amount.toString(),
     decimals: e.decimals,
   }));
+}
+
+/** How many rows the last aggregateByMint call had to discard. */
+export function droppedBalanceRows(): number {
+  return unresolvedRows;
 }
 
 /**
@@ -202,11 +222,12 @@ export async function getWalletBalances(ownerAddress: string): Promise<{ balance
     });
   }
   const rowsByMint = aggregateByMint(rows);
+  const dropped = droppedBalanceRows();
   const out: WalletBalance[] = [];
   // A holding we could not price is a holding we could not check, which is just
   // as "unknown" as a directory we could not load. Both must surface as partial,
   // or the client reads the missing row as a confirmed zero.
-  let unresolved = false;
+  let unresolved = dropped > 0;
   rowsByMint.forEach((r) => {
     const entry = dir.get(r.mint);
     if (!entry) return;

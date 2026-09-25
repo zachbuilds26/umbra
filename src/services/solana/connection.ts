@@ -7,7 +7,7 @@ let connection: Connection | null = null;
 /** Every RPC call gets a hard deadline. web3.js 1.x takes no fetch override, so
  * each call is raced against a timer — otherwise a stalled provider holds
  * wallet/balance/confirm requests open indefinitely. */
-async function withDeadline<T>(label: string, timeoutMs: number, run: () => Promise<T>): Promise<T> {
+export async function withRpcDeadline<T>(label: string, timeoutMs: number, run: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -19,6 +19,10 @@ async function withDeadline<T>(label: string, timeoutMs: number, run: () => Prom
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function withDeadline<T>(label: string, timeoutMs: number, run: () => Promise<T>): Promise<T> {
+  return withRpcDeadline(label, timeoutMs, run);
 }
 
 export function getConnection(): Connection {

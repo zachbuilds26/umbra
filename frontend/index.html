@@ -3563,14 +3563,17 @@
           swapFail('Swap library failed to load (check connection and refresh).', false);
           return;
         }
-        executing = true;
-        if (!retrying) {
-          swapErrorEl.style.display = 'none';
-          swapRetryBtn.style.display = 'none';
-          swapExplorerEl.style.display = 'none';
-        }
-        openSwapModal();
+        // From here on every exit must clear this, including a failure while
+        // opening the confirm modal. It is set inside the try so a thrown DOM
+        // error cannot leave the swap button permanently disabled.
         try {
+          executing = true;
+          if (!retrying) {
+            swapErrorEl.style.display = 'none';
+            swapRetryBtn.style.display = 'none';
+            swapExplorerEl.style.display = 'none';
+          }
+          openSwapModal();
           var q = lastQuote;
           paintSwapHero(q);
           paintSwapTitle('Confirm in wallet', '');
@@ -3589,35 +3592,44 @@
           if (!walletProvider || !walletProvider.signTransaction) throw new Error('Connected wallet cannot sign.');
           var signed = await walletProvider.signTransaction(vtx);
           if (window.umbraWallet !== wallet) throw new Error('Wallet changed — nothing was sent.');
-          // 3) Always tell the backend which transaction was signed.
+          // 3) Always tell the backend which transaction was submitted.
           //
-          // Some providers broadcast inside signTransaction and hand back only
-          // {__sig}. Skipping this call for those meant the backend never learned
-          // the signature, so the ledger could not record a swap that had already
-          // executed — the user saw a failure for a trade that went through.
-          // The backend checks the chain first and only relays when the
-          // transaction is not already there, so this is safe either way.
+          // Some providers broadcast inside signTransaction and then return only
+          // {__sig} — there is no signed transaction to relay in that case. So
+          // the signature itself is sent, and the backend fetches that
+          // transaction from the chain and checks its message against the one it
+          // built for this quote. Skipping this entirely meant a swap that had
+          // already executed was never recorded, and the user saw a failure.
           paintSwapTitle('Submitting…', '');
+          var selfBroadcast = typeof signed.__sig === 'string' && signed.__sig.length > 0;
+          var bcBody = {
+            quoteId: q.quoteId,
+            userPublicKey: wallet,
+          };
+          if (selfBroadcast) {
+            bcBody.signature = signed.__sig;
+          } else {
+            bcBody.signedTransaction = bs64encode(signed.serialize());
+          }
           var bcRes = await fetch(API_BASE + '/api/swap/broadcast', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              quoteId: q.quoteId,
-              userPublicKey: wallet,
-              signedTransaction: bs64encode(signed.serialize()),
-            }),
+            body: JSON.stringify(bcBody),
           });
-          var bcData = await bcRes.json();
-          if (!bcRes.ok) {
-            // A wallet that already broadcast and then failed this call must not
-            // be told the swap did not happen: it may well have executed.
-            if (signed.__sig) {
-              sig = signed.__sig;
-            } else {
-              throw new Error((bcData.error && bcData.error.message) || 'Could not submit the swap.');
-            }
-          } else {
+          var bcData = null;
+          try {
+            bcData = await bcRes.json();
+          } catch (_) {
+            bcData = null;
+          }
+          if (bcRes.ok && bcData && bcData.signature) {
             sig = bcData.signature;
+          } else if (selfBroadcast) {
+            // The wallet already broadcast, so the swap may well have executed.
+            // Never report that as a failed swap, and never invite a retry.
+            sig = signed.__sig;
+          } else {
+            throw new Error((bcData && bcData.error && bcData.error.message) || 'Could not submit the swap.');
           }
           // 4) Backend records + confirms
           var subRes = await fetch(API_BASE + '/api/transactions/swap', {
