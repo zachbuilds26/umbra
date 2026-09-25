@@ -93,13 +93,13 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
               recordPrice(symbol, pre.value);
               const { getPrestocksAsset } = await import('../services/prestocks/assets.js');
               const pa = await getPrestocksAsset(symbol).catch(() => null);
-              const { getJupiterLiquidity } = await import('../services/xstocks/assets.service.js');
+              const { getJupiterLiquidity, getJupiterChange24h } = await import('../services/xstocks/assets.service.js');
               return {
                 symbol,
                 price: pre.value,
                 marketCap: pa?.marketCap ?? null,
                 liquidity: await getJupiterLiquidity(symbol).catch(() => null),
-                change24hPct: changePct(symbol),
+                change24hPct: (await getJupiterChange24h(symbol).catch(() => null)) ?? changePct(symbol),
                 timestamp: pre.timestamp,
               };
             }
@@ -157,10 +157,11 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     if (!asset) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
     if (asset.price) recordPrice(symbol, asset.price.value);
     const fair = await withTimeout(getFairPrice(symbol).catch(() => null), 3000);
+    const { getJupiterChange24h } = await import('../services/xstocks/assets.service.js');
     return {
       summary: {
         asset,
-        change24hPct: changePct(symbol),
+        change24hPct: (await getJupiterChange24h(symbol).catch(() => null)) ?? changePct(symbol),
         sparkline: sparkline(symbol),
         fair: fair
           ? { tokenVsEquityBps: fair.tokenVsEquityBps, equityVsReferenceBps: fair.equityVsReferenceBps }
