@@ -298,7 +298,7 @@ export function networkFeeFromOrder(order: JupiterOrderResponse): { currency: 'S
   return { currency: 'SOL', amount: '0.00001', estimated: true };
 }
 
-function normalizeQuote(args: {
+export function normalizeQuote(args: {
   quoteId: string;
   sellSide: ResolvedSide;
   buySide: ResolvedSide;
@@ -310,6 +310,7 @@ function normalizeQuote(args: {
   networkFee: { currency: 'SOL'; amount: string; estimated: boolean };
   platformFeeBps: number | null;
   routeVenue: string | null;
+  blockReason?: { code: string; message: string } | null;
 }): UmbraQuote {
   const { sellSide, buySide, amount, receiveDisplay } = args;
   return {
@@ -327,6 +328,7 @@ function normalizeQuote(args: {
     routeVenue: args.routeVenue,
     expiresAt: args.expiresAt,
     transaction: null,
+    blockReason: args.blockReason ?? null,
   };
 }
 
@@ -400,31 +402,48 @@ export async function buildSwapQuote(params: {
     throw badRequest('VALIDATION_ERROR', 'Amount is too large for Solana. Reduce the amount.');
   }
 
-  if (taker) {
-    try {
-      const held = await readInputBalanceBaseUnits(new PublicKey(taker), sellSide.mint);
-      if (held !== null && !coversAmount(held, amountBaseUnits)) {
-        let display: string | null = null;
-        try {
-          display = await fromBaseUnits(sellSide.symbol, held);
-        } catch {
-          display = null;
+  let order: JupiterOrderResponse;
+  let blockReason: { code: string; message: string } | null = null;
+  try {
+    if (taker) {
+      try {
+        const held = await readInputBalanceBaseUnits(new PublicKey(taker), sellSide.mint);
+        if (held !== null && !coversAmount(held, amountBaseUnits)) {
+          let display: string | null = null;
+          try {
+            display = await fromBaseUnits(sellSide.symbol, held);
+          } catch {
+            display = null;
+          }
+          throw upstream('INSUFFICIENT_BALANCE', describeInputShortfall(sellSide.symbol, display));
         }
-        throw upstream('INSUFFICIENT_BALANCE', describeInputShortfall(sellSide.symbol, display));
+      } catch (err) {
+        if (err instanceof HttpError && err.code === 'INSUFFICIENT_BALANCE') throw err;
       }
-    } catch (err) {
-      if (err instanceof HttpError && err.code === 'INSUFFICIENT_BALANCE') throw err;
     }
-  }
 
-  const order = await fetchOrder({
-    inputMint: sellSide.mint,
-    outputMint: buySide.mint,
-    amountBaseUnits,
-    taker,
-    slippageBps,
-    buySymbol: buySide.symbol,
-  });
+    order = await fetchOrder({
+      inputMint: sellSide.mint,
+      outputMint: buySide.mint,
+      amountBaseUnits,
+      taker,
+      slippageBps,
+      buySymbol: buySide.symbol,
+    });
+  } catch (err) {
+    // Priced but blocked: the taker cannot cover this swap, but the price
+    // itself is still real — re-quote without the taker so the card shows the
+    // numbers with a locked button instead of a blank 0.00.
+    if (!(taker && err instanceof HttpError && err.code === 'INSUFFICIENT_BALANCE')) throw err;
+    blockReason = { code: 'INSUFFICIENT_BALANCE', message: err.message };
+    order = await fetchOrder({
+      inputMint: sellSide.mint,
+      outputMint: buySide.mint,
+      amountBaseUnits,
+      slippageBps,
+      buySymbol: buySide.symbol,
+    });
+  }
   logSwapAttempt({
     stage: 'quote',
     inputMint: sellSide.mint,
@@ -435,6 +454,7 @@ export async function buildSwapQuote(params: {
     priceImpactPct: order.priceImpactPct ?? null,
     slippageBps,
     routeAvailable: Boolean(order.outAmount),
+    rejectReason: blockReason?.message ?? null,
   });
 
   if (!order.outAmount) throw upstream('NO_ROUTE', 'No executable route is currently available for this pair.');
@@ -535,6 +555,7 @@ export async function buildSwapQuote(params: {
     networkFee: networkFeeFromOrder(order),
     platformFeeBps: order.platformFee?.feeBps ?? order.feeBps ?? null,
     routeVenue: typeof order.router === 'string' && order.router ? order.router : null,
+    blockReason,
   });
   quote.priceImpactBps = priceImpactBps;
   return quote;

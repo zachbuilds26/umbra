@@ -5,6 +5,7 @@ import {
   assertStockStablePair,
   classifyJupiterFailure,
   displayToAtomicUnits,
+  normalizeQuote,
 } from '../src/services/jupiter/quote.service.js';
 import { canonicalSymbol } from '../src/services/xstocks/assets.service.js';
 
@@ -152,8 +153,7 @@ describe('routing failure classification', () => {
   });
 });
 
-describe('atomic unit conversion', () => {
-  it('converts USDC (6dp) exactly, including values a float would truncate', () => {
+describe('atomic unit conversion', () => {  it('converts USDC (6dp) exactly, including values a float would truncate', () => {
     assert.equal(displayToAtomicUnits('0.01', 6), '10000');
     assert.equal(displayToAtomicUnits('1', 6), '1000000');
     // Math.floor(1.005 * 1e6) === 1004999 in binary floating point.
@@ -169,6 +169,42 @@ describe('atomic unit conversion', () => {
   it('never invents atomic units below one token unit', () => {
     assert.equal(displayToAtomicUnits('0.0000001', 6), '0');
     assert.equal(displayToAtomicUnits('0.000000001', 9), '1');
+  });
+});
+
+describe('blocked quotes still show the price', () => {
+  const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+  const NVDAX_MINT = 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh';
+  const base = {
+    quoteId: 'umbra_q_test',
+    sellSide: { symbol: 'USDC', mint: USDC_MINT, decimals: 6 },
+    buySide: { symbol: 'NVDAx', mint: NVDAX_MINT, decimals: 8 },
+    amount: '0.07',
+    receiveDisplay: '0.0003',
+    usdValue: '0.07',
+    minimumReceived: '0.00029',
+    expiresAt: new Date().toISOString(),
+    networkFee: { currency: 'SOL' as const, amount: '0.00001', estimated: true },
+    platformFeeBps: null,
+    routeVenue: 'whirlpool',
+  };
+
+  it('carries the block reason with the full pricing', () => {
+    const q = normalizeQuote({
+      ...base,
+      blockReason: { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient funds — add about 0.001722 SOL ($0.20) to swap.' },
+    });
+    assert.deepEqual(q.blockReason, {
+      code: 'INSUFFICIENT_BALANCE',
+      message: 'Insufficient funds — add about 0.001722 SOL ($0.20) to swap.',
+    });
+    assert.equal(q.receive.amount, '0.0003');
+    assert.equal(q.transaction, null);
+  });
+
+  it('leaves the block reason null on executable quotes', () => {
+    const q = normalizeQuote({ ...base });
+    assert.equal(q.blockReason, null);
   });
 });
 

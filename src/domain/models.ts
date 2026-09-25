@@ -44,6 +44,12 @@ export interface UmbraQuote {
   routeVenue?: string | null;
   expiresAt: string;
   transaction: string | null;
+  /**
+   * Set when the price is shown but the swap cannot execute right now
+   * (e.g. the wallet is short). The frontend paints the numbers and locks
+   * the Swap button instead of blanking the card to 0.00.
+   */
+  blockReason?: { code: string; message: string } | null;
 }
 
 export interface UmbraBridgeRoute {

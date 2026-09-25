@@ -2403,11 +2403,12 @@
       function updateActionBtn() {
         var action = document.getElementById('actionBtn');
         if (window.umbraWallet) {
-          if (typeof swapBlocked !== 'undefined' && swapBlocked === 'INSUFFICIENT_BALANCE') {
+          if (typeof swapBlocked !== 'undefined' && swapBlocked) {
+            var blockedFunds = swapBlocked === 'INSUFFICIENT_BALANCE';
             action.setAttribute('disabled', '');
-            action.textContent = 'Insufficient funds';
-            action.title = 'Not enough SOL to open the accounts this swap needs';
-            action.setAttribute('aria-label', 'Insufficient funds for this swap');
+            action.textContent = blockedFunds ? 'Insufficient funds' : 'Unavailable';
+            action.title = blockedFunds ? 'Not enough SOL to open the accounts this swap needs' : 'This swap is not available right now';
+            action.setAttribute('aria-label', blockedFunds ? 'Insufficient funds for this swap' : 'Swap unavailable');
           } else {
             action.removeAttribute('disabled');
             action.textContent = 'Swap';
@@ -3281,6 +3282,14 @@
             key: amt + '|' + sellSym + '|' + buySym + '|' + slippageBps,
           };
           swapBlocked = null;
+          var blockCode = data.blockReason && data.blockReason.code;
+          var blockMsg = data.blockReason && data.blockReason.message;
+          if (blockCode) {
+            // Priced but blocked: the numbers are real, the wallet just cannot
+            // cover it. Show everything, lock the button, keep no quote to sign.
+            lastQuote = null;
+            swapBlocked = blockCode;
+          }
           try { updateActionBtn(); } catch (_) {}
           var impact = data.priceImpactBps === null || data.priceImpactBps === undefined ? '—' : (data.priceImpactBps / 100).toFixed(2) + '%';
           // No fee rows here: the wallet shows the network fee at signing time.
@@ -3289,9 +3298,13 @@
             '<div class="row"><span>Price impact</span><span>' + impact + '</span></div>' +
             '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>';
           quoteLinesEl.innerHTML = html;
+          if (blockCode) {
+            quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
+          }
           // Auto-open so the first price is never a mystery, but respect a
           // manual close afterwards: a background refresh must not fight the user.
-          applyDetails(detailsUserChoice === null ? true : detailsUserChoice);
+          // A blocked quote always opens: the reason must be visible, not hidden.
+          applyDetails(blockCode ? true : (detailsUserChoice === null ? true : detailsUserChoice));
           if (window.lucide) window.lucide.createIcons();
           setBuyChange(null);
           // Pyth comparison: the reference feed for the STOCK side of this pair
@@ -3555,7 +3568,7 @@
       async function executeSwap() {
         if (executing) return;
         if (!window.umbraWallet) { resetRetryBtn(); connectWallet(); return; }
-        if (swapBlocked === 'INSUFFICIENT_BALANCE') { resetRetryBtn(); return; }
+        if (swapBlocked) { resetRetryBtn(); return; }
         var amt = (sellAmountEl.value || '').trim();
         if (!amt || Number(amt) <= 0) { resetRetryBtn(); return; }
         // Snapshot the wallet: switching accounts mid-flow must never build,
