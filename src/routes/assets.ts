@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { listSolanaAssets, enrichAsset, getPrice, getLastGoodPrice, getAsset, canonicalSymbol, canonicalAssetSymbol } from '../services/xstocks/assets.service.js';
+import { listSolanaAssets, enrichAsset, getPrice, getLastGoodPrice, getAsset, getSolanaMint, canonicalSymbol, canonicalAssetSymbol } from '../services/xstocks/assets.service.js';
 import { getFairPrice } from '../services/pyth/fair-price.service.js';
 import { recordPrice, changePct, sparkline } from '../services/prices/history.js';
 import { getPrestocksPrice, getPrestocksSymbols } from '../services/prestocks/assets.js';
@@ -70,17 +70,25 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     const theld = tickerCache.get(tkey);
     if (theld) return theld;
     const out: Array<{ symbol: string; price: string | null; marketCap: string | null; liquidity: string | null; change24hPct: number | null; timestamp: string }> = [];
-    // Bounded concurrency + per-symbol timeout: xStocks can stall (60s per
-    // symbol when Cloudflare blocks us) — cap it so pre-IPO prices stay fast.
-    // Pre-IPO symbols skip xStocks entirely (direct prestocks lookup is ~1ms).
-    // Timeout is 9s: xStocks 6s + Jupiter ~1.1s pacing + overhead, still falls
-    // back to last-good before the 10s fetchJsonWithRetry ceiling.
     const CONCURRENCY = 8;
-    const PRICE_TIMEOUT_MS = 9000;
-    const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T | null> =>
-      Promise.race([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]) as Promise<T | null>;
     // Prime prestocks symbol set once per request (single-flight cached)
     const preSet = await getPrestocksSymbols().catch(() => new Set<string>());
+    // One batched Tokens snapshot call for every resolvable mint: price,
+    // 24h change and liquidity for the whole shelf in a single request.
+    // Pre-IPO mints are skipped — Tokens indexes no markets for them.
+    const { getTokensSnapshots } = await import('../services/tokens/market.js');
+    const mintBySymbol = new Map<string, string>();
+    await Promise.all(
+      requested.filter((s) => !preSet.has(s.toUpperCase())).map(async (symbol) => {
+        const found = await getSolanaMint(symbol).catch(() => null);
+        if (found) mintBySymbol.set(symbol, found.mint);
+      }),
+    );
+    const snaps = await getTokensSnapshots([...mintBySymbol.values()]);
+    const symbolSnap = (symbol: string) => {
+      const mint = mintBySymbol.get(symbol);
+      return mint ? (snaps.get(mint) ?? null) : null;
+    };
     for (let i = 0; i < requested.length; i += CONCURRENCY) {
       const batch = requested.slice(i, i + CONCURRENCY);
       const priced = await Promise.all(
@@ -104,36 +112,30 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
               };
             }
           }
-          let price =
-            (await withTimeout(
-              getPrice(symbol)
-                .catch(() => null)
-                .then(async (p) => {
-                  if (p) return p;
-                  const pre = await getPrestocksPrice(symbol).catch(() => null);
-                  return pre ? { ...pre, currency: 'USD' as const } : null;
-                }),
-              PRICE_TIMEOUT_MS,
-            )) ?? null;
-          if (!price) {
-            const last = getLastGoodPrice(symbol);
-            if (last) price = { ...last, currency: 'USD' as const };
-          }
-          if (price) recordPrice(symbol, price.value);
           const mcap = null;
-          // Change precedence (all measured, never invented): Jupiter's real 24h
-          // window first, then our own history ring, then flat-0 for known prices.
-          const { getJupiterChange24h, getJupiterLiquidity } = await import('../services/xstocks/assets.service.js');
-          const jupChange = await getJupiterChange24h(symbol).catch(() => null);
-          // Liquidity rides the same cached Jupiter object (warmed by the call above).
-          const jupLiq = await getJupiterLiquidity(symbol).catch(() => null);
+          // Change precedence (all measured, never invented): Tokens' real 24h
+          // window first, then our own history ring. No live Jupiter/Finnhub
+          // calls on this path — Tokens is the stocks page source.
+          const snap = symbolSnap(symbol);
+          const snapPrice =
+            snap?.hasMarket && snap.priceUsd !== null
+              ? { value: String(snap.priceUsd), currency: 'USD' as const, timestamp: new Date().toISOString() }
+              : null;
+          const lastGood = (() => {
+            const last = getLastGoodPrice(symbol);
+            return last ? { ...last, currency: 'USD' as const } : null;
+          })();
+          const served = snapPrice ?? lastGood;
+          if (served) recordPrice(symbol, served.value);
+          const snapChange = snap?.hasMarket ? snap.change24hPct : null;
+          const snapLiq = snap?.hasMarket && snap.liquidityUsd !== null ? String(snap.liquidityUsd) : null;
           return {
             symbol,
-            price: price?.value ?? null,
+            price: served?.value ?? null,
             marketCap: mcap,
-            liquidity: jupLiq,
-            change24hPct: price ? (jupChange ?? changePct(symbol)) : null,
-            timestamp: price?.timestamp ?? new Date().toISOString(),
+            liquidity: snapLiq,
+            change24hPct: served ? (snapChange ?? changePct(symbol)) : null,
+            timestamp: served?.timestamp ?? new Date().toISOString(),
           };
         }),
       );
@@ -157,11 +159,13 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
     if (!asset) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
     if (asset.price) recordPrice(symbol, asset.price.value);
     const fair = await withTimeout(getFairPrice(symbol).catch(() => null), 3000);
-    const { getJupiterChange24h } = await import('../services/xstocks/assets.service.js');
+    const { getTokensSnapshots } = await import('../services/tokens/market.js');
+    const foundMint = await getSolanaMint(symbol).catch(() => null);
+    const snap = foundMint ? (await getTokensSnapshots([foundMint.mint])).get(foundMint.mint) ?? null : null;
     return {
       summary: {
         asset,
-        change24hPct: (await getJupiterChange24h(symbol).catch(() => null)) ?? changePct(symbol),
+        change24hPct: (snap?.hasMarket ? snap.change24hPct : null) ?? changePct(symbol),
         sparkline: sparkline(symbol),
         fair: fair
           ? { tokenVsEquityBps: fair.tokenVsEquityBps, equityVsReferenceBps: fair.equityVsReferenceBps }
@@ -189,42 +193,42 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /api/assets/marketcaps?symbols=A,B,C — one request for the whole shelf.
-  //
-  // The stocks list used to ask for each valuation separately: 56 requests on
-  // page load, against a Finnhub key that allows 60 calls a minute. A single
-  // visitor's page view could exhaust the quota for everyone, and the browser
-  // paid 56 round trips for data the server can gather once.
+    //
+  // Token market caps come from Tokens market snapshots (on-chain asset
+  // values, not equity valuations): one batched call, no per-symbol fan-out,
+  // no Finnhub quota burn.
   app.get('/api/assets/marketcaps', async (req) => {
     const q = z.object({ symbols: z.string().min(1).max(600) }).parse(req.query);
     const wanted = [...new Set(q.symbols.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 60);
     if (wanted.length === 0) return { marketCaps: {} };
-    const { getEquityMarketCapForAsset, getAsset } = await import('../services/xstocks/assets.service.js');
-    const resolved = await Promise.all(
+    const { getTokensSnapshots } = await import('../services/tokens/market.js');
+    const mintBySymbol = new Map<string, string>();
+    await Promise.all(
       wanted.map(async (raw) => {
         const symbol = await canonicalAssetSymbol(raw).catch(() => null);
-        if (!symbol) return null;
-        const asset = await getAsset(symbol).catch(() => null);
-        if (!asset) return null;
-        const marketCap = await getEquityMarketCapForAsset(asset).catch(() => null);
-        return marketCap ? ([symbol, marketCap] as const) : null;
+        if (!symbol) return;
+        const found = await getSolanaMint(symbol).catch(() => null);
+        if (found) mintBySymbol.set(symbol, found.mint);
       }),
     );
+    const snaps = await getTokensSnapshots([...mintBySymbol.values()]);
     const marketCaps: Record<string, string> = {};
-    for (const entry of resolved) {
-      if (entry) marketCaps[entry[0]] = entry[1];
+    for (const [symbol, mint] of mintBySymbol) {
+      const snap = snaps.get(mint);
+      if (snap?.hasMarket && snap.marketCapUsd !== null) marketCaps[symbol] = String(snap.marketCapUsd);
     }
     return { marketCaps };
   });
 
-  // GET /api/assets/:symbol/marketcap — valuation only (~300ms: no price or
-  // multiplier legs). Powers the stocks list; Finnhub first, Jupiter fallback.
+  // GET /api/assets/:symbol/marketcap — Tokens snapshot value for one symbol.
   app.get('/api/assets/:symbol/marketcap', async (req) => {
     const params = z.object({ symbol: z.string().min(1).max(16) }).parse(req.params);
     const symbol = await canonicalAssetSymbol(params.symbol);
-    const asset = await getAsset(symbol).catch(() => null);
-    if (!asset) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
-    const { getEquityMarketCapForAsset } = await import('../services/xstocks/assets.service.js');
-    return { symbol, marketCap: await getEquityMarketCapForAsset(asset).catch(() => null) };
+    const found = await getSolanaMint(symbol).catch(() => null);
+    if (!found) throw notFound('UNSUPPORTED_ASSET', `Asset ${params.symbol} is not supported.`);
+    const { getTokensSnapshots } = await import('../services/tokens/market.js');
+    const snap = (await getTokensSnapshots([found.mint])).get(found.mint) ?? null;
+    return { symbol, marketCap: snap?.hasMarket && snap.marketCapUsd !== null ? String(snap.marketCapUsd) : null };
   });
 
   app.get('/api/assets/:symbol/price', async (req) => {
