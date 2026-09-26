@@ -440,10 +440,7 @@
     }
 
     .mobile-menu .micon {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: var(--umbra-accent-soft);
+      width: 24px;
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -2284,6 +2281,14 @@
       });
       menu.addEventListener('click', function (e) {
         if (e.target.tagName === 'A') closeMenu();
+      });
+      // Tapping the dimmed page outside the sheet dismisses it too —
+      // the X button is not the only way out.
+      document.addEventListener('click', function (e) {
+        if (!menu.classList.contains('open')) return;
+        var t = e.target;
+        if (t && t.closest && (t.closest('#mobileMenu') || t.closest('#menuBtn'))) return;
+        closeMenu();
       });
 
       // Tab views: exactly one section visible; pills highlight the current one.
