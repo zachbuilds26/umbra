@@ -938,6 +938,15 @@
     #buyChange.up { color: var(--umbra-accent); }
     #buyChange.down { color: #f6465d; }
 
+    /* Tappable change badge: dashed underline like the big venues — tapping
+       explains the number through the shared tooltip. */
+    #buyChange.up,
+    #buyChange.down {
+      text-decoration: underline dashed;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+
     /* Details header: top half of the details card (rows complete it) */
     .details-label {
       display: flex;
@@ -3139,11 +3148,13 @@
         if (pct === null || pct === undefined) {
           el.textContent = '';
           el.className = '';
+          el.removeAttribute('data-tip');
           return;
         }
         var sign = pct > 0 ? '+' : '';
         el.textContent = '(' + sign + pct.toFixed(2) + '%)';
         el.className = pct >= 0 ? 'up' : 'down';
+        el.setAttribute('data-tip', '24h price change — how much ' + buySym + ' moved in the last day. For context only, not part of your quote.');
       }
 
       function resetQuoteSummary() {
@@ -4614,7 +4625,7 @@
       }
       // One click handler only (the old code had two and they fought each other)
       document.addEventListener('click', function (e) {
-        var target = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        var target = e.target && e.target.closest ? e.target.closest('.info-icon, #buyChange[data-tip]') : null;
         if (target) {
           e.stopPropagation();
           var tip = ensureInfoTip();
