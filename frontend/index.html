@@ -448,7 +448,7 @@
       animation: sheetUp 0.25s ease;
     }
 
-    .mobile-menu a.mrow {
+    .mobile-menu .mrow {
       display: flex;
       align-items: center;
       gap: 14px;
@@ -467,8 +467,27 @@
     .mobile-menu a.mrow:hover {
       background: #242424;
     }
-    .mobile-menu a.mrow.active {
+    .mobile-menu .mrow.active {
       background: transparent;
+    }
+
+    /* Disabled rows: visible but dead (no link, no handler, no focus) */
+    .mobile-menu .mrow.is-off {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .mobile-menu .mrow.is-off:hover {
+      background: transparent;
+    }
+    .soon-badge {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 800;
+      color: var(--umbra-accent-ink);
+      background: var(--umbra-accent);
+      border-radius: 999px;
+      padding: 2px 8px;
+      flex: none;
     }
 
     .mobile-foot {
@@ -1878,6 +1897,7 @@
     <a href="#swap" class="mrow active"><span class="micon"><i data-lucide="repeat" width="17" height="17"></i></span><span>Swap</span></a>
     <a href="#stocks" class="mrow"><span class="micon"><i data-lucide="trending-up" width="17" height="17"></i></span><span>Stocks</span></a>
     <a href="#transactions" class="mrow"><span class="micon"><span class="material-symbols-outlined" style="font-size:18px; line-height:1;">search_activity</span></span><span>Transactions</span></a>
+    <span class="mrow is-off" aria-disabled="true" title="Launch coming soon"><span class="micon"><i data-lucide="rocket" width="17" height="17"></i></span><span>Launch</span><span class="soon-badge">soon</span></span>
     <div class="sheet-div" aria-hidden="true"></div>
     <div class="mobile-foot">
       <span class="mobile-chain" title="Solana is the only network"><span class="mchain-disc"><img src="./assets/solana-mark.png" alt="" /></span>Mainnet</span>
