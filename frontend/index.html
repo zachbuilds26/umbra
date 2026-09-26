@@ -1411,7 +1411,7 @@
     }
     .stocks-card {
       width: 100%;
-      max-width: 920px;
+      max-width: 780px;
       flex: none;
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
@@ -1645,67 +1645,6 @@
     .stock-mcap {
       font-size: 12px;
       color: var(--umbra-muted);
-    }
-
-    /* ---------- Stocks table (screener layout: rank, token, numbers, chart) ---------- */
-    .stocks-table-scroll {
-      overflow-x: auto;
-      scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
-    }
-    table.stocks-table {
-      width: 100%;
-      min-width: 680px;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    .stocks-table thead th {
-      text-align: left;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--umbra-muted);
-      padding: 12px;
-      border-bottom: 1px solid var(--umbra-border);
-      white-space: nowrap;
-    }
-    .stocks-table thead th.num,
-    .stocks-table td.num {
-      text-align: right;
-    }
-    .stocks-table tbody td {
-      padding: 12px;
-      border-bottom: 1px solid var(--umbra-border);
-      vertical-align: middle;
-      white-space: nowrap;
-    }
-    .stocks-table tbody tr:last-child td {
-      border-bottom: 0;
-    }
-    .stocks-table tbody tr.srow {
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-    .stocks-table tbody tr.srow:hover {
-      background: var(--umbra-secondary);
-    }
-    .stocks-table td.rank {
-      color: var(--umbra-muted);
-      width: 36px;
-    }
-    .stocks-table .chg-up {
-      color: var(--umbra-accent);
-      font-weight: 600;
-    }
-    .stocks-table .chg-down {
-      color: #f6465d;
-      font-weight: 600;
-    }
-    .stocks-table td.tchart {
-      width: 132px;
-    }
-    .stocks-table td.tchart svg {
-      display: block;
-      margin-left: auto;
     }
 
     /* ---------- Drawer ---------- */
@@ -3604,79 +3543,28 @@
         if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
         return '$' + Number(n).toLocaleString('en-US');
       }
-      function stockPriceHtml(a) {
+      function stockRowHtml(a) {
+        var icon = tkIcon(a.symbol, 'tk-36');
         // Skeleton = still loading. "—" = the fetch finished with nothing, which
         // is the honest answer for mints no venue indexes.
-        return a.price
+        var price = a.price
           ? '$' + Number(a.price.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : a._priceChecked
             ? '—'
             : '<span class="skeleton short"></span>';
-      }
-      function stockMcapHtml(a) {
-        return a.marketCap
+        var mcap = a.marketCap
           ? formatMcap(a.marketCap)
           : a._mcapChecked
             ? '—'
             : '<span class="skeleton"></span>';
-      }
-      function stockChgHtml(a) {
-        // No 24h observation is a dash, never a 0.00% move.
-        var c = (a.change24hPct === null || a.change24hPct === undefined || a.change24hPct === '')
-          ? NaN : Number(a.change24hPct);
-        if (!isFinite(c)) return a._priceChecked ? '—' : '<span class="skeleton short"></span>';
-        var up = c >= 0;
-        return '<span class="' + (up ? 'chg-up' : 'chg-down') + '">' + (up ? '▲' : '▼') + ' ' + Math.abs(c).toFixed(2) + '%</span>';
-      }
-      // Small area chart for the Trend column (drawer keeps its own renderer).
-      function miniSpark(points, w, h) {
-        w = w || 120; h = h || 36;
-        var pad = 3;
-        var vals = points.map(function (p) { return Number(p.p); });
-        if (vals.length < 2) return '';
-        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
-        if (!isFinite(min) || !isFinite(max) || min === max) { min -= 1; max += 1; }
-        var range = max - min;
-        min -= range * 0.1; max += range * 0.1; range = max - min;
-        var coords = vals.map(function (v, i) {
-          return {
-            x: pad + (i / (vals.length - 1)) * (w - pad * 2),
-            y: h - pad - ((v - min) / range) * (h - pad * 2)
-          };
-        });
-        var line = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
-        var area = line + ' L' + coords[coords.length - 1].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' L' + coords[0].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' Z';
-        var up = vals[vals.length - 1] >= vals[0];
-        var col = up ? '#55B98A' : '#f6465d';
-        var id = 'ms-' + Math.random().toString(36).slice(2, 8);
-        return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" preserveAspectRatio="none">' +
-          '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + col + '" stop-opacity="0.32"/><stop offset="100%" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>' +
-          '<path d="' + area + '" fill="url(#' + id + ')" />' +
-          '<path d="' + line + '" fill="none" stroke="' + col + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" /></svg>';
-      }
-      function stockChartHtml(sym) {
-        var ce = sparkCache[sym];
-        if (ce === undefined) return '<span class="skeleton" style="width:96px;height:28px;"></span>';
-        if (ce) return miniSpark(ce.p);
-        return '<span style="color:var(--umbra-muted);">—</span>';
-      }
-      function stockTrHtml(a, rank) {
-        var icon = tkIcon(a.symbol, 'tk-36');
         return (
-          '<tr class="srow" data-symbol="' + esc(a.symbol) + '">' +
-          '<td class="rank">' + rank + '</td>' +
-          '<td><span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + '</b><span>' + esc(a.name || '') + '</span></span></span></td>' +
-          '<td class="num">' + stockPriceHtml(a) + '</td>' +
-          '<td class="num">' + stockChgHtml(a) + '</td>' +
-          '<td class="num">' + stockMcapHtml(a) + '</td>' +
-          '<td class="num tchart" data-spark="' + esc(a.symbol) + '">' + stockChartHtml(a.symbol) + '</td>' +
-          '</tr>'
+          '<a class="stock-row" href="#swap" data-symbol="' + esc(a.symbol) + '">' +
+          '<span class="stock-left">' + icon + '<span class="stock-meta"><b>' + esc(a.symbol) + '</b><span>' + esc(a.name || '') + '</span></span></span>' +
+          '<span class="stock-right"><span class="stock-price">' + price + '</span><span class="stock-mcap">' + mcap + '</span></span>' +
+          '</a>'
         );
       }
-      function stockTableHead() {
-        return '<thead><tr><th>#</th><th>Token</th><th class="num">Price</th><th class="num">24H</th><th class="num">Mkt Cap</th><th class="num">Trend</th></tr></thead>';
-      }
-      // Shimmer rows shaped like the plain row list (token picker, activity):
+      // Shimmer rows shaped like the list while it loads (KyberSwap-style):
       // layout first, numbers second. Never used for empty/error states.
       function stockSkeletonRows(n) {
         var rows = '';
@@ -3690,60 +3578,6 @@
             '<span class="skeleton" style="width:40px;height:8px;"></span></span></div>';
         }
         return rows;
-      }
-      // Shimmer table shaped like the screener while it loads:
-      // layout first, numbers second. Never used for empty/error states.
-      function stockTableSkeleton(n) {
-        var rows = '';
-        for (var i = 0; i < (n || 8); i++) {
-          rows += '<tr>' +
-            '<td class="rank"><span class="skeleton short"></span></td>' +
-            '<td><span class="stock-left"><span class="skeleton" style="width:36px;height:36px;border-radius:50%;flex:none;"></span>' +
-            '<span class="stock-meta"><span class="skeleton" style="width:72px;height:12px;"></span>' +
-            '<span class="skeleton" style="width:120px;height:8px;margin-top:6px;"></span></span></span></td>' +
-            '<td class="num"><span class="skeleton" style="width:64px;height:12px;"></span></td>' +
-            '<td class="num"><span class="skeleton short"></span></td>' +
-            '<td class="num"><span class="skeleton"></span></td>' +
-            '<td class="num tchart"><span class="skeleton" style="width:96px;height:28px;"></span></td></tr>';
-        }
-        return '<div class="stocks-table-scroll"><table class="stocks-table">' + stockTableHead() + '<tbody>' + rows + '</tbody></table></div>';
-      }
-      // Trend charts load lazily behind the numbers: at most 4 summaries in
-      // flight, results cached for the session, cells painted in place.
-      var sparkCache = {};
-      var sparkQueue = [];
-      var sparkActive = 0;
-      function paintSparkCell(sym) {
-        if (!sym || sparkCache[sym] === undefined) return;
-        var cells = document.querySelectorAll('td[data-spark="' + sym + '"]');
-        if (!cells.length) return;
-        var html = sparkCache[sym] ? miniSpark(sparkCache[sym].p) : '<span style="color:var(--umbra-muted);">—</span>';
-        Array.prototype.forEach.call(cells, function (td) { td.innerHTML = html; });
-      }
-      function pumpSparks() {
-        while (sparkActive < 4 && sparkQueue.length) {
-          var sym = sparkQueue.shift();
-          if (sparkCache[sym] !== undefined) { paintSparkCell(sym); continue; }
-          sparkActive++;
-          (function (s) {
-            fetch(API_BASE + '/api/assets/' + encodeURIComponent(s) + '/summary')
-              .then(function (r) { return r.ok ? r.json() : null; })
-              .then(function (d) {
-                var pts = d && d.summary && d.summary.sparkline;
-                sparkCache[s] = (pts && pts.length >= 2) ? { p: pts } : null;
-              })
-              .catch(function () { sparkCache[s] = null; })
-              .then(function () { sparkActive--; paintSparkCell(s); pumpSparks(); });
-          })(sym);
-        }
-      }
-      function loadTableCharts(list) {
-        (list || []).forEach(function (a) {
-          var sym = a && a.symbol;
-          if (!sym || sparkCache[sym] !== undefined) { paintSparkCell(sym); return; }
-          if (sparkQueue.indexOf(sym) === -1) sparkQueue.push(sym);
-        });
-        pumpSparks();
       }
       // Every symbol here was live quote-verified (USDC pair). 37 deep + 11 thin + 8 Pre-IPO = 56.
       // Removed as unquotable: 26 junk entries (bad tickers like "T", "KO", "MCHP", "BRK.Bx")
@@ -3773,7 +3607,7 @@
           if (stocksLoadFailed) {
             emptyMsg = 'Could not load the stocks list. Check your connection and try again.';
           } else if (!stocksCache.length) {
-            el.innerHTML = stockTableSkeleton(8);
+            el.innerHTML = stockSkeletonRows(8);
             return;
           } else {
             emptyMsg = f ? 'No matches found.' : 'No stocks found';
@@ -3781,18 +3615,14 @@
           el.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; min-height:320px; padding:32px 16px; text-align:center; color:var(--umbra-muted); font-size:14px;">' + esc(emptyMsg) + '</div>';
           return;
         }
-        el.innerHTML = '<div class="stocks-table-scroll"><table class="stocks-table">' +
-          stockTableHead() + '<tbody>' +
-          list.map(function (a, i) { return stockTrHtml(a, i + 1); }).join('') +
-          '</tbody></table></div>';
-        Array.prototype.forEach.call(el.querySelectorAll('tr.srow'), function (row) {
+        el.innerHTML = list.map(stockRowHtml).join('');
+        Array.prototype.forEach.call(el.querySelectorAll('.stock-row'), function (row) {
           row.addEventListener('click', function (e) {
             e.preventDefault();
             var sym = row.getAttribute('data-symbol');
             openStockDrawer(sym);
           });
         });
-        loadTableCharts(list);
         // Update dropdown counts — fixed one-time total, not live filtered
         var total = stocksTotal || stocksCache.length;
         var ca = document.getElementById('countAll'); if (ca) ca.textContent = total || '—';
@@ -3829,7 +3659,7 @@
                 }
             } catch (_) {}
             if (!stocksCache.length && _listEl) {
-              _listEl.innerHTML = stockTableSkeleton(8);
+              _listEl.innerHTML = stockSkeletonRows(8);
             }
           }
           // The shelf list is already being loaded for the picker by
@@ -3865,7 +3695,6 @@
                             // carries xStock mcaps, so locking here froze rows at "—".
                             if (t.marketCap) { a.marketCap = t.marketCap; a._mcapChecked = true; }
                             if (t.liquidity) a.liquidity = t.liquidity;
-                            if (t.change24hPct !== null && t.change24hPct !== undefined && isFinite(Number(t.change24hPct))) a.change24hPct = Number(t.change24hPct);
                           }
                         });
                       }
@@ -3931,7 +3760,6 @@
                             }
                             if (t.marketCap) a.marketCap = t.marketCap;
                             if (t.liquidity) a.liquidity = t.liquidity;
-                            if (t.change24hPct !== null && t.change24hPct !== undefined && isFinite(Number(t.change24hPct))) a.change24hPct = Number(t.change24hPct);
                           }
                         });
                         if (patched) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
