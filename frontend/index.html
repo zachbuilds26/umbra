@@ -610,6 +610,14 @@
     .swap-hero h1 span {
       color: var(--umbra-accent);
     }
+    /* Word-swap intro: the two nouns fade out, trade places, fade back in */
+    .swap-hero h1 .hw {
+      display: inline-block;
+      transition: opacity 0.35s ease;
+    }
+    .swap-hero h1.swapping .hw {
+      opacity: 0;
+    }
     /* Typewriter caret: hidden until the typer starts (no-JS stays clean) */
     .swap-hero h1 .hero-caret {
       display: none;
@@ -1899,7 +1907,7 @@
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
         <div class="swap-hero">
-          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped">Stocks to <span>stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
+          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped"><span class="hw" id="heroW1">Stocks</span> to <span class="hw" id="heroW3">stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
         </div>
         <div class="swap-card ox">
           <div class="swap-top">
@@ -2550,18 +2558,18 @@
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
 
-      /* ---------- Hero typewriter: headline -> pair rotation, looped ---- */
+      /* ---------- Hero typewriter: word swap, then pair rotation loop -- */
       (function heroTyper() {
         var title = document.getElementById('heroTitle');
         var el = document.getElementById('heroTyped');
         if (!title || !el) return;
-        var phrases = ['Stocks to stables.', 'NVDAx to USDC', 'METAx to USDT', 'AMZNx to USDC', 'MSFTx to USDT'];
+        var phrases = ['Stables to stocks.', 'NVDAx to USDC', 'METAx to USDT', 'AMZNx to USDC', 'MSFTx to USDT', 'Stocks to stables.'];
         var reduce = false;
         try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
         // Reduced motion or no timer: static headline, no caret, no shift.
         if (reduce) return;
         title.classList.add('typing');
-        var pi = 0, ci = el.textContent.length, deleting = true;
+        var pi = 0, ci = 0, deleting = false;
         function tick() {
           var full = phrases[pi];
           if (!deleting) {
@@ -2585,8 +2593,24 @@
             setTimeout(tick, 28);
           }
         }
-        // Start by wiping the static headline, then loop everything forever.
-        setTimeout(tick, 1800);
+        // Intro: "Stocks" and "stables." trade places first ("Stables to
+        // stocks."), then the normal delete-type loop takes over forever.
+        setTimeout(function () {
+          title.classList.add('swapping');
+          setTimeout(function () {
+            var w1 = document.getElementById('heroW1');
+            var w3 = document.getElementById('heroW3');
+            if (w1) w1.textContent = 'Stables';
+            if (w3) w3.textContent = 'stocks.';
+            title.classList.remove('swapping');
+            setTimeout(function () {
+              el.textContent = phrases[0];
+              ci = phrases[0].length;
+              deleting = true;
+              tick();
+            }, 1700);
+          }, 400);
+        }, 1800);
       })();
 
       /* ---------- Swap card ---------- */
