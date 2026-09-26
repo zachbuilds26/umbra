@@ -232,6 +232,53 @@
       font-weight: 600;
     }
 
+    /* Desktop Trade dropdown (mirrors the sheet's Trade group) */
+    .nav-drop {
+      position: relative;
+    }
+    .trade-pill {
+      gap: 8px;
+    }
+    .trade-pill .trade-chev {
+      color: var(--umbra-muted);
+      transition: transform 0.2s ease;
+    }
+    .trade-pill[aria-expanded="true"] .trade-chev {
+      transform: rotate(180deg) translateY(-2px);
+    }
+    .nav-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      min-width: 180px;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      z-index: 55;
+    }
+    .nav-menu-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    a.nav-menu-row:hover {
+      background: var(--umbra-secondary);
+    }
+    .nav-menu-row.is-off {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     .network-btn {
       display: inline-flex;
       align-items: center;
@@ -1852,7 +1899,15 @@
         <span>Umbra</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
-        <a class="nav-pill active" href="#swap">Swap</a>
+        <div class="nav-drop" id="tradeDrop">
+          <button class="nav-pill trade-pill" id="tradePill" aria-expanded="false" aria-haspopup="true">
+            <span>Trade</span><span class="css-chev trade-chev" aria-hidden="true"></span>
+          </button>
+          <div class="nav-menu" id="tradeMenu" hidden>
+            <a href="#swap" class="nav-menu-row">Swap</a>
+            <span class="nav-menu-row is-off" aria-disabled="true" title="Bridge coming soon"><span>Bridge</span><span class="soon-badge">soon</span></span>
+          </div>
+        </div>
         <a class="nav-pill" href="#stocks">Stocks</a>
         <a class="nav-pill" href="#transactions">Transactions</a>
       </nav>
@@ -2283,6 +2338,38 @@
         tradeSub.hidden = !open;
         tradeToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
+      // Desktop Trade dropdown: same options as the sheet's Trade group.
+      var tradePill = document.getElementById('tradePill');
+      var tradeMenu = document.getElementById('tradeMenu');
+      function closeTrade() {
+        if (tradeMenu && tradePill && !tradeMenu.hidden) {
+          tradeMenu.hidden = true;
+          tradePill.setAttribute('aria-expanded', 'false');
+        }
+      }
+      if (tradePill && tradeMenu) {
+        tradePill.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var open = tradeMenu.hidden;
+          tradeMenu.hidden = !open;
+          tradePill.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        Array.prototype.forEach.call(tradeMenu.querySelectorAll('a'), function (a) {
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var hash = a.getAttribute('href');
+            try { history.replaceState(null, '', hash); } catch (_) {}
+            setActive(hash);
+            closeTrade();
+          });
+        });
+        document.addEventListener('click', function (e) {
+          if (!e.target || !e.target.closest || !e.target.closest('#tradeDrop')) closeTrade();
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') closeTrade();
+        });
+      }
 
       // Tab views: exactly one section visible; pills highlight the current one.
       function on(id, evt, fn) {
@@ -2306,6 +2393,8 @@
         pills.forEach(function (p) {
           p.classList.toggle('active', p.getAttribute('href') === hash);
         });
+        var tradePill = document.getElementById('tradePill');
+        if (tradePill) tradePill.classList.toggle('active', hash === '#swap');
         mobileLinks.forEach(function (a) {
           a.classList.toggle('active', a.getAttribute('href') === hash);
         });
