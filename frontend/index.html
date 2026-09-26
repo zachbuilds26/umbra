@@ -609,49 +609,22 @@
     }
     .swap-hero h1 #heroTyped {
       color: var(--umbra-text);
-      transition: opacity 0.3s ease;
-    }
-    .swap-hero h1 #heroTyped.fading {
-      opacity: 0;
     }
     /* Last word stays green in both headline forms */
-    .swap-hero h1 #heroW1 {
-      color: var(--umbra-text);
-    }
-    .swap-hero h1 #heroW3,
     .swap-hero h1 .hl {
       color: var(--umbra-accent);
     }
-    /* Word-swap intro: the two nouns fade out, trade places, fade back in */
-    .swap-hero h1 .hw {
-      display: inline-block;
-      transition: opacity 0.35s ease;
-    }
-    .swap-hero h1.swapping .hw {
-      opacity: 0;
-    }
-    /* Typewriter caret: hidden until the typer starts (no-JS stays clean) */
-    .swap-hero h1 .hero-caret {
-      display: none;
-      width: 3px;
-      height: 0.95em;
-      background: var(--umbra-accent);
-      margin-left: 5px;
-      vertical-align: -0.12em;
-      animation: caretBlink 1s steps(1) infinite;
-    }
-    .swap-hero h1.typing .hero-caret {
-      display: inline-block;
-    }
-    .swap-hero h1.typing #heroTyped {
-      color: var(--umbra-text);
-    }
-    @keyframes caretBlink {
-      0%, 55% { opacity: 1; }
-      56%, 100% { opacity: 0; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .swap-hero h1 .hero-caret { animation: none; }
+    /* Screen-reader-only fallback text */
+    .swap-hero h1 .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* ---------- Swap card (reference look, our colour) ----------
@@ -1919,7 +1892,7 @@
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
         <div class="swap-hero">
-          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped"><span class="hw" id="heroW1">Stocks</span> to <span class="hw" id="heroW3">stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
+          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped" aria-hidden="true">Stocks to <span class="hl">stables.</span></span><span class="sr-only">Stocks to stables.</span></h1>
         </div>
         <div class="swap-card ox">
           <div class="swap-top">
@@ -2570,50 +2543,47 @@
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
 
-      /* ---------- Hero rotator: word swap, then fade rotation -------- */
+      /* ---------- Hero typewriter (folio pattern, our colours) --------
+         Types each phrase out, holds it, erases fast, repeats forever.
+         Green last word lands when the phrase completes. */
       (function heroTyper() {
-        var title = document.getElementById('heroTitle');
         var el = document.getElementById('heroTyped');
-        if (!title || !el) return;
-        // Full phrases, shown whole — no typing animation past the intro.
-        var rot = [
-          'Stables to <span class="hl">stocks.</span>',
-          'NVDAx to USDC',
-          'METAx to USDT',
-          'AMZNx to USDC',
-          'MSFTx to USDT',
-          'Stocks to <span class="hl">stables.</span>'
+        if (!el) return;
+        var phrases = [
+          { t: 'Stocks to stables.', h: 'Stocks to <span class="hl">stables.</span>' },
+          { t: 'Stables to stocks.', h: 'Stables to <span class="hl">stocks.</span>' },
+          { t: 'NVDAx to USDC', h: null },
+          { t: 'METAx to USDT', h: null },
+          { t: 'AMZNx to USDC', h: null },
+          { t: 'MSFTx to USDT', h: null }
         ];
         var reduce = false;
         try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
-        // Reduced motion or no timer: static headline, no caret, no shift.
-        if (reduce) return;
-        title.classList.add('typing');
-        var i = 1;
-        function showNext() {
-          el.classList.add('fading');
-          setTimeout(function () {
-            el.innerHTML = rot[i];
-            i = (i + 1) % rot.length;
-            el.classList.remove('fading');
-            setTimeout(showNext, 2200);
-          }, 320);
+        // Reduced motion: full headline with its green word, no animation.
+        if (reduce) {
+          el.innerHTML = phrases[0].h;
+          return;
         }
-        // Intro: "Stocks" and "stables." trade places first ("Stables to
-        // stocks."), then the fade rotation takes over forever.
-        setTimeout(function () {
-          title.classList.add('swapping');
-          setTimeout(function () {
-            var w1 = document.getElementById('heroW1');
-            var w3 = document.getElementById('heroW3');
-            if (w1) w1.textContent = 'Stables';
-            if (w3) w3.textContent = 'stocks.';
-            title.classList.remove('swapping');
-            // Typing is done: caret off, rotation is fade-only from here.
-            title.classList.remove('typing');
-            setTimeout(showNext, 2000);
-          }, 400);
-        }, 1800);
+        // Start empty like folio (no-JS still shows the static headline).
+        el.innerHTML = '';
+        var pi = 0, chars = 0, dir = 1, timer = null;
+        function step() {
+          var ph = phrases[pi];
+          chars += dir;
+          if (dir === 1 && chars >= ph.t.length) {
+            el.innerHTML = ph.h || ph.t;
+            dir = -1;
+            timer = setTimeout(step, 2600);
+          } else if (dir === -1 && chars <= 0) {
+            dir = 1;
+            pi = (pi + 1) % phrases.length;
+            timer = setTimeout(step, 700);
+          } else {
+            el.textContent = ph.t.slice(0, chars);
+            timer = setTimeout(step, dir === 1 ? 85 : 40);
+          }
+        }
+        timer = setTimeout(step, 400);
       })();
 
       /* ---------- Swap card ---------- */
