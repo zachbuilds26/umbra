@@ -784,12 +784,17 @@
       height: 32px;
       border-radius: 50%;
       border: 3px solid var(--umbra-surface);
-      background: var(--umbra-secondary);
-      color: var(--umbra-muted);
+      background: #000;
+      color: #fff;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
+    }
+
+    .ox-div .flip-btn:hover {
+      background: #1a1a1a;
+      color: #fff;
     }
 
     .ox-div .flip-btn svg,
@@ -1949,7 +1954,7 @@
 
           <div class="ox-div"><span></span>
             <button class="flip-btn" id="flipBtn" aria-label="Flip direction">
-              <i data-lucide="arrow-down" width="17" height="17"></i>
+              <i data-lucide="arrow-up-down" width="15" height="15"></i>
             </button>
           <span></span></div>
 
