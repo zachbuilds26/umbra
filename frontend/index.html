@@ -598,22 +598,16 @@
     }
 
     /* ---------- Swap hero headline (replaces the tape) ----------
-       Same Sora voice as the Solana Mainnet pill.
-       Swap page + mobile only: hidden everywhere else. */
+       Same Sora voice as the Solana Mainnet pill. One fixed size everywhere. */
     .swap-hero {
-      display: none;
+      display: block;
       text-align: center;
       padding: 24px 16px 0;
-    }
-    @media (max-width: 768px) {
-      .swap-hero {
-        display: block;
-      }
     }
     .swap-hero h1 {
       font-family: var(--umbra-font-body);
       font-weight: 600;
-      font-size: clamp(26px, 4.5vw, 40px);
+      font-size: 26px;
       line-height: 1.15;
       letter-spacing: -0.01em;
       color: var(--umbra-text);
