@@ -598,9 +598,19 @@
       line-height: 1.15;
       letter-spacing: -0.01em;
       color: var(--umbra-text);
+      min-height: 1.2em;
     }
-    .swap-hero h1 .hl {
-      color: var(--umbra-accent);
+    /* Screen-reader-only fallback text */
+    .swap-hero h1 .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* ---------- Swap card (reference look, our colour) ----------
@@ -1866,7 +1876,7 @@
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
         <div class="swap-hero">
-          <h1>Swap in <span class="hl">seconds.</span></h1>
+          <h1 id="heroTitle" aria-label="Swap in seconds."><span id="heroTyped" aria-hidden="true">Swap in seconds.</span><span class="sr-only">Swap in seconds.</span></h1>
         </div>
         <div class="swap-card ox">
           <div class="swap-top">
@@ -2516,6 +2526,39 @@
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
+
+      /* ---------- Hero typewriter (folio pattern, our colours) --------
+         Types the line out, holds it, erases fast, repeats forever. */
+      (function heroTyper() {
+        var el = document.getElementById('heroTyped');
+        if (!el) return;
+        var TEXT = 'Swap in seconds.';
+        var reduce = false;
+        try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+        // Reduced motion: full line, no animation.
+        if (reduce) {
+          el.textContent = TEXT;
+          return;
+        }
+        // Start empty like folio (no-JS still shows the static headline).
+        el.textContent = '';
+        var chars = 0, dir = 1, timer = null;
+        function step() {
+          chars += dir;
+          if (dir === 1 && chars >= TEXT.length) {
+            el.textContent = TEXT;
+            dir = -1;
+            timer = setTimeout(step, 2600);
+          } else if (dir === -1 && chars <= 0) {
+            dir = 1;
+            timer = setTimeout(step, 700);
+          } else {
+            el.textContent = TEXT.slice(0, chars);
+            timer = setTimeout(step, dir === 1 ? 85 : 40);
+          }
+        }
+        timer = setTimeout(step, 400);
+      })();
 
       /* ---------- Swap card ---------- */
       var sellSym = 'NVDAx';
