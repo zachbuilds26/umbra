@@ -3714,7 +3714,7 @@
           msg = 'Our quote provider did not respond. Try again in a moment.';
         }
         paintSwapTitle('Swap failed', 'bad');
-        paintSwapState('x', 'bad', false);
+        paintSwapState('circle-x', 'bad', false);
         setSwapBusy(false);
         swapErrorEl.style.display = 'flex';
         swapErrorEl.textContent = msg;
@@ -3891,7 +3891,7 @@
           if (final === 'confirmed') {
             executing = false;
             paintSwapTitle('Swap confirmed', 'ok');
-            paintSwapState('check', 'ok', false);
+            paintSwapState('circle-check', 'ok', false);
             retrying = false;
             swapRetryBtn.style.display = 'none';
             if (typeof refreshActivity === 'function') refreshActivity();
