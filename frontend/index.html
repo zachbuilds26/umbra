@@ -3861,12 +3861,14 @@
         }
         return rows;
       }
-      // Every symbol here was live quote-verified (USDC pair). 37 deep + 11 thin + 8 Pre-IPO = 56.
-      // Removed as unquotable: 26 junk entries (bad tickers like "T", "KO", "MCHP", "BRK.Bx")
-      // and 6 dead pools (SNPSx, ONx, ACNx, AMATx, KLACx, LRCXx). Never list unverified symbols.
-      var ALLOWLIST = ["NVDAx","AAPLx","TSLAx","MSFTx","AMZNx","METAx","SPYx","TSMx","AVGOx","NFLXx","PLTRx","HOODx","GLDx","JPMx","JNJx","MAx","BACx","WMTx","UNHx","HDx","DISx","CRMx","PFEx","LLYx","QCOMx","TXNx","INTCx","MUx","ADIx","MRVLx","CDNSx","MPWRx","ARMx","CMCSAx","CHTRx","TMUSx","VZx","GOOGLx","QQQx","AMDx","COINx","MSTRx","Vx","PGx","ORCLx","KOx","NVOx","ASMLx"];
+      // Every symbol here was live quote-verified (USDC pair). 14 deep + 6 thin + 8 Pre-IPO = 28.
+      // Removed as unroutable (NO_ROUTE at $5 and $25, verified 2026-09-26):
+      // NFLXx, JPMx, JNJx, MAx, BACx, UNHx, HDx, DISx, CRMx, PFEx, LLYx, QCOMx,
+      // TXNx, MUx, ADIx, MRVLx, CDNSx, MPWRx, ARMx, CMCSAx, CHTRx, TMUSx, VZx,
+      // Vx, PGx, ORCLx, NVOx, ASMLx. Never list unverified symbols.
+      var ALLOWLIST = ["NVDAx","AAPLx","TSLAx","MSFTx","AMZNx","METAx","SPYx","TSMx","AVGOx","PLTRx","HOODx","GLDx","WMTx","INTCx","GOOGLx","QQQx","AMDx","COINx","MSTRx","KOx"];
       // Thin liquidity: quotes at $1, fail at $10+. Friendly error only — no badges.
-      var THIN = ["GOOGLx","QQQx","AMDx","COINx","MSTRx","Vx","PGx","ORCLx","KOx","NVOx","ASMLx"];
+      var THIN = ["GOOGLx","QQQx","AMDx","COINx","MSTRx","KOx"];
       var PREIPO = ["SPACEX","OPENAI","ANTHROPIC","NEURALINK","ANDURIL","KALSHI","POLYMARKET","FIGUREAI"];
       var stocksCache = [];
       var stocksTotal = ALLOWLIST.length + PREIPO.length;

@@ -42,7 +42,7 @@ async function main(): Promise<void> {
       ).catch(() => ({}));
       void assets;
       await fetch(
-        `${base}/api/assets/ticker?symbols=NVDAx,AAPLx,TSLAx,MSFTx,AMZNx,GOOGLx,METAx,SPYx,QQQx,TSMx,AVGOx,AMDx,NFLXx,PLTRx,COINx,HOODx,MSTRx,GLDx,SPACEX,OPENAI,ANTHROPIC,NEURALINK,ANDURIL,KALSHI,POLYMARKET,FIGUREAI`,
+        `${base}/api/assets/ticker?symbols=NVDAx,AAPLx,TSLAx,MSFTx,AMZNx,GOOGLx,METAx,SPYx,QQQx,TSMx,AVGOx,AMDx,PLTRx,COINx,HOODx,MSTRx,GLDx,SPACEX,OPENAI,ANTHROPIC,NEURALINK,ANDURIL,KALSHI,POLYMARKET,FIGUREAI`,
       ).catch(() => undefined);
     } catch {
       // caches warm on first visitor instead

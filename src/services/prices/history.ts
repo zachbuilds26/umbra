@@ -28,7 +28,7 @@ const MAX_SYMBOLS = 500;
 const SAMPLE_SYMBOLS = [
   'NVDAx', 'SPACEX', 'AAPLx', 'OPENAI', 'TSLAx', 'ANTHROPIC', 'MSFTx', 'NEURALINK',
   'AMZNx', 'ANDURIL', 'GOOGLx', 'KALSHI', 'METAx', 'POLYMARKET', 'SPYx', 'FIGUREAI',
-  'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
+  'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
 ];
 
 const rings = new Map<string, PricePoint[]>();
