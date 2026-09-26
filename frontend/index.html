@@ -259,6 +259,9 @@
        the bar (reference header), so only the network button hides here. */
     @media (max-width: 768px) {
       .network-btn { display: none !important; }
+      /* Logo only: wordmark hides, hamburger sits close to the mark. */
+      .brand > span:last-child { display: none; }
+      .brand { margin-right: 4px; }
     }
 
     .network-btn .disc {
