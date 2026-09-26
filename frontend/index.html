@@ -3148,7 +3148,10 @@
       function quoteError(msg, code) {
         swapBlocked = code === 'INSUFFICIENT_BALANCE' ? code : null;
         try { updateActionBtn(); } catch (_) {}
-        msg = friendlyQuoteError(code, msg);
+        // Same token both sides is not an amount problem — say exactly that.
+        msg = (sellSym === buySym)
+          ? 'Same token on both sides — choose a different token to swap.'
+          : friendlyQuoteError(code, msg);
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
         setDetailsVisible(true);
