@@ -874,13 +874,14 @@
       padding: 2px 0 6px;
     }
 
-    /* Arrow button overlaps both panels, centered, like the reference */
+    /* Arrow button floats in the gap between the panels — no background,
+       no overlap, just the white arrows. */
     .ox-div {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin: -14px 0;
+      margin: 8px 0;
       position: relative;
       z-index: 2;
     }
@@ -894,8 +895,9 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      border: 3px solid var(--umbra-surface);
-      background: var(--umbra-bg);
+      border: 0;
+      box-shadow: none;
+      background: transparent;
       color: #fff;
       display: inline-flex;
       align-items: center;
@@ -904,8 +906,9 @@
     }
 
     .ox-div .flip-btn:hover {
-      background: var(--umbra-secondary);
+      background: transparent;
       color: #fff;
+      opacity: 0.75;
     }
 
     .ox-div .flip-btn svg,
