@@ -1450,14 +1450,15 @@
       .api-pill.bad .api-dot { background: #f6465d; }
       .api-ms { color: var(--umbra-muted); font-variant-numeric: tabular-nums; }
 
-      /* Bigger swap card on phones: more padding, larger type and controls so
-         it matches the width it already occupies. */
+      /* Phone swap rows: compact pills so the full symbol shows next to
+         the big amount (reference proportions), instead of truncating. */
       .swap-card { padding: 16px 14px; }
-      .amount-wrap input { font-size: 42px; height: 46px; }
+      .amount-wrap input { font-size: 40px; height: 44px; }
       .amount-wrap .usd-line { font-size: 14px; }
-      .token-select { padding: 10px 14px; gap: 10px; }
-      .swap-card .tk-36 { width: 40px; height: 40px; }
-      .swap-card .tk-36 .tk-letter { font-size: 16px; }
+      .token-select { padding: 8px 10px; gap: 8px; max-width: 55%; }
+      .swap-card .tk-36 { width: 32px; height: 32px; }
+      .swap-card .tk-36 .tk-letter { font-size: 13px; }
+      .ox-side { padding: 12px; }
       .swap-tab { font-size: 14px; }
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
