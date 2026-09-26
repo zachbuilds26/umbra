@@ -839,16 +839,16 @@
       opacity: 0.85;
     }
 
-    /* Sell / Receive panels: filled boxes a touch lighter than the card */
+    /* Sell / Receive rows: flat, no boxes */
     .ox-side {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 12px 14px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--umbra-border);
+      padding: 6px 0;
+      border-radius: 0;
+      background: transparent;
+      border: 0;
     }
 
     /* Token selector: bare icon + bold name + chevron (reference).
@@ -1709,7 +1709,7 @@
       .token-select { padding: 8px 10px; gap: 8px; max-width: 55%; }
       .swap-card .tk-36 { width: 32px; height: 32px; }
       .swap-card .tk-36 .tk-letter { font-size: 13px; }
-      .ox-side { padding: 12px; }
+      .ox-side { padding: 6px 0; }
       .swap-tab { font-size: 14px; }
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
