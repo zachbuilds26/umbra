@@ -491,7 +491,8 @@
     .sheet-div {
       height: 1px;
       background: var(--umbra-border);
-      margin: 10px 6px;
+      /* Auto top margin pins divider + foot to the sheet bottom */
+      margin: auto 6px 10px;
       flex: none;
     }
 
@@ -593,7 +594,7 @@
     }
 
     .mobile-foot {
-      margin-top: auto;
+      margin-top: 2px;
       padding: 8px 6px 0;
       border-top: 0;
       display: flex;
