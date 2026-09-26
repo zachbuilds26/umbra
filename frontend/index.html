@@ -1610,6 +1610,10 @@
     #transactions .stocks-wrap {
       padding-top: 40px;
     }
+    /* Wrap is always column: row direction shoved the empty state left */
+    #transactions #activityListWrap {
+      flex-direction: column;
+    }
     /* Phones: the card stretches full height instead of ending mid-screen */
     @media (max-width: 640px) {
       #transactions .stocks-wrap {
