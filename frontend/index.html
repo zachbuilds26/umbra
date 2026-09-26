@@ -1549,6 +1549,16 @@
     #transactions .stocks-wrap {
       padding-top: 40px;
     }
+    /* Phones: the card stretches full height instead of ending mid-screen */
+    @media (max-width: 640px) {
+      #transactions .stocks-wrap {
+        margin-top: 0;
+        padding-top: 24px;
+      }
+      #transactions .stocks-card {
+        flex: 1 0 auto;
+      }
+    }
     .stocks-card {
       width: 100%;
       max-width: 780px;
