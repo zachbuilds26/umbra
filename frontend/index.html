@@ -479,6 +479,33 @@
     .mobile-menu .mrow.is-off:hover {
       background: transparent;
     }
+
+    /* Trade group toggle + indented sub rows */
+    .mobile-menu button.mrow {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      font-family: var(--umbra-font-body);
+      text-align: left;
+      cursor: pointer;
+    }
+    .mobile-menu .trade-chev {
+      margin-left: auto;
+      color: var(--umbra-muted);
+      transition: transform 0.2s ease;
+    }
+    .mobile-menu .trade-toggle[aria-expanded="true"] .trade-chev {
+      transform: rotate(180deg) translateY(-2px);
+    }
+    .mobile-menu .trade-sub {
+      display: flex;
+      flex-direction: column;
+      padding-left: 38px;
+    }
+    .mobile-menu .mrow.sub {
+      font-size: 15px;
+      padding: 10px 14px;
+    }
     .soon-badge {
       margin-left: auto;
       font-size: 10px;
@@ -1849,7 +1876,13 @@
   <div class="mobile-menu" id="mobileMenu">
     <span class="sheet-handle" aria-hidden="true"></span>
     <div class="sheet-label">App</div>
-    <a href="#swap" class="mrow active"><span class="micon"><i data-lucide="repeat" width="19" height="19" stroke-width="2.5"></i></span><span>Swap</span></a>
+    <button class="mrow trade-toggle" id="tradeToggle" aria-expanded="false" aria-controls="tradeSub">
+      <span class="micon"><i data-lucide="repeat" width="19" height="19" stroke-width="2.5"></i></span><span>Trade</span><span class="css-chev trade-chev" aria-hidden="true"></span>
+    </button>
+    <div class="trade-sub" id="tradeSub" hidden>
+      <a href="#swap" class="mrow sub active"><span>Swap</span></a>
+      <span class="mrow sub is-off" aria-disabled="true" title="Bridge coming soon"><span>Bridge</span><span class="soon-badge">soon</span></span>
+    </div>
     <a href="#stocks" class="mrow"><span class="micon"><i data-lucide="trending-up" width="19" height="19" stroke-width="2.5"></i></span><span>Stocks</span></a>
     <a href="#transactions" class="mrow"><span class="micon"><i data-lucide="history" width="19" height="19" stroke-width="2.5"></i></span><span>Transactions</span></a>
     <span class="mrow is-off" aria-disabled="true" title="Launch coming soon"><span class="micon"><i data-lucide="rocket" width="19" height="19" stroke-width="2.5"></i></span><span>Launch</span><span class="soon-badge">soon</span></span>
@@ -2242,6 +2275,14 @@
         var t = e.target;
         if (t && t.closest && (t.closest('#mobileMenu') || t.closest('#menuBtn'))) return;
         closeMenu();
+      });
+      // Trade group: expands Swap (live) and Bridge (disabled until enabled).
+      var tradeToggle = document.getElementById('tradeToggle');
+      var tradeSub = document.getElementById('tradeSub');
+      if (tradeToggle && tradeSub) tradeToggle.addEventListener('click', function () {
+        var open = tradeSub.hidden;
+        tradeSub.hidden = !open;
+        tradeToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
 
       // Tab views: exactly one section visible; pills highlight the current one.
