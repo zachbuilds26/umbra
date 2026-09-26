@@ -3655,7 +3655,7 @@
           return;
         }
         swapStateEl.classList.add('show');
-        swapStateEl.innerHTML = '<span class="state-disc ' + (cls || 'accent') + '"><i data-lucide="' + icon + '" width="26" height="26"' + (spin ? ' class="spin"' : '') + '></i></span>';
+        swapStateEl.innerHTML = '<span class="state-disc ' + (cls || 'accent') + '"><i data-lucide="' + icon + '" width="26" height="26" stroke-width="3"' + (spin ? ' class="spin"' : '') + '></i></span>';
         if (window.lucide) window.lucide.createIcons();
       }
       function setSwapBusy(on) {
