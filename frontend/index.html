@@ -586,10 +586,17 @@
     }
 
     /* ---------- Swap hero headline (replaces the tape) ----------
-       Same Sora voice as the Solana Mainnet pill. */
+       Same Sora voice as the Solana Mainnet pill.
+       Swap page + mobile only: hidden everywhere else. */
     .swap-hero {
+      display: none;
       text-align: center;
       padding: 24px 16px 0;
+    }
+    @media (max-width: 768px) {
+      .swap-hero {
+        display: block;
+      }
     }
     .swap-hero h1 {
       font-family: var(--umbra-font-body);
@@ -1888,12 +1895,12 @@
   </div>
 
   <main>
-    <div class="swap-hero">
-      <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped">Stocks to <span>stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
-    </div>
     <!-- Swap card: confirm-sheet layout, Umbra skin. -->
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
+        <div class="swap-hero">
+          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped">Stocks to <span>stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
+        </div>
         <div class="swap-card ox">
           <div class="swap-top">
             <div class="swap-tabs" role="tablist" aria-label="Swap or bridge">
