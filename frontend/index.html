@@ -7,7 +7,7 @@
   <meta name="description" content="Umbra - Dex aggregator for tokenized stocks on solana." />
   <link rel="icon" type="image/png" href="./assets/logo-white.png" />
   <link rel="apple-touch-icon" href="./assets/logo-white.png" />
-  <!-- Above-fold images first: header, network pill, default pair, tape head -->
+  <!-- Above-fold images first: header, network pill, default pair -->
   <link rel="preload" as="image" href="./assets/logo-white.png" />
   <link rel="preload" as="image" href="./assets/solana-mark.png" />
   <link rel="preload" as="image" href="./assets/tokens/NVDAx.png" />
@@ -583,6 +583,24 @@
       .page-section.active { flex: 1; display: flex; flex-direction: column; padding-bottom: 20px; }
       .swap-wrap, .stocks-wrap { margin-top: auto; }
       .swap-wrap { padding-bottom: 0; gap: 16px; }
+    }
+
+    /* ---------- Swap hero headline (replaces the tape) ----------
+       Same Sora voice as the Solana Mainnet pill. */
+    .swap-hero {
+      text-align: center;
+      padding: 24px 16px 0;
+    }
+    .swap-hero h1 {
+      font-family: var(--umbra-font-body);
+      font-weight: 600;
+      font-size: clamp(26px, 4.5vw, 40px);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      color: var(--umbra-text);
+    }
+    .swap-hero h1 span {
+      color: var(--umbra-accent);
     }
 
     /* ---------- Swap card (reference look, our colour) ----------
@@ -1466,12 +1484,6 @@
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
       .details-label { font-size: 14px; }
-
-      /* Tape chips scale with the card so the strip doesn't look like a
-         different product sitting above it. */
-      .tape-chip { font-size: 14px; padding: 9px 16px; gap: 9px; }
-      .tape-chip .tk-20 { width: 24px; height: 24px; }
-      .tape-chip .tk-20 .tk-letter { font-size: 11px; }
     }
     .stocks-list {
       min-height: 320px;
@@ -1756,68 +1768,6 @@
     .x-link:hover { color: var(--umbra-text); }
     .x-link svg { display: block; }
 
-    /* ---------- Ticker tape ---------- */
-    .tape {
-      overflow: hidden;
-      background: transparent;
-      border: 0;
-      position: relative;
-      z-index: 1;
-      margin-top: 4px;
-      mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-    }
-
-    .tape-track {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: max-content;
-      padding: 10px 0;
-      animation: tape-scroll 50s linear infinite;
-    }
-
-    .tape:hover .tape-track {
-      animation-play-state: paused;
-    }
-
-    @keyframes tape-scroll {
-      from {
-        transform: translateX(0);
-      }
-      to {
-        transform: translateX(-50%);
-      }
-    }
-
-    .tape-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 14px;
-      border-radius: 999px;
-      background: var(--umbra-secondary);
-      color: var(--umbra-text);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: background 0.15s ease;
-    }
-
-    .tape-chip:hover {
-      background: var(--umbra-secondary-hover);
-    }
-
-    .tape-chip img {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: block;
-      background: var(--umbra-surface);
-    }
-
     /* Badged token icon — main logo with Solana mark pinned bottom-right */
     .tk {
       position: relative;
@@ -1861,55 +1811,6 @@
     .tk-36 .tk-letter { font-size: 14px; }
     .tk-48 { width: 48px; height: 48px; }
     .tk-48 .tk-letter { font-size: 18px; }
-
-    .tape-chip .sym {
-      color: var(--umbra-muted);
-    }
-
-    .tape-chip .chg-up {
-      color: var(--umbra-accent);
-      font-weight: 600;
-    }
-
-    .tape-chip .chg-down {
-      color: #f6465d;
-      font-weight: 600;
-    }
-
-    .tape-chip .chg-none {
-      color: var(--umbra-muted);
-    }
-
-    .tape-note {
-      padding: 10px 24px;
-      font-size: 13px;
-      color: var(--umbra-muted);
-    }
-
-    .tape-skeleton {
-      display: flex;
-      gap: 8px;
-      padding: 10px 0;
-      width: max-content;
-    }
-
-    .tape-skeleton span {
-      width: 150px;
-      height: 34px;
-      border-radius: 999px;
-      background: var(--umbra-secondary);
-      animation: pulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%,
-      100% {
-        opacity: 0.5;
-      }
-      50% {
-        opacity: 1;
-      }
-    }
   </style>
 </head>
 <body>
@@ -1963,12 +1864,8 @@
   </div>
 
   <main>
-    <div class="tape" aria-label="Live token prices">
-      <div class="tape-skeleton" id="tapeSkeleton" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <div class="tape-track" id="tapeTrack" hidden></div>
-      <div class="tape-note" id="tapeNote" hidden></div>
+    <div class="swap-hero">
+      <h1>Stocks to <span>stables.</span></h1>
     </div>
     <!-- Swap card: confirm-sheet layout, Umbra skin. -->
     <section id="swap" class="page-section active" aria-label="Swap">
@@ -2310,12 +2207,6 @@
           return window.location.origin;
         } catch (_) { return window.location.origin; }
       })();
-      // Interleaved on purpose: pre-IPO names used to sit in one block at the
-      // end, which read like a second-class list. Same 26 names, mixed.
-      var TAPE_SYMBOLS = [
-        'NVDAx', 'AAPLx', 'TSLAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'METAx', 'SPYx',
-        'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
-      ];
       var btn = document.getElementById('menuBtn');
       var menu = document.getElementById('mobileMenu');
       function lockBody(locked) {
@@ -2589,10 +2480,7 @@
       });
       // Classic/module bridge: the Reown module script calls these on session change.
       window.umbraWalletHooks = { connected: setConnected, disconnected: setDisconnected };
-      /* ---------- Ticker tape ---------- */
-      var track = document.getElementById('tapeTrack');
-      var skeleton = document.getElementById('tapeSkeleton');
-      var note = document.getElementById('tapeNote');
+      /* ---------- Token icons ---------- */
       // Icon manifest baked in (was a blocking fetch): letters become logos on
       // first paint instead of after a manifest round-trip. CDNSx/QCOMx/QQQx
       // have no logo file and intentionally fall back to letters.
@@ -2619,18 +2507,6 @@
           .replace(/'/g, '&#39;');
       }
 
-      function fmtChg(pct) {
-        // No 24h observation yet is not a 0.00% move. The API returns null until
-        // it holds two real prices inside the window, and printing "0.00%" here
-        // turned missing data into a measured-looking change.
-        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">—</span>';
-        pct = Number(pct);
-        if (!isFinite(pct)) return ' <span class="chg-none">—</span>';
-        var sign = pct > 0 ? '+' : '';
-        var cls = pct >= 0 ? 'chg-up' : 'chg-down';
-        return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
-      }
-
       // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
       function tkIcon(symbol, size) {
         symbol = String(symbol || '');
@@ -2641,127 +2517,6 @@
           ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
-      }
-      function iconHtml(symbol) {
-        return tkIcon(symbol, 'tk-20');
-      }
-
-      function chipHtml(item) {
-        var sym = String((item && item.symbol) || '');
-        if (!sym) return '';
-        return (
-          '<span class="tape-chip" data-symbol="' + esc(sym) + '" style="cursor:default;">' +
-          iconHtml(sym) +
-          '<span class="sym">$' + esc(sym) + '</span>' +
-          '<span>' + fmtPrice(item.price) + '</span>' +
-          fmtChg(item.change24hPct) +
-          '</span>'
-        );
-      }
-
-      function showNote(text) {
-        // Never wipe a painted track (cache or previous load): a failed refresh
-        // must not flash the tape away. Only take over when nothing is showing.
-        if (track && !track.hidden && track.children.length) {
-          try { console.warn('[umbra] tape refresh failed:', text); } catch (_) {}
-          return;
-        }
-        skeleton.hidden = true;
-        skeleton.style.display = 'none';
-        track.hidden = true;
-        track.style.display = 'none';
-        note.hidden = false;
-        note.style.display = 'block';
-        note.textContent = text;
-      }
-
-      // Ticker refreshes can overlap (30s interval + slow provider): an older
-      // response must never repaint newer prices or write them to the cache.
-      var tapeSeq = 0;
-      async function loadTape() {
-        // Icons are inline above; only live prices are fetched.
-        var mySeq = ++tapeSeq;
-        var data = await fetch(url0()).then(function (res) {
-          if (!res.ok) throw new Error('ticker ' + res.status);
-          return res.json();
-        });
-        if (mySeq !== tapeSeq) return;
-        var items = (data.ticker || []).filter(function (t) {
-          return t.price !== null;
-        });
-        if (items.length === 0) {
-          showNote('Prices are warming up — check back in a minute.');
-          return;
-        }
-        var half = items.map(chipHtml).join('');
-        try { localStorage.setItem('umbra_tape_cache', JSON.stringify({ t: Date.now(), items: items })); } catch (_) {}
-        track.innerHTML = half + half; // doubled for a seamless loop
-        tapeStaleMarked = false;
-        track.removeAttribute('data-stale');
-        track.style.opacity = '';
-        skeleton.hidden = true;
-        skeleton.style.display = 'none';
-        if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
-        note.hidden = true;
-        note.style.display = 'none';
-        track.hidden = false;
-        track.style.display = '';
-        refreshSelectors(); // upgrade sell/buy coins from letters to real icons
-      }
-
-      function url0() {
-        return API_BASE + '/api/assets/ticker?symbols=' + TAPE_SYMBOLS.join(',');
-      }
-
-      // Instant tape: paint last visit's chips synchronously (real recent
-      // numbers, <30min old), then refresh live underneath. No skeleton wait.
-      try {
-        var _tc = JSON.parse(localStorage.getItem('umbra_tape_cache') || 'null');
-        if (_tc && Date.now() - _tc.t < 30 * 60 * 1000 && Array.isArray(_tc.items) && _tc.items.length) {
-          var half0 = _tc.items.filter(function (t) { return t && t.symbol; }).map(chipHtml).join('');
-          if (half0) {
-            track.innerHTML = half0 + half0;
-            skeleton.hidden = true;
-            skeleton.style.display = 'none';
-            if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
-            note.hidden = true;
-            note.style.display = 'none';
-            track.hidden = false;
-            track.style.display = '';
-          }
-        }
-      } catch (e) { try { console.warn('[umbra] tape cache unreadable', e); } catch (_) {} }
-      loadTape().catch(function () {
-        showNote('Prices unavailable right now — check your connection and retry.');
-      });
-      // Always retry in background (even when hidden): a latched error note or
-      // missing track must recover without a reload.
-      setInterval(function () {
-        loadTape().catch(function () {
-          // A failed refresh must not leave the last prices on screen looking
-          // live. Cached chips are real but no longer current, so say so.
-          markTapeStale();
-        });
-      }, 30000);
-
-      // Once a refresh fails, the chips still on screen are the previous
-      // snapshot. Mark them instead of implying they are current.
-      var tapeStaleMarked = false;
-      function markTapeStale() {
-        if (tapeStaleMarked) return;
-        var trackEl = document.getElementById('tapeTrack');
-        if (!trackEl || trackEl.hidden) return;
-        tapeStaleMarked = true;
-        try {
-          trackEl.setAttribute('data-stale', '1');
-          trackEl.style.opacity = '0.55';
-          var noteEl = document.getElementById('tapeNote');
-          if (noteEl) {
-            noteEl.textContent = 'Prices may be out of date — reconnecting…';
-            noteEl.hidden = false;
-            noteEl.style.display = 'block';
-          }
-        } catch (_) {}
       }
 
       /* ---------- Swap card ---------- */
@@ -2802,7 +2557,7 @@
         buyCoinEl.innerHTML = coinHtml(buySym);
       }
       // Paint real icons on the very first frame (preloaded files + inline
-      // manifest — no fetch needed), instead of waiting for the tape/directory.
+      // manifest — no fetch needed), instead of waiting for the directory.
       try { refreshSelectors(); } catch (_) {}
 
       // 'idle' | 'loading' | 'ready' | 'error'. An empty directory used to double
@@ -4214,7 +3969,8 @@
         var mySeq = ++activitySeq;
         // First load shows shimmer rows, not "No records yet": an empty
         // message before the fetch lands reads as "you have no history".
-        // Existing rows stay put on refresh (same rule as the tape).
+        // Existing rows stay put on refresh so a reload never flashes
+        // the list away while the next page is still in flight.
         if (!allTransactions.length) {
           var listEl0 = document.getElementById('activityList');
           var emptyEl0 = document.getElementById('activityEmpty');
