@@ -233,6 +233,26 @@
       font-weight: 600;
     }
 
+    .nav-pill.is-off {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Mini "soon" tag used on Launch, Bridge tab, and sheet rows */
+    .tag-soon {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--umbra-accent-ink);
+      background: var(--umbra-accent);
+      border-radius: 999px;
+      padding: 2px 7px;
+      margin-left: 6px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
     /* Desktop Trade dropdown (mirrors the sheet's Trade group) */
     .nav-drop {
       position: relative;
@@ -556,8 +576,10 @@
     }
     .soon-badge {
       margin-left: auto;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--umbra-accent-ink);
       background: var(--umbra-accent);
       border-radius: 999px;
@@ -1935,6 +1957,7 @@
         </div>
         <a class="nav-pill" href="#stocks">Stocks</a>
         <a class="nav-pill" href="#transactions">Transactions</a>
+        <span class="nav-pill is-off" aria-disabled="true" title="Launch coming soon"><span>Launch</span><span class="tag-soon">soon</span></span>
       </nav>
     </div>
 
@@ -1988,7 +2011,7 @@
           <div class="swap-top">
             <div class="swap-tabs" role="tablist" aria-label="Swap or bridge">
               <button class="swap-tab active" id="tabSwap" role="tab" aria-selected="true">Swap</button>
-              <button class="swap-tab" id="tabBridge" role="tab" aria-selected="false" disabled style="opacity:0.45; cursor:not-allowed;" title="Bridge disabled for now">Bridge <span style="font-size:8px; font-weight:800; color:var(--umbra-accent-ink); background:var(--umbra-accent); border-radius:999px; padding:1px 4px; margin-left:4px; vertical-align:middle;">soon</span></button>
+              <button class="swap-tab" id="tabBridge" role="tab" aria-selected="false" disabled style="opacity:0.45; cursor:not-allowed;" title="Bridge disabled for now">Bridge <span class="tag-soon">soon</span></button>
             </div>
             <div class="swap-tools">
               <button class="tool-btn" id="slipBtn" title="Slippage - tap to change" aria-label="Slippage setting">
