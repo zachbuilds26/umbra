@@ -598,9 +598,33 @@
       line-height: 1.15;
       letter-spacing: -0.01em;
       color: var(--umbra-text);
+      min-height: 1.2em;
     }
     .swap-hero h1 span {
       color: var(--umbra-accent);
+    }
+    /* Typewriter caret: hidden until the typer starts (no-JS stays clean) */
+    .swap-hero h1 .hero-caret {
+      display: none;
+      width: 3px;
+      height: 0.95em;
+      background: var(--umbra-accent);
+      margin-left: 5px;
+      vertical-align: -0.12em;
+      animation: caretBlink 1s steps(1) infinite;
+    }
+    .swap-hero h1.typing .hero-caret {
+      display: inline-block;
+    }
+    .swap-hero h1.typing #heroTyped {
+      color: var(--umbra-text);
+    }
+    @keyframes caretBlink {
+      0%, 55% { opacity: 1; }
+      56%, 100% { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .swap-hero h1 .hero-caret { animation: none; }
     }
 
     /* ---------- Swap card (reference look, our colour) ----------
@@ -1865,7 +1889,7 @@
 
   <main>
     <div class="swap-hero">
-      <h1>Stocks to <span>stables.</span></h1>
+      <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped">Stocks to <span>stables.</span></span><span class="hero-caret" aria-hidden="true"></span></h1>
     </div>
     <!-- Swap card: confirm-sheet layout, Umbra skin. -->
     <section id="swap" class="page-section active" aria-label="Swap">
@@ -2518,6 +2542,45 @@
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
+
+      /* ---------- Hero typewriter: headline -> pair rotation, looped ---- */
+      (function heroTyper() {
+        var title = document.getElementById('heroTitle');
+        var el = document.getElementById('heroTyped');
+        if (!title || !el) return;
+        var phrases = ['Stocks to stables.', 'NVDAx to USDC', 'METAx to USDT', 'AMZNx to USDC', 'MSFTx to USDT'];
+        var reduce = false;
+        try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+        // Reduced motion or no timer: static headline, no caret, no shift.
+        if (reduce) return;
+        title.classList.add('typing');
+        var pi = 0, ci = el.textContent.length, deleting = true;
+        function tick() {
+          var full = phrases[pi];
+          if (!deleting) {
+            ci++;
+            el.textContent = full.slice(0, ci);
+            if (ci >= full.length) {
+              deleting = true;
+              setTimeout(tick, 1700);
+              return;
+            }
+            setTimeout(tick, 55 + Math.random() * 60);
+          } else {
+            ci--;
+            el.textContent = full.slice(0, Math.max(0, ci));
+            if (ci <= 0) {
+              deleting = false;
+              pi = (pi + 1) % phrases.length;
+              setTimeout(tick, 350);
+              return;
+            }
+            setTimeout(tick, 28);
+          }
+        }
+        // Start by wiping the static headline, then loop everything forever.
+        setTimeout(tick, 1800);
+      })();
 
       /* ---------- Swap card ---------- */
       var sellSym = 'NVDAx';
