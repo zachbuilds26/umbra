@@ -3325,7 +3325,9 @@
             (impactNote ? '<div class="row"><span class="error">' + esc(impactNote) + '</span></div>' : '') +
             '</div>';
           quoteLinesEl.innerHTML = html;
-          if (blockCode) {
+          // No balance lecture here: the action button already says
+          // Insufficient funds. Other block reasons still get their line.
+          if (blockCode && blockCode !== 'INSUFFICIENT_BALANCE') {
             quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
           }
           var moreBtn = document.getElementById('quoteMoreBtn');
