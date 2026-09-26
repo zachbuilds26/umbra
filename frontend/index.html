@@ -958,7 +958,7 @@
       justify-content: space-between;
       gap: 12px;
       padding: 12px 0 2px;
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 400;
       color: var(--umbra-text);
     }
@@ -969,15 +969,15 @@
       background: none;
       border: 0;
       padding: 4px 0 4px 8px;
-      color: var(--umbra-text);
+      color: var(--umbra-accent);
       font-family: var(--umbra-font-body);
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 13.5px;
+      font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
     }
     .qmore .css-chev {
-      color: var(--umbra-muted);
+      color: var(--umbra-accent);
       transition: transform 0.2s ease;
     }
     .qmore[aria-expanded="true"] .css-chev {
@@ -3313,7 +3313,7 @@
           // No fee rows here: the wallet shows the network fee at signing time.
           // Compact summary up front; Route + Minimum received hide behind More.
           var moreOpen = quoteMoreOpen ? '' : ' hidden';
-          var moreLabel = quoteMoreOpen ? 'Less' : 'More';
+          var moreLabel = quoteMoreOpen ? 'Hide details' : 'Show details';
           var moreExp = quoteMoreOpen ? 'true' : 'false';
           var html =
             '<div class="qsum"><span>' + esc(fmtRate(data.rate)) + '</span>' +
@@ -3335,7 +3335,7 @@
             quoteMoreOpen = !!open;
             if (ex) ex.hidden = !open;
             moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            moreBtn.innerHTML = (open ? 'Less ' : 'More ') + '<span class="css-chev" aria-hidden="true"></span>';
+            moreBtn.innerHTML = (open ? 'Hide details ' : 'Show details ') + '<span class="css-chev" aria-hidden="true"></span>';
           });
           // Details always show: no toggle, no hidden state to fight.
           setDetailsVisible(true);
