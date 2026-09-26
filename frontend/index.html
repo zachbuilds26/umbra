@@ -757,16 +757,21 @@
     #buyChange.up { color: var(--umbra-accent); }
     #buyChange.down { color: #f6465d; }
 
+    /* Details header: top half of the details card (rows complete it) */
     .details-label {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       width: 100%;
-      color: var(--umbra-muted);
+      color: var(--umbra-text);
       font-family: var(--umbra-font-body);
-      font-size: 13px;
-      font-weight: 600;
-      padding: 12px 0 0;
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 16px;
+      padding: 14px 16px 10px;
+      border: 1px solid var(--umbra-border);
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
     }
 
     .swap-tools {
@@ -958,8 +963,32 @@
       font-weight: 600;
     }
 
+    .quote-lines .warn {
+      color: #d8a657;
+      font-weight: 600;
+    }
+
     .quote-lines .error {
       color: #f6465d;
+    }
+
+    /* Swap details rows: bottom half of the details card.
+       (Bridge lines keep the plain base style above.) */
+    #swapView .quote-lines {
+      margin-top: 0;
+      border: 1px solid var(--umbra-border);
+      border-top: 0;
+      border-radius: 0 0 16px 16px;
+      padding: 2px 16px 14px;
+      gap: 0;
+    }
+
+    #swapView .quote-lines .row {
+      padding: 10px 0;
+    }
+
+    #swapView .quote-lines .row + .row {
+      padding-top: 10px;
     }
 
     /* Receive-price typing dots: three bouncing dots inside the price field
