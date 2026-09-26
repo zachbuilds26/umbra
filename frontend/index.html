@@ -1558,6 +1558,20 @@
       #transactions .stocks-card {
         flex: 1 0 auto;
       }
+      /* Empty/connect states center in the leftover card height */
+      #transactions #activityContent {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      #transactions #activityListWrap {
+        flex-direction: column;
+        flex: 1;
+      }
+      #transactions #activityEmpty,
+      #transactions #activityConnect {
+        flex: 1;
+      }
     }
     .stocks-card {
       width: 100%;
@@ -4096,7 +4110,7 @@
         var connectEl = document.getElementById('activityConnect');
         var wrapEl = document.getElementById('activityListWrap');
         if (connectEl) connectEl.style.display = isConnected ? 'none' : 'flex';
-        if (wrapEl) wrapEl.style.display = isConnected ? 'block' : 'none';
+        if (wrapEl) wrapEl.style.display = isConnected ? 'flex' : 'none';
         var ex = document.getElementById('activityExplorer');
         if (ex && isConnected) ex.href = 'https://explorer.solana.com/address/' + window.umbraWallet;
         if (isConnected) refreshActivity();
