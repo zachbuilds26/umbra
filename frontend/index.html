@@ -537,24 +537,30 @@
       display: block;
     }
 
+    /* ---------- Page backdrop (full-page layer, so no seam ever shows
+       between the floating header and the content below it) ---------- */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px),
+        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
+      background-size:
+        22px 22px,
+        auto;
+    }
+
     /* ---------- Page + hero backdrop (their recipe, our colour) ---------- */
     main {
       padding-top: 0;
       min-height: calc(100vh - 80px);
       display: flex;
       flex-direction: column;
-      background:
-        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
+      background: transparent;
       position: relative;
-    }
-
-    main::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px);
-      background-size: 22px 22px;
-      pointer-events: none;
     }
 
     /* ---------- Shared page sections (exclusive views — one visible at a time) ---------- */
