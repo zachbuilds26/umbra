@@ -607,7 +607,19 @@
       color: var(--umbra-text);
       min-height: 1.2em;
     }
-    .swap-hero h1 span {
+    .swap-hero h1 #heroTyped {
+      color: var(--umbra-text);
+      transition: opacity 0.3s ease;
+    }
+    .swap-hero h1 #heroTyped.fading {
+      opacity: 0;
+    }
+    /* Last word stays green in both headline forms */
+    .swap-hero h1 #heroW1 {
+      color: var(--umbra-text);
+    }
+    .swap-hero h1 #heroW3,
+    .swap-hero h1 .hl {
       color: var(--umbra-accent);
     }
     /* Word-swap intro: the two nouns fade out, trade places, fade back in */
@@ -2558,43 +2570,37 @@
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
 
-      /* ---------- Hero typewriter: word swap, then pair rotation loop -- */
+      /* ---------- Hero rotator: word swap, then fade rotation -------- */
       (function heroTyper() {
         var title = document.getElementById('heroTitle');
         var el = document.getElementById('heroTyped');
         if (!title || !el) return;
-        var phrases = ['Stables to stocks.', 'NVDAx to USDC', 'METAx to USDT', 'AMZNx to USDC', 'MSFTx to USDT', 'Stocks to stables.'];
+        // Full phrases, shown whole — no typing animation past the intro.
+        var rot = [
+          'Stables to <span class="hl">stocks.</span>',
+          'NVDAx to USDC',
+          'METAx to USDT',
+          'AMZNx to USDC',
+          'MSFTx to USDT',
+          'Stocks to <span class="hl">stables.</span>'
+        ];
         var reduce = false;
         try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
         // Reduced motion or no timer: static headline, no caret, no shift.
         if (reduce) return;
         title.classList.add('typing');
-        var pi = 0, ci = 0, deleting = false;
-        function tick() {
-          var full = phrases[pi];
-          if (!deleting) {
-            ci++;
-            el.textContent = full.slice(0, ci);
-            if (ci >= full.length) {
-              deleting = true;
-              setTimeout(tick, 1700);
-              return;
-            }
-            setTimeout(tick, 55 + Math.random() * 60);
-          } else {
-            ci--;
-            el.textContent = full.slice(0, Math.max(0, ci));
-            if (ci <= 0) {
-              deleting = false;
-              pi = (pi + 1) % phrases.length;
-              setTimeout(tick, 350);
-              return;
-            }
-            setTimeout(tick, 28);
-          }
+        var i = 1;
+        function showNext() {
+          el.classList.add('fading');
+          setTimeout(function () {
+            el.innerHTML = rot[i];
+            i = (i + 1) % rot.length;
+            el.classList.remove('fading');
+            setTimeout(showNext, 2200);
+          }, 320);
         }
         // Intro: "Stocks" and "stables." trade places first ("Stables to
-        // stocks."), then the normal delete-type loop takes over forever.
+        // stocks."), then the fade rotation takes over forever.
         setTimeout(function () {
           title.classList.add('swapping');
           setTimeout(function () {
@@ -2603,12 +2609,9 @@
             if (w1) w1.textContent = 'Stables';
             if (w3) w3.textContent = 'stocks.';
             title.classList.remove('swapping');
-            setTimeout(function () {
-              el.textContent = phrases[0];
-              ci = phrases[0].length;
-              deleting = true;
-              tick();
-            }, 1700);
+            // Typing is done: caret off, rotation is fade-only from here.
+            title.classList.remove('typing');
+            setTimeout(showNext, 2000);
           }, 400);
         }, 1800);
       })();
