@@ -751,6 +751,23 @@
       border: 1px solid var(--umbra-border);
     }
 
+    /* Token selector: bare icon + bold name + chevron (reference).
+       Scoped to the swap rows so bridge/filter pills keep their look. */
+    .ox-side .token-select {
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 4px 2px;
+      font-size: 17px;
+      font-weight: 700;
+      max-width: 55%;
+    }
+    .ox-side .token-select:hover {
+      background: transparent;
+      opacity: 0.85;
+    }
+
     .ox-side-label {
       font-size: 13px;
       color: var(--umbra-muted);
