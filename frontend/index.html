@@ -255,11 +255,10 @@
       .network-btn .full { display: none; }
       .network-btn .short { display: inline; }
     }
-    /* On phones/tablets header Connect + chain live inside the menu sheet, not the bar.
-       Scoped to .nav-right: the Transactions empty-state uses .connect-btn too and must stay visible. */
+    /* On phones the chain pill lives inside the menu sheet; Connect stays in
+       the bar (reference header), so only the network button hides here. */
     @media (max-width: 768px) {
       .network-btn { display: none !important; }
-      .nav-right .connect-btn { display: none !important; }
     }
 
     .network-btn .disc {
@@ -1945,6 +1944,10 @@
         </span>
         <span>Umbra</span>
       </a>
+      <button class="icon-btn menu-btn" type="button" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span id="menuIconOpen"><i data-lucide="menu" width="20" height="20"></i></span>
+        <span id="menuIconClose" style="display:none;"><i data-lucide="x" width="20" height="20"></i></span>
+      </button>
       <nav class="nav-links" aria-label="Primary">
         <a class="nav-pill active" href="#swap">Swap</a>
         <a class="nav-pill" href="#stocks">Stocks</a>
@@ -1959,10 +1962,6 @@
       </span>
       <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
         <span class="full">Connect Wallet</span><span class="short">Connect</span>
-      </button>
-      <button class="icon-btn menu-btn" type="button" id="menuBtn" aria-label="Open menu" aria-expanded="false">
-        <span id="menuIconOpen"><i data-lucide="menu" width="20" height="20"></i></span>
-        <span id="menuIconClose" style="display:none;"><i data-lucide="x" width="20" height="20"></i></span>
       </button>
     </div>
   </header>
