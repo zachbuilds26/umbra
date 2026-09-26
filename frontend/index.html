@@ -46,19 +46,19 @@
      * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
      * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
      * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
-     * Palette + type are Umbra's own: #ffffff / #178a57, Sora body, Cinzel wordmark.
+     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
      */
     :root {
-      --umbra-bg: #edf3ef;
-      --umbra-surface: #ffffff;
-      --umbra-secondary: rgba(20, 90, 60, 0.07);
-      --umbra-secondary-hover: rgba(20, 90, 60, 0.13);
-      --umbra-accent: #178a57;
-      --umbra-accent-soft: rgba(23, 138, 87, 0.13);
-      --umbra-accent-ink: #ffffff;
-      --umbra-text: #0d1b14;
-      --umbra-muted: #5d6f65;
-      --umbra-border: rgba(13, 27, 20, 0.12);
+      --umbra-bg: #121212;
+      --umbra-surface: #1a1a1a;
+      --umbra-secondary: rgba(255, 255, 255, 0.07);
+      --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
+      --umbra-accent: #55b98a;
+      --umbra-accent-soft: rgba(85, 185, 138, 0.2);
+      --umbra-accent-ink: #121212;
+      --umbra-text: #ffffff;
+      --umbra-muted: #9aa0a6;
+      --umbra-border: rgba(255, 255, 255, 0.08);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -74,7 +74,7 @@
 
     html {
       scrollbar-width: thin;
-      scrollbar-color: #c3d2cb transparent;
+      scrollbar-color: #2a2a2a transparent;
     }
     html::-webkit-scrollbar,
     body::-webkit-scrollbar {
@@ -87,25 +87,25 @@
     }
     html::-webkit-scrollbar-thumb,
     body::-webkit-scrollbar-thumb {
-      background: #c3d2cb;
+      background: #2a2a2a;
       border-radius: 999px;
     }
     html::-webkit-scrollbar-thumb:hover,
     body::-webkit-scrollbar-thumb:hover {
-      background: #9db3a8;
+      background: #3a3a3a;
     }
 
     body {
       background:
-        radial-gradient(circle at 20% 85%, rgba(23, 138, 87, 0.1), transparent 40%),
-        radial-gradient(circle at 75% 100%, rgba(23, 138, 87, 0.07), transparent 42%),
-        linear-gradient(#ffffff 0%, #f2f7f4 60%, #e7f0ea 100%);
+        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
+        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
+        linear-gradient(#121212 0%, #121212 45%, #0e1512 100%);
       background-attachment: fixed;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       -webkit-font-smoothing: antialiased;
       scrollbar-width: thin;
-      scrollbar-color: #c3d2cb transparent;
+      scrollbar-color: #2a2a2a transparent;
     }
 
     /* ---------- Header ---------- */
@@ -121,7 +121,6 @@
         border-top: 0;
         border-left: 0;
         border-right: 0;
-        box-shadow: 0 1px 0 rgba(13, 27, 20, 0.04);
     }
 
     @media (min-width: 640px) {
@@ -174,10 +173,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
-      background: #0d1b14;
-      overflow: hidden;
-      flex: none;
     }
 
     .brand-mark img {
@@ -253,7 +248,7 @@
     }
 
     .network-btn:hover {
-      background: rgba(23, 138, 87, 0.22);
+      background: rgba(85, 185, 138, 0.28);
     }
     .network-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -380,7 +375,6 @@
           background: var(--umbra-surface);
           border: 1px solid var(--umbra-border);
           border-radius: 22px;
-          box-shadow: 0 16px 40px rgba(13, 27, 20, 0.14);
           padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
           flex-direction: column;
           gap: 2px;
@@ -399,7 +393,7 @@
       position: fixed;
       inset: 0;
       z-index: 48;
-      background: rgba(13, 27, 20, 0.4);
+      background: rgba(0, 0, 0, 0.55);
     }
 
     .mobile-menu .micon {
@@ -432,6 +426,10 @@
 
     .mobile-menu a.mrow:hover {
       background: var(--umbra-secondary);
+    }
+
+    .mobile-menu a.mrow:hover {
+      background: #242424;
     }
     .mobile-menu a.mrow.active {
       background: transparent;
@@ -515,7 +513,7 @@
       display: flex;
       flex-direction: column;
       background:
-        linear-gradient(rgba(23, 138, 87, 0.05), transparent 60%);
+        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
       position: relative;
     }
 
@@ -523,7 +521,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background-image: radial-gradient(circle, rgba(13, 27, 20, 0.08) 0.65px, transparent 0.7px);
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px);
       background-size: 22px 22px;
       pointer-events: none;
     }
@@ -552,7 +550,7 @@
     }
 
     /* ---------- Swap card (their structure, our colour) ----------
-     * Card #FFFFFF rounded-2xl · Swap/Bridge tabs · activity + slippage icons
+     * Card #1A1A1A rounded-2xl · Swap/Bridge tabs · activity + slippage icons
      * Sell box (balance + 50%/Max) · flip button · Receive box · full action button. */
     /* ---------- Swap hero headline (where the tape used to sit) ---------- */
     .swap-hero {
@@ -595,7 +593,6 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 24px;
-      box-shadow: 0 16px 40px rgba(13, 27, 20, 0.1);
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -713,7 +710,7 @@
       border-radius: 50%;
       border: 1px solid var(--umbra-border);
       background: var(--umbra-surface);
-      box-shadow: 0 4px 12px rgba(13, 27, 20, 0.12);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
       color: var(--umbra-muted);
       display: inline-flex;
       align-items: center;
@@ -848,7 +845,7 @@
     .ox-side .token-select {
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
-      box-shadow: 0 2px 8px rgba(13, 27, 20, 0.06);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
     .ox-side .token-select:hover {
       background: var(--umbra-surface);
@@ -1116,7 +1113,7 @@
       position: fixed;
       inset: 0;
       z-index: 60;
-      background: rgba(13, 27, 20, 0.45);
+      background: rgba(0, 0, 0, 0.6);
       align-items: center;
       justify-content: center;
       padding: 16px;
@@ -1135,7 +1132,6 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 16px;
-      box-shadow: 0 24px 64px rgba(13, 27, 20, 0.2);
       overflow: hidden;
       overflow-y: auto;
     }
@@ -1231,7 +1227,7 @@
       overflow-y: auto;
       padding: 0 8px 12px;
       scrollbar-width: thin;
-      scrollbar-color: #c3d2cb transparent;
+      scrollbar-color: #2a2a2a transparent;
     }
     .token-list::-webkit-scrollbar {
       width: 6px;
@@ -1240,11 +1236,11 @@
       background: transparent;
     }
     .token-list::-webkit-scrollbar-thumb {
-      background: #c3d2cb;
+      background: #2a2a2a;
       border-radius: 999px;
     }
     .token-list::-webkit-scrollbar-thumb:hover {
-      background: #9db3a8;
+      background: #3a3a3a;
     }
 
     .token-opt {
@@ -1312,7 +1308,6 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 16px;
-      box-shadow: 0 16px 40px rgba(13, 27, 20, 0.08);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -1358,7 +1353,7 @@
       color: var(--umbra-text);
       font-size: 12px;
       line-height: 1.4;
-      box-shadow: 0 8px 24px rgba(13,27,20,0.14);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
       display: none;
     }
     .info-tip.open { display: block; }
@@ -1390,8 +1385,8 @@
        center it in whatever space the card leaves behind. */
     .api-pill { display: none; }
     @keyframes apiPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(23, 138, 87, 0.5); }
-      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(23, 138, 87, 0); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(85, 185, 138, 0.5); }
+      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(85, 185, 138, 0); }
     }
     @keyframes apiBlinkSlow {
       0%, 100% { opacity: 1; }
@@ -1449,7 +1444,7 @@
       flex-direction: column;
       gap: 4px;
       scrollbar-width: thin;
-      scrollbar-color: #c3d2cb transparent;
+      scrollbar-color: #2a2a2a transparent;
     }
     .stocks-list::-webkit-scrollbar {
       width: 6px;
@@ -1458,11 +1453,11 @@
       background: transparent;
     }
     .stocks-list::-webkit-scrollbar-thumb {
-      background: #c3d2cb;
+      background: #2a2a2a;
       border-radius: 999px;
     }
     .stocks-list::-webkit-scrollbar-thumb:hover {
-      background: #9db3a8;
+      background: #3a3a3a;
     }
     .stock-row {
       display: flex;
@@ -1551,7 +1546,7 @@
       position: fixed;
       inset: 0;
       z-index: 70;
-      background: rgba(13,27,20,0.45);
+      background: rgba(0,0,0,0.6);
       align-items: stretch;
       justify-content: flex-end;
     }
@@ -1564,7 +1559,6 @@
       height: 100%;
       background: var(--umbra-surface);
       border-left: 1px solid var(--umbra-border);
-      box-shadow: -16px 0 48px rgba(13, 27, 20, 0.14);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -1580,11 +1574,11 @@
       flex: 1;
       overflow-y: auto;
       scrollbar-width: thin;
-      scrollbar-color: #c3d2cb transparent;
+      scrollbar-color: #2a2a2a transparent;
     }
     .drawer-body::-webkit-scrollbar { width: 6px; }
     .drawer-body::-webkit-scrollbar-track { background: transparent; }
-    .drawer-body::-webkit-scrollbar-thumb { background: #c3d2cb; border-radius: 999px; }
+    .drawer-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 999px; }
     @media (max-width: 640px) {
       .drawer { max-width: 100%; }
     }
@@ -1620,11 +1614,11 @@
       top: calc(100% + 6px);
       left: 0;
       min-width: 150px;
-      background: var(--umbra-surface);
-      border: 1px solid var(--umbra-border);
+      background: #262626;
+      border: 1px solid rgba(255,255,255,0.14);
       border-radius: 12px;
       padding: 6px;
-      box-shadow: 0 12px 32px rgba(13,27,20,0.16);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
       z-index: 50;
     }
     .tx-menu button {
@@ -1726,7 +1720,7 @@
       height: 42%;
       border-radius: 50%;
       border: 2px solid var(--umbra-surface);
-      background: #0d1b14;
+      background: #121212;
       object-fit: contain;
       display: block;
     }
@@ -1940,7 +1934,7 @@
                 <span id="stocksFilterLabel" style="white-space:nowrap;">All</span>
                 <span class="css-chev" aria-hidden="true"></span>
               </button>
-              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#ffffff; border:1px solid rgba(13,27,20,0.12); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(13,27,20,0.16); z-index:50;">
+              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#262626; border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,0.6); z-index:50;">
                 <button class="token-opt" data-filter="all" style="width:100%;"><span class="meta"><b>All</b></span><span class="tag" id="countAll">—</span></button>
                 <button class="token-opt" data-filter="xstock" style="width:100%;"><span class="meta"><b>xStocks</b></span><span class="tag" id="countX">—</span></button>
                 <button class="token-opt" data-filter="pre" style="width:100%;"><span class="meta"><b>Pre-IPO</b></span><span class="tag" id="countPre">—</span></button>
@@ -3959,13 +3953,13 @@
         var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
         var areaPath = linePath + ' L' + coords[coords.length-1].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' L' + coords[0].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' Z';
         var up = vals[vals.length-1] >= vals[0];
-        var col = up ? '#178a57' : '#f6465d';
+        var col = up ? '#55B98A' : '#f6465d';
         var id = 'grad-' + Math.random().toString(36).slice(2,7);
         // Grid lines
         var grid = '';
         for (var g = 1; g <= 2; g++) {
           var gy = pad + (g/3)*(h - pad*2);
-          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(13,27,20,0.08)" stroke-width="1" /> ';
+          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1" /> ';
         }
         drawerChartEl.innerHTML =
           '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="80" preserveAspectRatio="none" style="display:block;">' +
@@ -4138,7 +4132,7 @@
           var file = (name||'').replace(/\s+/g,'');
           var src = './assets/chains/' + file + '.png';
           // Fallback to colored letter if image fails
-          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#e3ece6;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#e3ece6\'; this.parentElement.style.color=\'#0d1b14\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
         }
         function chainIconImg(name) {
           var file = (name||'').replace(/\s+/g,'');
@@ -4419,8 +4413,8 @@
         metadata: metadata,
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
-        themeMode: 'light',
-        themeVariables: { '--w3m-accent': '#178a57' }
+        themeMode: 'dark',
+        themeVariables: { '--w3m-accent': '#55B98A' }
       });
       var solProvider = null;
       try {
