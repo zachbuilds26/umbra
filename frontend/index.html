@@ -640,9 +640,9 @@
       }
     }
 
-    /* ---------- Swap card (reference look, our colour) ----------
-     * Rounded card · Swap/Bridge tabs · Sell box (balance + 50%/Max) ·
-     * overlapping arrow button · Receive box · full action button. */
+    /* ---------- Swap card (flat reference look, our colour) ----------
+     * Plain text tabs · Sell row (balance + 50%/Max) · hairline divider
+     * with the arrow button on it · Receive row · details card · action. */
     .swap-wrap {
       flex: 1;
       display: flex;
@@ -658,17 +658,17 @@
     .swap-card {
       width: 100%;
       max-width: 28rem;
-      background: var(--umbra-surface);
-      border: 1px solid var(--umbra-border);
-      border-radius: 20px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      padding: 12px;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 4px 2px;
       display: flex;
       flex-direction: column;
       position: relative;
     }
 
-    /* Card top: mini Swap/Bridge pill tabs + slippage tool */
+    /* Card top: plain text tabs (reference) + slippage tool */
     .swap-top {
       margin-bottom: 12px;
       display: flex;
@@ -679,28 +679,31 @@
     .swap-tabs {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      border-radius: 999px;
-      background: var(--umbra-bg);
-      padding: 4px;
+      gap: 18px;
+      border-radius: 0;
+      background: transparent;
+      border: 0;
+      padding: 0;
     }
 
     .swap-tab {
-      padding: 6px 12px;
-      font-size: 12px;
+      padding: 6px 2px;
+      font-size: 15px;
       font-weight: 500;
-      border-radius: 999px;
+      border-radius: 0;
       border: 0;
       background: transparent;
       color: var(--umbra-muted);
       font-family: var(--umbra-font-body);
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      transition: color 0.15s ease;
     }
 
     .swap-tab.active {
-      background: var(--umbra-accent-soft);
-      color: var(--umbra-accent);
+      background: transparent;
+      color: var(--umbra-text);
+      font-weight: 700;
+      font-size: 17px;
     }
 
     .swap-tools {
@@ -739,16 +742,32 @@
       opacity: 0.85;
     }
 
-    /* Sell / Receive panels: filled boxes a touch lighter than the card */
+    /* Sell / Receive rows: flat, no boxes — sections split by hairlines */
     .ox-side {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 12px 14px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--umbra-border);
+      padding: 6px 0;
+      border-radius: 0;
+      background: transparent;
+      border: 0;
+    }
+
+    /* Token selector: bare icon + bold name + chevron (reference) */
+    .ox-side .token-select {
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      border-radius: 0;
+      padding: 4px 2px;
+      font-size: 17px;
+      font-weight: 700;
+      max-width: 55%;
+    }
+    .ox-side .token-select:hover {
+      background: transparent;
+      opacity: 0.85;
     }
 
     .ox-side-label {
@@ -757,19 +776,22 @@
       padding: 2px 0 6px;
     }
 
-    /* Arrow button overlaps both panels, centered, like the reference */
+    /* Arrow button sits on the divider line between the sections */
     .ox-div {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin: -14px 0;
+      margin: 8px 0;
       position: relative;
       z-index: 2;
     }
 
     .ox-div > span {
-      display: none;
+      display: block;
+      flex: 1;
+      height: 1px;
+      background: var(--umbra-border);
     }
 
     .ox-div .flip-btn {
@@ -777,8 +799,9 @@
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      border: 3px solid var(--umbra-surface);
+      border: 0;
       background: #000;
+      box-shadow: 0 0 0 4px var(--umbra-bg);
       color: #fff;
       display: inline-flex;
       align-items: center;
@@ -1515,13 +1538,13 @@
 
       /* Phone swap rows: compact pills so the full symbol shows next to
          the big amount (reference proportions), instead of truncating. */
-      .swap-card { padding: 16px 14px; }
+      .swap-card { padding: 0; }
       .amount-wrap input { font-size: 34px; height: 40px; }
       .amount-wrap .usd-line { font-size: 14px; }
       .token-select { padding: 8px 10px; gap: 8px; max-width: 55%; }
       .swap-card .tk-36 { width: 32px; height: 32px; }
       .swap-card .tk-36 .tk-letter { font-size: 13px; }
-      .ox-side { padding: 12px; }
+      .ox-side { padding: 6px 0; }
       .swap-tab { font-size: 14px; }
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
