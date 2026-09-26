@@ -4308,10 +4308,10 @@
             chgTxt + '</div>';
           return;
         }
-        // Exchange-style line chart: grid + right price axis + last-price tag.
-        // No candles: candles need open/high/low/close intervals and our rings
-        // only hold observed price points — bucketing those into fake candles
-        // would invent price action that never happened.
+        // Candlesticks built ONLY from observed points: each time bucket's
+        // open/high/low/close are real observations (open = first seen,
+        // close = last seen). Empty buckets are gaps, never filler. No volume
+        // bars: we don't collect trade volume anywhere, so none is drawn.
         function fmtAx(v) {
           return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
@@ -4324,24 +4324,43 @@
           if (mm.length < 2) mm = '0' + mm;
           return hh + ':' + mm;
         }
-        var w = 360, h = 110, padL = 4, padR = 66, padT = 10, padB = 16;
-        var vals = points.map(function (p) { return Number(p.p); });
-        var min = Math.min.apply(null, vals);
-        var max = Math.max.apply(null, vals);
+        var w = 360, h = 150, padL = 4, padR = 58, padT = 20, padB = 16;
+        var t0 = Number(points[0].t), t1 = Number(points[points.length - 1].t);
+        if (!isFinite(t0) || !isFinite(t1) || t1 <= t0) { t0 = Date.now() - 3600000; t1 = Date.now(); }
+        var NB = 24;
+        var span = t1 - t0;
+        var buckets = [];
+        var bi;
+        for (bi = 0; bi < NB; bi++) buckets.push([]);
+        points.forEach(function (p) {
+          var t = Number(p.t), v = Number(p.p);
+          if (!isFinite(t) || !isFinite(v)) return;
+          var idx = Math.min(NB - 1, Math.max(0, Math.floor(((t - t0) / span) * NB)));
+          buckets[idx].push(v);
+        });
+        var candles = buckets.map(function (bvals, i) {
+          if (!bvals.length) return null;
+          return { i: i, o: bvals[0], h: Math.max.apply(null, bvals), l: Math.min.apply(null, bvals), c: bvals[bvals.length - 1] };
+        });
+        var allVals = [];
+        candles.forEach(function (c) { if (c) { allVals.push(c.h, c.l); } });
+        if (!allVals.length) {
+          drawerChartEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px;color:var(--umbra-muted);"><span>No price history for ' + esc(symbol || 'this token') + ' yet</span></div>';
+          return;
+        }
+        var min = Math.min.apply(null, allVals), max = Math.max.apply(null, allVals);
         if (!isFinite(min) || !isFinite(max) || min === max) { min -= 1; max += 1; }
         var range = max - min;
-        // Add 10% padding top/bottom for breathing room
-        min -= range * 0.1; max += range * 0.1; range = max - min;
+        min -= range * 0.12; max += range * 0.12; range = max - min;
         var pw = w - padL - padR;
         var ph = h - padT - padB;
         function yOf(v) { return padT + (1 - (v - min) / range) * ph; }
-        function xOf(i) { return padL + (i / (vals.length - 1)) * pw; }
-        var coords = vals.map(function (v, i) { return { x: xOf(i), y: yOf(v) }; });
-        var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
-        var up = vals[vals.length - 1] >= vals[0];
-        var col = up ? '#55B98A' : '#f6465d';
+        var slotW = pw / NB;
+        var bodyW = Math.max(2, slotW * 0.55);
+        var upCol = '#55B98A', downCol = '#f6465d';
         var gridCol = 'rgba(255,255,255,0.08)';
         var txtCol = '#9aa0a6';
+        var svg = '';
         // Gridlines + right axis at max / mid / min
         var levels = [max - range * 0.1, (max + min) / 2, min + range * 0.1];
         var grid = levels.map(function (lv) {
@@ -4349,28 +4368,52 @@
           return '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + pw).toFixed(1) + '" y2="' + gy + '" stroke="' + gridCol + '" stroke-width="1" />' +
             '<text x="' + (padL + pw + 6) + '" y="' + (Number(gy) + 3.5).toFixed(1) + '" font-size="9" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtAx(lv)) + '</text>';
         }).join('');
-        // Last-price dashed line + tag
-        var lastV = vals[vals.length - 1];
-        var lastY = yOf(lastV).toFixed(1);
-        var tag = esc(fmtAx(lastV));
-        var tagW = 8 + tag.length * 5.6;
-        var tagX = padL + pw + 4;
-        var lastLine =
-          '<line x1="' + padL + '" y1="' + lastY + '" x2="' + (padL + pw).toFixed(1) + '" y2="' + lastY + '" stroke="' + col + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.8" />' +
-          '<rect x="' + tagX.toFixed(1) + '" y="' + (Number(lastY) - 9).toFixed(1) + '" width="' + tagW.toFixed(1) + '" height="18" rx="4" fill="' + col + '" />' +
-          '<text x="' + (tagX + 4).toFixed(1) + '" y="' + (Number(lastY) + 3.5).toFixed(1) + '" font-size="9" font-weight="700" fill="#121212" font-family="Sora,sans-serif">' + tag + '</text>';
-        // Time labels: first / last observation
-        var t0 = points[0] ? points[0].t : null;
-        var t1 = points[points.length - 1] ? points[points.length - 1].t : null;
+        // Candles: wick + body, green up / red down
+        candles.forEach(function (c) {
+          if (!c) return;
+          var cx = (padL + c.i * slotW + slotW / 2).toFixed(1);
+          var col = c.c >= c.o ? upCol : downCol;
+          var yH = yOf(c.h).toFixed(1), yL = yOf(c.l).toFixed(1);
+          var yO = yOf(c.o), yC = yOf(c.c);
+          var yTop = Math.min(yO, yC).toFixed(1);
+          var bodyH = Math.max(1, Math.abs(yC - yO)).toFixed(1);
+          svg += '<line x1="' + cx + '" y1="' + yH + '" x2="' + cx + '" y2="' + yL + '" stroke="' + col + '" stroke-width="1" />' +
+            '<rect x="' + (Number(cx) - bodyW / 2).toFixed(1) + '" y="' + yTop + '" width="' + bodyW.toFixed(1) + '" height="' + bodyH + '" fill="' + col + '" />';
+        });
+        // MA(5) / MA(10) of bucket closes: real derived averages
+        function maLine(k) {
+          var closes = [];
+          candles.forEach(function (c) { if (c) closes.push({ i: c.i, c: c.c }); });
+          if (closes.length < k) return { path: '', last: null };
+          var pts = [];
+          for (var j = k - 1; j < closes.length; j++) {
+            var sum = 0;
+            for (var m = j - k + 1; m <= j; m++) sum += closes[m].c;
+            pts.push({ i: closes[j].i, v: sum / k });
+          }
+          var path = pts.map(function (p, pi2) {
+            var x = (padL + p.i * slotW + slotW / 2).toFixed(1);
+            return (pi2 === 0 ? 'M' : 'L') + x + ' ' + yOf(p.v).toFixed(1);
+          }).join(' ');
+          return { path: path, last: pts[pts.length - 1].v };
+        }
+        var ma5 = maLine(5), ma10 = maLine(10);
+        var ma5Col = '#e8c547', ma10Col = '#9d7bff';
+        if (ma5.path) svg += '<path d="' + ma5.path + '" fill="none" stroke="' + ma5Col + '" stroke-width="1.2" />';
+        if (ma10.path) svg += '<path d="' + ma10.path + '" fill="none" stroke="' + ma10Col + '" stroke-width="1.2" />';
+        // Legend: MA values
+        if (ma5.last !== null && ma5.last !== undefined) {
+          svg += '<text x="' + padL + '" y="12" font-size="9" fill="' + ma5Col + '" font-family="Sora,sans-serif">MA(5): ' + esc(fmtAx(ma5.last)) + '</text>';
+        }
+        if (ma10.last !== null && ma10.last !== undefined) {
+          svg += '<text x="' + (padL + 118) + '" y="12" font-size="9" fill="' + ma10Col + '" font-family="Sora,sans-serif">MA(10): ' + esc(fmtAx(ma10.last)) + '</text>';
+        }
+        // Time labels: first / last bucket edge
         var times = '<text x="' + padL + '" y="' + (h - 4) + '" font-size="9" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtTime(t0)) + '</text>' +
           '<text x="' + (padL + pw).toFixed(1) + '" y="' + (h - 4) + '" font-size="9" text-anchor="end" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtTime(t1)) + '</text>';
         drawerChartEl.innerHTML =
-          '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="110" preserveAspectRatio="none" style="display:block;" role="img" aria-label="Price history chart">' +
-          grid + times +
-          '<path d="' + linePath + '" fill="none" stroke="' + col + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />' +
-          '<circle cx="' + coords[coords.length - 1].x.toFixed(1) + '" cy="' + coords[coords.length - 1].y.toFixed(1) + '" r="2.5" fill="' + col + '" />' +
-          lastLine +
-          '</svg>';
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="150" preserveAspectRatio="none" style="display:block;" role="img" aria-label="Price history chart">' +
+          grid + svg + times + '</svg>';
       }
       async function paintDrawerHoldings(symbol) {
         var row = document.getElementById('drawerHoldRow');
