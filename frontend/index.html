@@ -484,6 +484,7 @@
       #slipModal .token-modal {
         max-width: none;
         width: 100%;
+        min-height: 400px;
         border-radius: 22px 22px 0 0;
         border-bottom: 0;
         padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
@@ -2337,6 +2338,7 @@
         <button id="slipCustomBtn" type="button">Custom</button>
         <input id="slipCustomInput" type="number" min="0" max="5" step="any" placeholder="0.0" inputmode="decimal" aria-label="Custom slippage percent" />
       </div>
+      <button class="swap-action" id="slipSaveBtn" type="button" style="margin-top:auto; height:52px; font-size:15px;">Save</button>
     </div>
   </div>
 
@@ -3024,6 +3026,7 @@
       }
       function applySlippage(bps) {
         slippageBps = Math.max(0, Math.min(500, Math.round(bps)));
+        stagedSlippage = slippageBps;
         var label = fmtSlip(slippageBps);
         slipValEl.textContent = label;
         paintSlipModal();
@@ -3033,17 +3036,20 @@
         var pills = document.querySelectorAll('#slipPills button');
         var matched = false;
         Array.prototype.forEach.call(pills, function (b) {
-          var on = Number(b.getAttribute('data-bps')) === slippageBps;
+          var on = Number(b.getAttribute('data-bps')) === stagedSlippage;
           b.classList.toggle('active', on);
           if (on) matched = true;
         });
         var cb = document.getElementById('slipCustomBtn');
         if (cb) cb.classList.toggle('active', !matched);
         var ci = document.getElementById('slipCustomInput');
-        if (ci && document.activeElement !== ci) ci.value = matched ? '' : (slippageBps / 100).toString();
+        if (ci && document.activeElement !== ci) ci.value = matched ? '' : (stagedSlippage / 100).toString();
       }
+      // Staged choice: pills/input highlight only, Save applies + closes.
+      var stagedSlippage = 50;
       var slipModalEl = document.getElementById('slipModal');
       function openSlipModal() {
+        stagedSlippage = slippageBps;
         paintSlipModal();
         slipModalEl.classList.add('open');
       }
@@ -3060,9 +3066,13 @@
       });
       Array.prototype.forEach.call(document.querySelectorAll('#slipPills button'), function (b) {
         b.addEventListener('click', function () {
-          applySlippage(Number(b.getAttribute('data-bps')));
-          closeSlipModal();
+          stagedSlippage = Math.max(0, Math.min(500, Number(b.getAttribute('data-bps')) || 0));
+          paintSlipModal();
         });
+      });
+      on('slipSaveBtn', 'click', function () {
+        applySlippage(stagedSlippage);
+        closeSlipModal();
       });
       on('slipCustomBtn', 'click', function () {
         var ci = document.getElementById('slipCustomInput');
@@ -3074,8 +3084,8 @@
         // Backend caps slippage at 5% (500 bps): above that the minimum
         // received stops being a real protection, so the input refuses it.
         if (isFinite(v) && v >= 0 && v <= 5) {
-          applySlippage(v * 100);
-          closeSlipModal();
+          stagedSlippage = v * 100;
+          paintSlipModal();
         } else {
           paintSlipModal();
         }
