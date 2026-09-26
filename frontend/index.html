@@ -1467,6 +1467,16 @@
       background: var(--umbra-secondary);
     }
 
+    /* No green focus ring on picker rows (tap focus looked like a
+       selection outline) — the wash matches hover instead. */
+    .token-opt:focus {
+      outline: none;
+    }
+    .token-opt:focus-visible {
+      outline: none;
+      background: var(--umbra-secondary);
+    }
+
     .token-opt .meta {
       display: flex;
       flex-direction: column;
