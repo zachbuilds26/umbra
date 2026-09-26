@@ -4035,6 +4035,10 @@
             openStockDrawer(sym);
           });
         });
+        // Gap-fill: a ticker batch can answer without a symbol the summary
+        // endpoint prices fine. Priceless rows backfill from the same source
+        // the drawer uses — at most 4 in flight, each symbol tried once.
+        fillMissingPrices(list);
         // Update dropdown counts — fixed one-time total, not live filtered
         var total = stocksTotal || stocksCache.length;
         var ca = document.getElementById('countAll'); if (ca) ca.textContent = total || '—';
@@ -4045,6 +4049,45 @@
           var txt = currentStocksFilter === 'all' ? 'All' : currentStocksFilter === 'xstock' ? 'xStocks' : 'Pre-IPO';
           label.textContent = txt;
         }
+      }
+      var priceFillSeen = {};
+      var priceFillQueue = [];
+      var priceFillActive = 0;
+      function pumpPriceFills() {
+        while (priceFillActive < 4 && priceFillQueue.length) {
+          var sym = priceFillQueue.shift();
+          priceFillActive++;
+          (function (s) {
+            fetch(API_BASE + '/api/assets/' + encodeURIComponent(s) + '/summary')
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (d) {
+                var ap = d && d.summary && d.summary.asset && d.summary.asset.price;
+                var v = ap && ap.value !== undefined && ap.value !== null ? ap.value : ap;
+                if (v !== null && v !== undefined && v !== '' && isFinite(Number(v))) {
+                  var hit = false;
+                  stocksCache.forEach(function (a) {
+                    if (a.symbol === s && !a.price) {
+                      a.price = { value: v, timestamp: Date.now(), currency: 'USD' };
+                      a._priceChecked = true;
+                      hit = true;
+                    }
+                  });
+                  if (hit) renderStocks(document.getElementById('stocksSearch') ? document.getElementById('stocksSearch').value : '', 'stocksList');
+                }
+              })
+              .catch(function () { /* stays dashed, never guessed */ })
+              .then(function () { priceFillActive--; pumpPriceFills(); });
+          })(sym);
+        }
+      }
+      function fillMissingPrices(list) {
+        (list || []).forEach(function (a) {
+          var sym = a && a.symbol;
+          if (!sym || a.price || priceFillSeen[sym]) return;
+          priceFillSeen[sym] = true;
+          priceFillQueue.push(sym);
+        });
+        pumpPriceFills();
       }
       // Overlapping refreshes (re-entering the tab, a cache hit plus a fetch)
       // would otherwise let the slower, older response overwrite newer rows.
