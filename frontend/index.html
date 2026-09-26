@@ -3218,7 +3218,7 @@
         var sign = vd > 0 ? '+' : '';
         el.textContent = '(' + sign + vd.toFixed(2) + '%)';
         el.className = vd >= 0 ? 'up' : 'down';
-        el.setAttribute('data-tip', 'Value difference = (Received value − Paid value) / Paid value. Your size moved this pair\u2019s pool price, so you get a little less than the market rate.');
+        el.setAttribute('data-tip', 'What this swap costs you — the gap between the market value going in and what comes out, caused by price impact at this size.');
       }
 
       function resetQuoteSummary() {
