@@ -394,7 +394,7 @@
     .connect-btn:hover {
       opacity: 0.9;
     }
-    /* Dropdown chevron on the connected address (pure CSS, no font icons) */
+    /* Dropdown chevron on the connected button (pure CSS, no font icons) */
     /* Address chevron: near-black ink on green, static — no animation at all */
     .connect-btn .dd-chev,
     .mobile-connect .dd-chev {
@@ -402,6 +402,18 @@
       margin-left: 8px;
       vertical-align: middle;
       color: var(--umbra-accent-ink);
+    }
+    /* Wallet avatar disc inside the connected pill (reference pattern) */
+    .connect-btn .wavatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--umbra-accent-ink);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
     }
     .connect-btn .dd-chev svg,
     .mobile-connect .dd-chev svg { display: block; }
@@ -2502,10 +2514,9 @@
       function setConnected(pubkey) {
         window.umbraWallet = pubkey;
         var btn = document.getElementById('connectBtn');
-        // esc(): the address comes from the wallet provider/session, and this
-        // string is interpolated into innerHTML. Unescaped, a crafted provider
-        // value would inject markup into the page that holds the user's session.
-        btn.innerHTML = esc(shortKey(pubkey)) + '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+        // Avatar pill, no address text (address stays in title/aria-label).
+        btn.innerHTML = '<span class="wavatar"><i data-lucide="wallet" width="16" height="16"></i></span><span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+        try { if (window.lucide) window.lucide.createIcons(); } catch (_) {}
         btn.classList.add('connected');
         btn.classList.remove('flipped');
         try {
@@ -2518,7 +2529,7 @@
         } catch (_) {}
         btn.title = pubkey + ' — click for account';
         btn.setAttribute('aria-label', 'Connected ' + pubkey);
-        // Connected shows truncated address (no responsive spans needed)
+        // Connected shows avatar + chevron (address in title/aria only)
         var half = document.getElementById('halfBtn');
         var max = document.getElementById('maxBtn');
         half.removeAttribute('disabled');
