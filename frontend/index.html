@@ -1293,6 +1293,45 @@
     /* Title takes state color: green confirmed, red failed */
     #swapModalTitle.tone-ok { color: var(--umbra-accent); }
     #swapModalTitle.tone-bad { color: #f6465d; }
+    /* Swap state icon: staged process feedback (wallet → send → confirm → done) */
+    .swap-state { display: none; align-items: center; justify-content: center; padding: 2px 0 14px; }
+    .swap-state.show { display: flex; }
+    .state-disc {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .state-disc.accent { background: var(--umbra-accent-soft); color: var(--umbra-accent); }
+    .state-disc.ok { background: var(--umbra-accent-soft); color: var(--umbra-accent); animation: popIn 0.35s ease; }
+    .state-disc.bad { background: rgba(246, 70, 93, 0.12); color: #f6465d; }
+    .state-disc .spin { animation: spin 1s linear infinite; }
+    .state-disc.pulse { animation: statePulse 1.6s ease-in-out infinite; }
+    @keyframes popIn {
+      from { transform: scale(0.6); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes statePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    /* Busy stages collapse the detail rows: amounts + status only */
+    #swapModal.busy .swap-hero-line,
+    #swapModal.busy .swap-hero-hair { display: none; }
+    /* Modal entrance */
+    #swapModal.open .token-modal { animation: cardIn 0.25s ease; }
+    @keyframes cardIn {
+      from { transform: translateY(14px); opacity: 0.4; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #swapModal.open .token-modal,
+      .state-disc.ok { animation: none; }
+      .state-disc .spin,
+      .state-disc.pulse { animation: none; }
+    }
     .swap-hero-row {
       display: flex;
       align-items: center;
@@ -2349,6 +2388,7 @@
         <b id="swapModalTitle">Confirm <em>Swap</em></b>
         <button class="icon-btn" id="swapModalClose" aria-label="Close" style="display:inline-flex;"><i data-lucide="x" width="18" height="18"></i></button>
       </div>
+      <div class="swap-state" id="swapStateIcon" aria-hidden="true"></div>
       <div id="swapPairHero" style="margin-bottom:4px;"></div>
       <div id="swapExplorer" style="margin-top:12px; text-align:center; display:none;">
         <a id="swapExplorerLink" class="swap-explorer-btn" href="#" target="_blank" rel="noreferrer">View on Explorer ↗</a>
@@ -3584,6 +3624,22 @@
         if (tone === 'ok') swapTitleEl.classList.add('tone-ok');
         else if (tone === 'bad') swapTitleEl.classList.add('tone-bad');
       }
+      // State icon per process stage + detail-row collapsing while busy.
+      var swapStateEl = document.getElementById('swapStateIcon');
+      function paintSwapState(icon, cls, spin) {
+        if (!swapStateEl) return;
+        if (!icon) {
+          swapStateEl.classList.remove('show');
+          swapStateEl.innerHTML = '';
+          return;
+        }
+        swapStateEl.classList.add('show');
+        swapStateEl.innerHTML = '<span class="state-disc ' + (cls || 'accent') + '"><i data-lucide="' + icon + '" width="26" height="26"' + (spin ? ' class="spin"' : '') + '></i></span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+      function setSwapBusy(on) {
+        swapModalEl.classList.toggle('busy', !!on);
+      }
       // Confirm card: signed amounts, connector line, grey detail rows.
       function swapHeroHtml(q) {
         var sellN = Number(q.sell.amount);
@@ -3637,6 +3693,8 @@
           msg = 'Our quote provider did not respond. Try again in a moment.';
         }
         paintSwapTitle('Swap failed', 'bad');
+        paintSwapState('x', 'bad', false);
+        setSwapBusy(false);
         swapErrorEl.style.display = 'flex';
         swapErrorEl.textContent = msg;
         swapErrorEl.classList.remove('shake');
@@ -3709,6 +3767,8 @@
           var q = lastQuote;
           paintSwapHero(q);
           paintSwapTitle('Confirm in wallet', '');
+          paintSwapState('wallet', 'accent pulse');
+          setSwapBusy(false);
           // 1) Unsigned transaction from our backend
           var txRes = await fetch(API_BASE + '/api/swap/transaction', {
             method: 'POST',
@@ -3737,6 +3797,8 @@
           // built for this quote. Skipping this entirely meant a swap that had
           // already executed was never recorded, and the user saw a failure.
           paintSwapTitle('Submitting…', '');
+          paintSwapState('send', 'accent', false);
+          setSwapBusy(true);
           var selfBroadcast = typeof signed.__sig === 'string' && signed.__sig.length > 0;
           var bcBody = {
             quoteId: q.quoteId,
@@ -3786,6 +3848,7 @@
               swapExplorerEl.style.display = 'block';
               executing = false;
               paintSwapTitle('Swap submitted — not yet recorded', '');
+              paintSwapState('clock', 'accent', false);
               swapErrorEl.style.display = 'flex';
               swapErrorEl.classList.remove('shake', 'tone-bad');
               swapErrorEl.textContent = 'Your transaction was sent. Umbra could not save it to your activity yet — check the explorer link for its status.';
@@ -3798,13 +3861,16 @@
             subErr.umbraCode = subData.error && subData.error.code;
             throw subErr;
           }
-          // 5) Poll to finality          paintSwapTitle('Confirming on Solana…', '');
+          // 5) Poll to finality
+          paintSwapTitle('Confirming on Solana…', '');
+          paintSwapState('loader-circle', 'accent', true);
           var final = await pollTx(subData.id, wallet);
           swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
           swapExplorerEl.style.display = 'block';
           if (final === 'confirmed') {
             executing = false;
             paintSwapTitle('Swap confirmed', 'ok');
+            paintSwapState('check', 'ok', false);
             retrying = false;
             swapRetryBtn.style.display = 'none';
             if (typeof refreshActivity === 'function') refreshActivity();
@@ -3846,6 +3912,8 @@
         swapRetryBtn.style.display = 'block';
         swapRetryBtn.innerHTML = '<span class="tdots on" style="position:static;transform:none;"><i></i><i></i><i></i></span>';
         paintSwapTitle('Retrying…', '');
+        paintSwapState('loader-circle', 'accent', true);
+        setSwapBusy(true);
         lastQuote = null;
         executeSwap();
       });
