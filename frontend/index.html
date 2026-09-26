@@ -3133,7 +3133,7 @@
         if (code === 'QUOTE_UNAVAILABLE') {
           return (sym ? sym + ' pricing is' : 'This pair\'s pricing is') + ' temporarily unavailable. Try again shortly, or pick another asset.';
         }
-        if (code === 'UNSUPPORTED_ASSET') return 'Umbra swaps one stock against USDC or USDT — pick the other side from the list.';
+        if (code === 'UNSUPPORTED_ASSET') return 'Umbra swaps only stock against USDC or USDT.';
         if (code === 'VALIDATION_ERROR') return 'That amount is not valid — enter a different amount.';
         if (code === 'QUOTE_EXPIRED') return 'That quote went stale — we are fetching a fresh one.';
         if (code === 'SWAP_UNAVAILABLE' || code === 'PROVIDER_ERROR') {
