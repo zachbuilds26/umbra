@@ -3154,7 +3154,7 @@
         try { updateActionBtn(); } catch (_) {}
         // Same token both sides is not an amount problem — say exactly that.
         msg = (sellSym === buySym)
-          ? 'Same token on both sides — choose a different token to swap.'
+          ? 'Same token — choose a different token to swap.'
           : friendlyQuoteError(code, msg);
         quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
