@@ -2458,6 +2458,19 @@
     </div>
   </div>
 
+  <!-- Transaction detail drawer -->
+  <div class="drawer-backdrop" id="txDrawer" aria-hidden="true">
+    <div class="drawer" role="dialog" aria-label="Transaction details">
+      <div class="drawer-head">
+        <button class="icon-btn" id="txDrawerClose" aria-label="Close" style="display:inline-flex;">
+          <i data-lucide="x" width="20" height="20"></i>
+        </button>
+        <span style="margin-left:8px; font-weight:600;">Transaction</span>
+      </div>
+      <div class="drawer-body" id="txDrawerBody"></div>
+    </div>
+  </div>
+
   <script>
     (function () {
       if (window.lucide) window.lucide.createIcons();
@@ -4283,12 +4296,23 @@
           var cls = status === 'confirmed' || status === 'completed' ? 'chg-up' : status === 'failed' || status === 'expired' ? 'chg-down' : '';
           var time = tx.createdAt ? new Date(tx.createdAt).toLocaleString() : '';
           return (
-            '<div class="stock-row" style="cursor:default;">' +
+            '<div class="stock-row" data-txid="' + esc(tx.id || '') + '" style="cursor:pointer;" role="button" tabindex="0">' +
             '<span class="stock-left"><span class="fallback" style="width:36px;height:36px;">' + icon + '</span><span class="stock-meta"><b>' + esc(title) + '</b><span>' + (isSwap ? 'Swap' : 'Bridge') + ' • ' + esc(time) + '</span></span></span>' +
             '<span class="stock-right"><span class="stock-price ' + cls + '">' + esc(status) + '</span><span class="stock-mcap">' + esc((tx.id || '').slice(0,8)) + '</span></span>' +
             '</div>'
           );
         }).join('');
+        Array.prototype.forEach.call(listEl.querySelectorAll('.stock-row[data-txid]'), function (row) {
+          row.addEventListener('click', function () {
+            openTxDrawer(row.getAttribute('data-txid'));
+          });
+          row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openTxDrawer(row.getAttribute('data-txid'));
+            }
+          });
+        });
       }
       function updateActivityView() {
         var isConnected = !!window.umbraWallet;
@@ -4437,6 +4461,108 @@
       document.getElementById('drawerClose').addEventListener('click', closeStockDrawer);
       drawerEl.addEventListener('click', function (e) { if (e.target === drawerEl) closeStockDrawer(); });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && drawerEl.classList.contains('open')) closeStockDrawer(); });
+
+      /* ---------- Transaction detail drawer ---------- */
+      var txDrawerEl = document.getElementById('txDrawer');
+      var txDrawerBody = document.getElementById('txDrawerBody');
+      var txReturnFocus = null;
+      function txStatusMeta(status) {
+        if (status === 'confirmed' || status === 'completed') {
+          return { label: status === 'completed' ? 'Completed' : 'Confirmed', color: 'var(--umbra-accent)', disc: 'ok', icon: 'circle-check', spin: false };
+        }
+        if (status === 'failed' || status === 'expired') {
+          return { label: status === 'failed' ? 'Failed' : 'Expired', color: '#f6465d', disc: 'bad', icon: 'circle-x', spin: false };
+        }
+        return { label: 'Pending', color: 'var(--umbra-text)', disc: 'accent', icon: 'loader-circle', spin: true };
+      }
+      function txWhen(iso) {
+        if (!iso) return '—';
+        var d = new Date(iso);
+        return isFinite(d.getTime()) ? d.toLocaleString() : '—';
+      }
+      function txLine(label, valHtml) {
+        return '<div class="swap-hero-line"><span>' + esc(label) + '</span><span class="val">' + valHtml + '</span></div>';
+      }
+      function txShort(sig) {
+        return sig.length > 20 ? sig.slice(0, 8) + '…' + sig.slice(-8) : sig;
+      }
+      function copyText(str, done) {
+        function fallback() {
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = str;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done(true);
+          } catch (_) { done(false); }
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(str).then(function () { done(true); }, fallback);
+            return;
+          }
+          fallback();
+        } catch (_) { fallback(); }
+      }
+      function openTxDrawer(id) {
+        var tx = null;
+        (allTransactions || []).forEach(function (t) { if (t && t.id === id) tx = t; });
+        if (!tx || !txDrawerEl || !txDrawerBody) return;
+        var meta = txStatusMeta(tx.status || 'unknown');
+        var isSwap = tx.type === 'swap';
+        var sellAmt = tx.sourceAmount || '—';
+        var recvAmt = tx.destinationAmount || '—';
+        var sellSym = tx.sourceAsset || '?';
+        var recvSym = tx.destinationAsset || (isSwap ? '?' : 'Solana');
+        var terminal = ['confirmed', 'completed', 'failed', 'expired'].indexOf(tx.status) >= 0;
+        var sig = tx.signature || tx.sourceTxHash || '';
+        var errMsg = tx.errorMessage || '';
+        var html =
+          '<div style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:20px 16px 12px;">' +
+          '<span class="state-disc ' + meta.disc + '"><i data-lucide="' + meta.icon + '" width="26" height="26" stroke-width="3"' + (meta.spin ? ' class="spin"' : '') + '></i></span>' +
+          '<b style="font-size:20px; font-weight:700; color:' + meta.color + ';">' + esc(meta.label) + '</b></div>' +
+          '<div style="padding:0 16px 20px;">' +
+          '<div class="swap-hero-row"><span class="neg">-' + esc(sellAmt) + '</span><span class="sym">' + esc(sellSym) + '</span></div>' +
+          '<div class="swap-hero-conn"></div>' +
+          '<div class="swap-hero-row recv"><span class="pos">+' + esc(recvAmt) + '</span><span class="sym">' + esc(recvSym) + '</span></div>' +
+          '<div class="swap-hero-hair"></div>' +
+          txLine('Type', isSwap ? 'Swap' : 'Bridge') +
+          txLine('Network', isSwap ? 'Solana' : esc(tx.sourceNetwork || '?') + ' → Solana') +
+          txLine('Submitted', esc(txWhen(tx.createdAt))) +
+          (terminal ? txLine('Finalized', esc(txWhen(tx.updatedAt))) : '') +
+          (sig ? '<div class="swap-hero-line"><span>Signature</span><span class="val">' + esc(txShort(sig)) + ' <button id="txCopySig" type="button" style="background:none; border:0; padding:0 0 0 4px; color:var(--umbra-accent); font-family:var(--umbra-font-body); font-size:14px; font-weight:600; cursor:pointer;">Copy</button></span></div>' : '') +
+          (meta.disc === 'bad' && errMsg ? '<div style="margin-top:12px; padding:10px 12px; border-radius:8px; background:rgba(246,70,93,0.1); color:#f6465d; font-size:13px;">' + esc(errMsg) + '</div>' : '') +
+          (sig ? '<div style="margin-top:14px; text-align:center;"><a class="swap-explorer-btn" href="https://explorer.solana.com/tx/' + encodeURIComponent(sig) + '" target="_blank" rel="noreferrer">View on Explorer ↗</a></div>' : '') +
+          '</div>';
+        txDrawerBody.innerHTML = html;
+        if (window.lucide) window.lucide.createIcons();
+        var copyBtn = document.getElementById('txCopySig');
+        if (copyBtn) copyBtn.addEventListener('click', function () {
+          copyText(sig, function (ok) {
+            copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+            setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1400);
+          });
+        });
+        txReturnFocus = document.activeElement;
+        txDrawerEl.classList.add('open');
+        txDrawerEl.setAttribute('aria-hidden', 'false');
+      }
+      function closeTxDrawer() {
+        if (!txDrawerEl) return;
+        txDrawerEl.classList.remove('open');
+        txDrawerEl.setAttribute('aria-hidden', 'true');
+        if (txReturnFocus && typeof txReturnFocus.focus === 'function') {
+          try { txReturnFocus.focus(); } catch (_) {}
+        }
+        txReturnFocus = null;
+      }
+      document.getElementById('txDrawerClose').addEventListener('click', closeTxDrawer);
+      txDrawerEl.addEventListener('click', function (e) { if (e.target === txDrawerEl) closeTxDrawer(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && txDrawerEl.classList.contains('open')) closeTxDrawer(); });
       drawerSwapBtn.addEventListener('click', function () {
         if (!drawerCurrent) return;
         // BUY: stock goes to RECEIVE, sell resets to USDC
