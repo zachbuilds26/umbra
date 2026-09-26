@@ -1192,6 +1192,11 @@
     #swapView .quote-lines {
       margin-top: 0;
     }
+    /* First message row always clears the Receive panel */
+    #swapView .quote-lines .row:first-child,
+    #swapView .qextra .row:first-child {
+      padding-top: 10px;
+    }
 
     /* Receive-price typing dots: three bouncing dots inside the price field
        while a quote is in flight (replaces the tofu "…" placeholder). */
