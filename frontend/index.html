@@ -7,7 +7,7 @@
   <meta name="description" content="Umbra - Dex aggregator for tokenized stocks on solana." />
   <link rel="icon" type="image/png" href="./assets/logo-white.png" />
   <link rel="apple-touch-icon" href="./assets/logo-white.png" />
-  <!-- Above-fold images first: header, network pill, default pair, tape head -->
+  <!-- Above-fold images first: header, network pill, default pair -->
   <link rel="preload" as="image" href="./assets/logo-white.png" />
   <link rel="preload" as="image" href="./assets/solana-mark.png" />
   <link rel="preload" as="image" href="./assets/tokens/NVDAx.png" />
@@ -46,19 +46,19 @@
      * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
      * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
      * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
-     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
+     * Palette + type are Umbra's own: #ffffff / #178a57, Sora body, Cinzel wordmark.
      */
     :root {
-      --umbra-bg: #121212;
-      --umbra-surface: #1a1a1a;
-      --umbra-secondary: rgba(255, 255, 255, 0.07);
-      --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
-      --umbra-accent: #55b98a;
-      --umbra-accent-soft: rgba(85, 185, 138, 0.2);
-      --umbra-accent-ink: #121212;
-      --umbra-text: #ffffff;
-      --umbra-muted: #9aa0a6;
-      --umbra-border: rgba(255, 255, 255, 0.08);
+      --umbra-bg: #edf3ef;
+      --umbra-surface: #ffffff;
+      --umbra-secondary: rgba(20, 90, 60, 0.07);
+      --umbra-secondary-hover: rgba(20, 90, 60, 0.13);
+      --umbra-accent: #178a57;
+      --umbra-accent-soft: rgba(23, 138, 87, 0.13);
+      --umbra-accent-ink: #ffffff;
+      --umbra-text: #0d1b14;
+      --umbra-muted: #5d6f65;
+      --umbra-border: rgba(13, 27, 20, 0.12);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -74,7 +74,7 @@
 
     html {
       scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
+      scrollbar-color: #c3d2cb transparent;
     }
     html::-webkit-scrollbar,
     body::-webkit-scrollbar {
@@ -87,25 +87,25 @@
     }
     html::-webkit-scrollbar-thumb,
     body::-webkit-scrollbar-thumb {
-      background: #2a2a2a;
+      background: #c3d2cb;
       border-radius: 999px;
     }
     html::-webkit-scrollbar-thumb:hover,
     body::-webkit-scrollbar-thumb:hover {
-      background: #3a3a3a;
+      background: #9db3a8;
     }
 
     body {
       background:
-        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
-        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
-        linear-gradient(#121212 0%, #121212 45%, #0e1512 100%);
+        radial-gradient(circle at 20% 85%, rgba(23, 138, 87, 0.1), transparent 40%),
+        radial-gradient(circle at 75% 100%, rgba(23, 138, 87, 0.07), transparent 42%),
+        linear-gradient(#ffffff 0%, #f2f7f4 60%, #e7f0ea 100%);
       background-attachment: fixed;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       -webkit-font-smoothing: antialiased;
       scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
+      scrollbar-color: #c3d2cb transparent;
     }
 
     /* ---------- Header ---------- */
@@ -121,6 +121,7 @@
         border-top: 0;
         border-left: 0;
         border-right: 0;
+        box-shadow: 0 1px 0 rgba(13, 27, 20, 0.04);
     }
 
     @media (min-width: 640px) {
@@ -173,6 +174,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 50%;
+      background: #0d1b14;
+      overflow: hidden;
+      flex: none;
     }
 
     .brand-mark img {
@@ -248,7 +253,7 @@
     }
 
     .network-btn:hover {
-      background: rgba(85, 185, 138, 0.28);
+      background: rgba(23, 138, 87, 0.22);
     }
     .network-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -375,6 +380,7 @@
           background: var(--umbra-surface);
           border: 1px solid var(--umbra-border);
           border-radius: 22px;
+          box-shadow: 0 16px 40px rgba(13, 27, 20, 0.14);
           padding: 10px 10px max(12px, env(safe-area-inset-bottom, 0px));
           flex-direction: column;
           gap: 2px;
@@ -393,7 +399,7 @@
       position: fixed;
       inset: 0;
       z-index: 48;
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(13, 27, 20, 0.4);
     }
 
     .mobile-menu .micon {
@@ -426,10 +432,6 @@
 
     .mobile-menu a.mrow:hover {
       background: var(--umbra-secondary);
-    }
-
-    .mobile-menu a.mrow:hover {
-      background: #242424;
     }
     .mobile-menu a.mrow.active {
       background: transparent;
@@ -513,7 +515,7 @@
       display: flex;
       flex-direction: column;
       background:
-        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
+        linear-gradient(rgba(23, 138, 87, 0.05), transparent 60%);
       position: relative;
     }
 
@@ -521,7 +523,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px);
+      background-image: radial-gradient(circle, rgba(13, 27, 20, 0.08) 0.65px, transparent 0.7px);
       background-size: 22px 22px;
       pointer-events: none;
     }
@@ -550,7 +552,7 @@
     }
 
     /* ---------- Swap card (their structure, our colour) ----------
-     * Card #1A1A1A rounded-2xl · Swap/Bridge tabs · activity + slippage icons
+     * Card #FFFFFF rounded-2xl · Swap/Bridge tabs · activity + slippage icons
      * Sell box (balance + 50%/Max) · flip button · Receive box · full action button. */
     .swap-wrap {
       flex: 1;
@@ -570,6 +572,7 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 0;
+      box-shadow: 0 16px 40px rgba(13, 27, 20, 0.1);
       padding: 24px;
       display: flex;
       flex-direction: column;
@@ -589,15 +592,15 @@
     .swap-card::before {
       top: -1px;
       left: -1px;
-      border-top: 2px solid rgba(255, 255, 255, 0.65);
-      border-left: 2px solid rgba(255, 255, 255, 0.65);
+      border-top: 2px solid var(--umbra-accent);
+      border-left: 2px solid var(--umbra-accent);
     }
 
     .swap-card::after {
       bottom: -1px;
       right: -1px;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.65);
-      border-right: 2px solid rgba(255, 255, 255, 0.65);
+      border-bottom: 2px solid var(--umbra-accent);
+      border-right: 2px solid var(--umbra-accent);
     }
 
     /* Card top: mini Swap/Bridge pill tabs + slippage tool */
@@ -1097,7 +1100,7 @@
       position: fixed;
       inset: 0;
       z-index: 60;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(13, 27, 20, 0.45);
       align-items: center;
       justify-content: center;
       padding: 16px;
@@ -1116,6 +1119,7 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 16px;
+      box-shadow: 0 24px 64px rgba(13, 27, 20, 0.2);
       overflow: hidden;
       overflow-y: auto;
     }
@@ -1211,7 +1215,7 @@
       overflow-y: auto;
       padding: 0 8px 12px;
       scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
+      scrollbar-color: #c3d2cb transparent;
     }
     .token-list::-webkit-scrollbar {
       width: 6px;
@@ -1220,11 +1224,11 @@
       background: transparent;
     }
     .token-list::-webkit-scrollbar-thumb {
-      background: #2a2a2a;
+      background: #c3d2cb;
       border-radius: 999px;
     }
     .token-list::-webkit-scrollbar-thumb:hover {
-      background: #3a3a3a;
+      background: #9db3a8;
     }
 
     .token-opt {
@@ -1292,6 +1296,7 @@
       background: var(--umbra-surface);
       border: 1px solid var(--umbra-border);
       border-radius: 16px;
+      box-shadow: 0 16px 40px rgba(13, 27, 20, 0.08);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -1337,7 +1342,7 @@
       color: var(--umbra-text);
       font-size: 12px;
       line-height: 1.4;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 24px rgba(13,27,20,0.14);
       display: none;
     }
     .info-tip.open { display: block; }
@@ -1369,8 +1374,8 @@
        center it in whatever space the card leaves behind. */
     .api-pill { display: none; }
     @keyframes apiPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(85, 185, 138, 0.5); }
-      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(85, 185, 138, 0); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(23, 138, 87, 0.5); }
+      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(23, 138, 87, 0); }
     }
     @keyframes apiBlinkSlow {
       0%, 100% { opacity: 1; }
@@ -1418,12 +1423,6 @@
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
       .details-label { font-size: 14px; }
-
-      /* Tape chips scale with the card so the strip doesn't look like a
-         different product sitting above it. */
-      .tape-chip { font-size: 14px; padding: 9px 16px; gap: 9px; }
-      .tape-chip .tk-20 { width: 24px; height: 24px; }
-      .tape-chip .tk-20 .tk-letter { font-size: 11px; }
     }
     .stocks-list {
       min-height: 320px;
@@ -1434,7 +1433,7 @@
       flex-direction: column;
       gap: 4px;
       scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
+      scrollbar-color: #c3d2cb transparent;
     }
     .stocks-list::-webkit-scrollbar {
       width: 6px;
@@ -1443,11 +1442,11 @@
       background: transparent;
     }
     .stocks-list::-webkit-scrollbar-thumb {
-      background: #2a2a2a;
+      background: #c3d2cb;
       border-radius: 999px;
     }
     .stocks-list::-webkit-scrollbar-thumb:hover {
-      background: #3a3a3a;
+      background: #9db3a8;
     }
     .stock-row {
       display: flex;
@@ -1523,6 +1522,8 @@
       font-size: 14px;
       font-weight: 600;
     }
+    .stock-price.chg-up { color: var(--umbra-accent); }
+    .stock-price.chg-down { color: #f6465d; }
     .stock-mcap {
       font-size: 12px;
       color: var(--umbra-muted);
@@ -1534,7 +1535,7 @@
       position: fixed;
       inset: 0;
       z-index: 70;
-      background: rgba(0,0,0,0.6);
+      background: rgba(13,27,20,0.45);
       align-items: stretch;
       justify-content: flex-end;
     }
@@ -1547,6 +1548,7 @@
       height: 100%;
       background: var(--umbra-surface);
       border-left: 1px solid var(--umbra-border);
+      box-shadow: -16px 0 48px rgba(13, 27, 20, 0.14);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -1562,11 +1564,11 @@
       flex: 1;
       overflow-y: auto;
       scrollbar-width: thin;
-      scrollbar-color: #2a2a2a transparent;
+      scrollbar-color: #c3d2cb transparent;
     }
     .drawer-body::-webkit-scrollbar { width: 6px; }
     .drawer-body::-webkit-scrollbar-track { background: transparent; }
-    .drawer-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 999px; }
+    .drawer-body::-webkit-scrollbar-thumb { background: #c3d2cb; border-radius: 999px; }
     @media (max-width: 640px) {
       .drawer { max-width: 100%; }
     }
@@ -1602,11 +1604,11 @@
       top: calc(100% + 6px);
       left: 0;
       min-width: 150px;
-      background: #262626;
-      border: 1px solid rgba(255,255,255,0.14);
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
       border-radius: 12px;
       padding: 6px;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      box-shadow: 0 12px 32px rgba(13,27,20,0.16);
       z-index: 50;
     }
     .tx-menu button {
@@ -1675,68 +1677,6 @@
     .x-link:hover { color: var(--umbra-text); }
     .x-link svg { display: block; }
 
-    /* ---------- Ticker tape ---------- */
-    .tape {
-      overflow: hidden;
-      background: transparent;
-      border: 0;
-      position: relative;
-      z-index: 1;
-      margin-top: 4px;
-      mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-    }
-
-    .tape-track {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: max-content;
-      padding: 10px 0;
-      animation: tape-scroll 50s linear infinite;
-    }
-
-    .tape:hover .tape-track {
-      animation-play-state: paused;
-    }
-
-    @keyframes tape-scroll {
-      from {
-        transform: translateX(0);
-      }
-      to {
-        transform: translateX(-50%);
-      }
-    }
-
-    .tape-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 14px;
-      border-radius: 999px;
-      background: var(--umbra-secondary);
-      color: var(--umbra-text);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: background 0.15s ease;
-    }
-
-    .tape-chip:hover {
-      background: var(--umbra-secondary-hover);
-    }
-
-    .tape-chip img {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      object-fit: cover;
-      display: block;
-      background: var(--umbra-surface);
-    }
-
     /* Badged token icon — main logo with Solana mark pinned bottom-right */
     .tk {
       position: relative;
@@ -1770,7 +1710,7 @@
       height: 42%;
       border-radius: 50%;
       border: 2px solid var(--umbra-surface);
-      background: #121212;
+      background: #0d1b14;
       object-fit: contain;
       display: block;
     }
@@ -1780,55 +1720,6 @@
     .tk-36 .tk-letter { font-size: 14px; }
     .tk-48 { width: 48px; height: 48px; }
     .tk-48 .tk-letter { font-size: 18px; }
-
-    .tape-chip .sym {
-      color: var(--umbra-muted);
-    }
-
-    .tape-chip .chg-up {
-      color: var(--umbra-accent);
-      font-weight: 600;
-    }
-
-    .tape-chip .chg-down {
-      color: #f6465d;
-      font-weight: 600;
-    }
-
-    .tape-chip .chg-none {
-      color: var(--umbra-muted);
-    }
-
-    .tape-note {
-      padding: 10px 24px;
-      font-size: 13px;
-      color: var(--umbra-muted);
-    }
-
-    .tape-skeleton {
-      display: flex;
-      gap: 8px;
-      padding: 10px 0;
-      width: max-content;
-    }
-
-    .tape-skeleton span {
-      width: 150px;
-      height: 34px;
-      border-radius: 999px;
-      background: var(--umbra-secondary);
-      animation: pulse 1.2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%,
-      100% {
-        opacity: 0.5;
-      }
-      50% {
-        opacity: 1;
-      }
-    }
   </style>
 </head>
 <body>
@@ -1877,13 +1768,6 @@
   </div>
 
   <main>
-    <div class="tape" aria-label="Live token prices">
-      <div class="tape-skeleton" id="tapeSkeleton" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <div class="tape-track" id="tapeTrack" hidden></div>
-      <div class="tape-note" id="tapeNote" hidden></div>
-    </div>
     <!-- Swap card: confirm-sheet layout, Umbra skin. -->
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
@@ -2036,7 +1920,7 @@
                 <span id="stocksFilterLabel" style="white-space:nowrap;">All</span>
                 <span class="css-chev" aria-hidden="true"></span>
               </button>
-              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#262626; border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,0.6); z-index:50;">
+              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#ffffff; border:1px solid rgba(13,27,20,0.12); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(13,27,20,0.16); z-index:50;">
                 <button class="token-opt" data-filter="all" style="width:100%;"><span class="meta"><b>All</b></span><span class="tag" id="countAll">—</span></button>
                 <button class="token-opt" data-filter="xstock" style="width:100%;"><span class="meta"><b>xStocks</b></span><span class="tag" id="countX">—</span></button>
                 <button class="token-opt" data-filter="pre" style="width:100%;"><span class="meta"><b>Pre-IPO</b></span><span class="tag" id="countPre">—</span></button>
@@ -2229,12 +2113,6 @@
           return window.location.origin;
         } catch (_) { return window.location.origin; }
       })();
-      // Interleaved on purpose: pre-IPO names used to sit in one block at the
-      // end, which read like a second-class list. Same 26 names, mixed.
-      var TAPE_SYMBOLS = [
-        'NVDAx', 'AAPLx', 'TSLAx', 'MSFTx', 'AMZNx', 'GOOGLx', 'METAx', 'SPYx',
-        'QQQx', 'TSMx', 'AVGOx', 'AMDx', 'NFLXx', 'PLTRx', 'COINx', 'HOODx', 'MSTRx', 'GLDx',
-      ];
       var btn = document.getElementById('menuBtn');
       var menu = document.getElementById('mobileMenu');
       function lockBody(locked) {
@@ -2500,10 +2378,7 @@
       });
       // Classic/module bridge: the Reown module script calls these on session change.
       window.umbraWalletHooks = { connected: setConnected, disconnected: setDisconnected };
-      /* ---------- Ticker tape ---------- */
-      var track = document.getElementById('tapeTrack');
-      var skeleton = document.getElementById('tapeSkeleton');
-      var note = document.getElementById('tapeNote');
+      /* ---------- Token icons ---------- */
       // Icon manifest baked in (was a blocking fetch): letters become logos on
       // first paint instead of after a manifest round-trip. CDNSx/QCOMx/QQQx
       // have no logo file and intentionally fall back to letters.
@@ -2530,18 +2405,6 @@
           .replace(/'/g, '&#39;');
       }
 
-      function fmtChg(pct) {
-        // No 24h observation yet is not a 0.00% move. The API returns null until
-        // it holds two real prices inside the window, and printing "0.00%" here
-        // turned missing data into a measured-looking change.
-        if (pct === null || pct === undefined || pct === '') return ' <span class="chg-none">—</span>';
-        pct = Number(pct);
-        if (!isFinite(pct)) return ' <span class="chg-none">—</span>';
-        var sign = pct > 0 ? '+' : '';
-        var cls = pct >= 0 ? 'chg-up' : 'chg-down';
-        return ' <span class="' + cls + '">' + sign + pct.toFixed(2) + '%</span>';
-      }
-
       // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
       function tkIcon(symbol, size) {
         symbol = String(symbol || '');
@@ -2552,127 +2415,6 @@
           ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
-      }
-      function iconHtml(symbol) {
-        return tkIcon(symbol, 'tk-20');
-      }
-
-      function chipHtml(item) {
-        var sym = String((item && item.symbol) || '');
-        if (!sym) return '';
-        return (
-          '<span class="tape-chip" data-symbol="' + esc(sym) + '" style="cursor:default;">' +
-          iconHtml(sym) +
-          '<span class="sym">$' + esc(sym) + '</span>' +
-          '<span>' + fmtPrice(item.price) + '</span>' +
-          fmtChg(item.change24hPct) +
-          '</span>'
-        );
-      }
-
-      function showNote(text) {
-        // Never wipe a painted track (cache or previous load): a failed refresh
-        // must not flash the tape away. Only take over when nothing is showing.
-        if (track && !track.hidden && track.children.length) {
-          try { console.warn('[umbra] tape refresh failed:', text); } catch (_) {}
-          return;
-        }
-        skeleton.hidden = true;
-        skeleton.style.display = 'none';
-        track.hidden = true;
-        track.style.display = 'none';
-        note.hidden = false;
-        note.style.display = 'block';
-        note.textContent = text;
-      }
-
-      // Ticker refreshes can overlap (30s interval + slow provider): an older
-      // response must never repaint newer prices or write them to the cache.
-      var tapeSeq = 0;
-      async function loadTape() {
-        // Icons are inline above; only live prices are fetched.
-        var mySeq = ++tapeSeq;
-        var data = await fetch(url0()).then(function (res) {
-          if (!res.ok) throw new Error('ticker ' + res.status);
-          return res.json();
-        });
-        if (mySeq !== tapeSeq) return;
-        var items = (data.ticker || []).filter(function (t) {
-          return t.price !== null;
-        });
-        if (items.length === 0) {
-          showNote('Prices are warming up — check back in a minute.');
-          return;
-        }
-        var half = items.map(chipHtml).join('');
-        try { localStorage.setItem('umbra_tape_cache', JSON.stringify({ t: Date.now(), items: items })); } catch (_) {}
-        track.innerHTML = half + half; // doubled for a seamless loop
-        tapeStaleMarked = false;
-        track.removeAttribute('data-stale');
-        track.style.opacity = '';
-        skeleton.hidden = true;
-        skeleton.style.display = 'none';
-        if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
-        note.hidden = true;
-        note.style.display = 'none';
-        track.hidden = false;
-        track.style.display = '';
-        refreshSelectors(); // upgrade sell/buy coins from letters to real icons
-      }
-
-      function url0() {
-        return API_BASE + '/api/assets/ticker?symbols=' + TAPE_SYMBOLS.join(',');
-      }
-
-      // Instant tape: paint last visit's chips synchronously (real recent
-      // numbers, <30min old), then refresh live underneath. No skeleton wait.
-      try {
-        var _tc = JSON.parse(localStorage.getItem('umbra_tape_cache') || 'null');
-        if (_tc && Date.now() - _tc.t < 30 * 60 * 1000 && Array.isArray(_tc.items) && _tc.items.length) {
-          var half0 = _tc.items.filter(function (t) { return t && t.symbol; }).map(chipHtml).join('');
-          if (half0) {
-            track.innerHTML = half0 + half0;
-            skeleton.hidden = true;
-            skeleton.style.display = 'none';
-            if (skeleton.parentNode) skeleton.parentNode.removeChild(skeleton);
-            note.hidden = true;
-            note.style.display = 'none';
-            track.hidden = false;
-            track.style.display = '';
-          }
-        }
-      } catch (e) { try { console.warn('[umbra] tape cache unreadable', e); } catch (_) {} }
-      loadTape().catch(function () {
-        showNote('Prices unavailable right now — check your connection and retry.');
-      });
-      // Always retry in background (even when hidden): a latched error note or
-      // missing track must recover without a reload.
-      setInterval(function () {
-        loadTape().catch(function () {
-          // A failed refresh must not leave the last prices on screen looking
-          // live. Cached chips are real but no longer current, so say so.
-          markTapeStale();
-        });
-      }, 30000);
-
-      // Once a refresh fails, the chips still on screen are the previous
-      // snapshot. Mark them instead of implying they are current.
-      var tapeStaleMarked = false;
-      function markTapeStale() {
-        if (tapeStaleMarked) return;
-        var trackEl = document.getElementById('tapeTrack');
-        if (!trackEl || trackEl.hidden) return;
-        tapeStaleMarked = true;
-        try {
-          trackEl.setAttribute('data-stale', '1');
-          trackEl.style.opacity = '0.55';
-          var noteEl = document.getElementById('tapeNote');
-          if (noteEl) {
-            noteEl.textContent = 'Prices may be out of date — reconnecting…';
-            noteEl.hidden = false;
-            noteEl.style.display = 'block';
-          }
-        } catch (_) {}
       }
 
       /* ---------- Swap card ---------- */
@@ -2713,7 +2455,7 @@
         buyCoinEl.innerHTML = coinHtml(buySym);
       }
       // Paint real icons on the very first frame (preloaded files + inline
-      // manifest — no fetch needed), instead of waiting for the tape/directory.
+      // manifest — no fetch needed), instead of waiting for the directory.
       try { refreshSelectors(); } catch (_) {}
 
       // 'idle' | 'loading' | 'ready' | 'error'. An empty directory used to double
@@ -4014,7 +3756,8 @@
         var mySeq = ++activitySeq;
         // First load shows shimmer rows, not "No records yet": an empty
         // message before the fetch lands reads as "you have no history".
-        // Existing rows stay put on refresh (same rule as the tape).
+        // Existing rows stay put on refresh so a reload never flashes
+        // the list away while the next page is still in flight.
         if (!allTransactions.length) {
           var listEl0 = document.getElementById('activityList');
           var emptyEl0 = document.getElementById('activityEmpty');
@@ -4196,13 +3939,13 @@
         var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
         var areaPath = linePath + ' L' + coords[coords.length-1].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' L' + coords[0].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' Z';
         var up = vals[vals.length-1] >= vals[0];
-        var col = up ? '#55B98A' : '#f6465d';
+        var col = up ? '#178a57' : '#f6465d';
         var id = 'grad-' + Math.random().toString(36).slice(2,7);
         // Grid lines
         var grid = '';
         for (var g = 1; g <= 2; g++) {
           var gy = pad + (g/3)*(h - pad*2);
-          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1" /> ';
+          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(13,27,20,0.08)" stroke-width="1" /> ';
         }
         drawerChartEl.innerHTML =
           '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="80" preserveAspectRatio="none" style="display:block;">' +
@@ -4375,7 +4118,7 @@
           var file = (name||'').replace(/\s+/g,'');
           var src = './assets/chains/' + file + '.png';
           // Fallback to colored letter if image fails
-          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#e3ece6;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#e3ece6\'; this.parentElement.style.color=\'#0d1b14\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
         }
         function chainIconImg(name) {
           var file = (name||'').replace(/\s+/g,'');
@@ -4656,8 +4399,8 @@
         metadata: metadata,
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
-        themeMode: 'dark',
-        themeVariables: { '--w3m-accent': '#55B98A' }
+        themeMode: 'light',
+        themeVariables: { '--w3m-accent': '#178a57' }
       });
       var solProvider = null;
       try {
