@@ -960,20 +960,40 @@
     }
 
     /* Details header: top half of the details card (rows complete it) */
-    .details-label {
+    /* Quote summary: single rate line + More toggle (reference compact) */
+    .qsum {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      width: 100%;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0 2px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--umbra-text);
+    }
+    .qmore {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 0;
+      padding: 4px 0 4px 8px;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
-      font-size: 15px;
-      font-weight: 700;
-      margin-top: 16px;
-      padding: 14px 16px 10px;
-      border: 1px solid var(--umbra-border);
-      border-bottom: 0;
-      border-radius: 16px 16px 0 0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .qmore .css-chev {
+      color: var(--umbra-muted);
+      transition: transform 0.2s ease;
+    }
+    .qmore[aria-expanded="true"] .css-chev {
+      transform: rotate(180deg) translateY(-2px);
+    }
+    .qextra {
+      padding-top: 2px;
     }
 
     .swap-tools {
@@ -1174,23 +1194,10 @@
       color: #f6465d;
     }
 
-    /* Swap details rows: bottom half of the details card.
+    /* Swap details rows: plain rows under the summary.
        (Bridge lines keep the plain base style above.) */
     #swapView .quote-lines {
       margin-top: 0;
-      border: 1px solid var(--umbra-border);
-      border-top: 0;
-      border-radius: 0 0 16px 16px;
-      padding: 2px 16px 14px;
-      gap: 0;
-    }
-
-    #swapView .quote-lines .row {
-      padding: 10px 0;
-    }
-
-    #swapView .quote-lines .row + .row {
-      padding-top: 10px;
     }
 
     /* Receive-price typing dots: three bouncing dots inside the price field
@@ -1670,7 +1677,6 @@
       .swap-tab { font-size: 14px; }
       .swap-action { height: 62px; font-size: 17px; }
       .tool-btn { font-size: 14px; }
-      .details-label { font-size: 14px; }
     }
     .stocks-list {
       min-height: 320px;
@@ -2092,8 +2098,6 @@
               <div class="usd-line"><span id="buyUsd">$0.00</span><span id="buyChange"></span><span id="buyLoading" style="display:none; margin-left:6px; color:var(--umbra-accent); animation:spin 0.9s linear infinite; line-height:0;"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></span></div>
             </div>
           </div>
-
-          <div class="details-label" id="detailsLabel" hidden>Details</div>
 
           <div class="quote-lines" id="quoteLines" hidden></div>
 
@@ -2736,6 +2740,7 @@
       var sellUsdPer = 0; // 0 = unknown: paintSellUsd shows '—', never amt×$1 ("$4.00" flash)
       var quoteTimer = null;
       var modalSide = 'sell';
+      var quoteMoreOpen = false;
 
       var sellAmountEl = document.getElementById('sellAmount');
       if (!sellAmountEl) { console.error('umbra: missing #sellAmount, aborting'); return; }
@@ -3172,12 +3177,10 @@
         setBuyChange(null);
       }
 
-      // Details are always shown — no toggle. The whole section hides only
+      // Quote summary always shows — the whole section hides only
       // when there is nothing to show (no amount typed yet).
       function setDetailsVisible(v) {
         quoteLinesEl.hidden = !v;
-        var lbl = document.getElementById('detailsLabel');
-        if (lbl) lbl.hidden = !v;
       }
 
       async function runQuote() {
@@ -3314,16 +3317,32 @@
             impactNote = 'High price impact — thin liquidity on this size.';
           }
           // No fee rows here: the wallet shows the network fee at signing time.
+          // Compact summary up front; Route + Minimum received hide behind More.
+          var moreOpen = quoteMoreOpen ? '' : ' hidden';
+          var moreLabel = quoteMoreOpen ? 'Less' : 'More';
+          var moreExp = quoteMoreOpen ? 'true' : 'false';
           var html =
-            '<div class="row"><span>Rate</span><span>' + esc(fmtRate(data.rate)) + '</span></div>' +
+            '<div class="qsum"><span>' + esc(fmtRate(data.rate)) + '</span>' +
+            '<button class="qmore" id="quoteMoreBtn" aria-expanded="' + moreExp + '">' + moreLabel + ' <span class="css-chev" aria-hidden="true"></span></button></div>' +
+            '<div class="qextra" id="quoteExtra"' + moreOpen + '>' +
             '<div class="row"><span>Price impact</span><span class="' + impactCls + '">' + impact + '</span></div>' +
             (data.routeVenue ? '<div class="row"><span>Route</span><span>via ' + esc(String(data.routeVenue)) + '</span></div>' : '') +
             '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>' +
-            (impactNote ? '<div class="row"><span class="error">' + esc(impactNote) + '</span></div>' : '');
+            (impactNote ? '<div class="row"><span class="error">' + esc(impactNote) + '</span></div>' : '') +
+            '</div>';
           quoteLinesEl.innerHTML = html;
           if (blockCode) {
             quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
           }
+          var moreBtn = document.getElementById('quoteMoreBtn');
+          if (moreBtn) moreBtn.addEventListener('click', function () {
+            var ex = document.getElementById('quoteExtra');
+            var open = ex && ex.hidden;
+            quoteMoreOpen = !!open;
+            if (ex) ex.hidden = !open;
+            moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            moreBtn.innerHTML = (open ? 'Less ' : 'More ') + '<span class="css-chev" aria-hidden="true"></span>';
+          });
           // Details always show: no toggle, no hidden state to fight.
           setDetailsVisible(true);
           if (window.lucide) window.lucide.createIcons();
