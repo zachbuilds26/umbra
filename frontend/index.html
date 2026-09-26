@@ -2613,10 +2613,11 @@
           if (typeof swapBlocked !== 'undefined' && swapBlocked) {
             var blockedFunds = swapBlocked === 'INSUFFICIENT_BALANCE';
             var blockedImpact = swapBlocked === 'HIGH_IMPACT';
+            var blockedGas = blockedFunds && /\bSOL\b/i.test(swapBlockedMsg || '');
             action.setAttribute('disabled', '');
-            action.textContent = blockedFunds ? 'Insufficient funds' : (blockedImpact ? 'High impact' : 'Unavailable');
-            action.title = blockedFunds ? 'Not enough SOL to open the accounts this swap needs' : (blockedImpact ? 'Price impact too high — reduce the amount' : 'This swap is not available right now');
-            action.setAttribute('aria-label', blockedFunds ? 'Insufficient funds for this swap' : (blockedImpact ? 'Price impact too high' : 'Swap unavailable'));
+            action.textContent = blockedGas ? 'Insufficient SOL for gas' : (blockedFunds ? 'Insufficient funds' : (blockedImpact ? 'High impact' : 'Unavailable'));
+            action.title = blockedGas ? 'Not enough SOL to cover this swap' : (blockedFunds ? 'Not enough SOL to open the accounts this swap needs' : (blockedImpact ? 'Price impact too high — reduce the amount' : 'This swap is not available right now'));
+            action.setAttribute('aria-label', blockedGas ? 'Insufficient SOL for gas' : (blockedFunds ? 'Insufficient funds for this swap' : (blockedImpact ? 'Price impact too high' : 'Swap unavailable')));
           } else {
             action.removeAttribute('disabled');
             action.textContent = 'Swap';
@@ -3118,6 +3119,7 @@
         // a transaction for terms the UI had already changed.
         lastQuote = null;
         swapBlocked = null;
+        swapBlockedMsg = '';
         window.umbraLastReceive = null;
         var amt = (sellAmountEl.value || '').trim();
         if (amt && Number(amt) > 0) {
@@ -3189,6 +3191,7 @@
       }
       function quoteError(msg, code) {
         swapBlocked = code === 'INSUFFICIENT_BALANCE' ? code : null;
+        swapBlockedMsg = swapBlocked ? (msg || '') : '';
         try { updateActionBtn(); } catch (_) {}
         // Same token both sides is not an amount problem — say exactly that.
         msg = (sellSym === buySym)
@@ -3243,6 +3246,7 @@
           setDetailsVisible(false);
           lastQuote = null;
           swapBlocked = null;
+          swapBlockedMsg = '';
           try { updateActionBtn(); } catch (_) {}
           window.umbraLastReceive = null;
           resetQuoteSummary();
@@ -3329,6 +3333,7 @@
             routeVenue: data.routeVenue || null,
           };
           swapBlocked = null;
+          swapBlockedMsg = '';
           var blockCode = data.blockReason && data.blockReason.code;
           var blockMsg = data.blockReason && data.blockReason.message;
           if (blockCode) {
@@ -3336,6 +3341,7 @@
             // cover it. Show everything, lock the button, keep no quote to sign.
             lastQuote = null;
             swapBlocked = blockCode;
+            swapBlockedMsg = blockMsg || '';
           }
           try { updateActionBtn(); } catch (_) {}
           var impactRaw = (data.priceImpactBps === null || data.priceImpactBps === undefined) ? null : Number(data.priceImpactBps);
@@ -3505,6 +3511,9 @@
       /* ---------- Swap execution + status modal ---------- */
       var lastQuote = null;
       var swapBlocked = null;
+      // Backend shortfall message behind the block (names SOL when gas is the
+      // problem) — lets the button say SOL-for-gas instead of funds.
+      var swapBlockedMsg = '';
       var swapModalEl = document.getElementById('swapModal');
       var swapTitleEl = document.getElementById('swapModalTitle');
       var swapExplorerEl = document.getElementById('swapExplorer');
