@@ -4308,7 +4308,23 @@
             chgTxt + '</div>';
           return;
         }
-        var w = 360, h = 80, pad = 8;
+        // Exchange-style line chart: grid + right price axis + last-price tag.
+        // No candles: candles need open/high/low/close intervals and our rings
+        // only hold observed price points — bucketing those into fake candles
+        // would invent price action that never happened.
+        function fmtAx(v) {
+          return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fmtTime(t) {
+          var d = new Date(Number(t));
+          if (!isFinite(d.getTime())) return '';
+          var hh = String(d.getHours());
+          if (hh.length < 2) hh = '0' + hh;
+          var mm = String(d.getMinutes());
+          if (mm.length < 2) mm = '0' + mm;
+          return hh + ':' + mm;
+        }
+        var w = 360, h = 110, padL = 4, padR = 66, padT = 10, padB = 16;
         var vals = points.map(function (p) { return Number(p.p); });
         var min = Math.min.apply(null, vals);
         var max = Math.max.apply(null, vals);
@@ -4316,29 +4332,44 @@
         var range = max - min;
         // Add 10% padding top/bottom for breathing room
         min -= range * 0.1; max += range * 0.1; range = max - min;
-        var coords = vals.map(function (v, i) {
-          var x = pad + (i / (vals.length - 1)) * (w - pad * 2);
-          var y = h - pad - ((v - min) / range) * (h - pad * 2);
-          return { x: x, y: y };
-        });
+        var pw = w - padL - padR;
+        var ph = h - padT - padB;
+        function yOf(v) { return padT + (1 - (v - min) / range) * ph; }
+        function xOf(i) { return padL + (i / (vals.length - 1)) * pw; }
+        var coords = vals.map(function (v, i) { return { x: xOf(i), y: yOf(v) }; });
         var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
-        var areaPath = linePath + ' L' + coords[coords.length-1].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' L' + coords[0].x.toFixed(1) + ' ' + (h - pad).toFixed(1) + ' Z';
-        var up = vals[vals.length-1] >= vals[0];
+        var up = vals[vals.length - 1] >= vals[0];
         var col = up ? '#55B98A' : '#f6465d';
-        var id = 'grad-' + Math.random().toString(36).slice(2,7);
-        // Grid lines
-        var grid = '';
-        for (var g = 1; g <= 2; g++) {
-          var gy = pad + (g/3)*(h - pad*2);
-          grid += '<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w-pad).toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1" /> ';
-        }
+        var gridCol = 'rgba(255,255,255,0.08)';
+        var txtCol = '#9aa0a6';
+        // Gridlines + right axis at max / mid / min
+        var levels = [max - range * 0.1, (max + min) / 2, min + range * 0.1];
+        var grid = levels.map(function (lv) {
+          var gy = yOf(lv).toFixed(1);
+          return '<line x1="' + padL + '" y1="' + gy + '" x2="' + (padL + pw).toFixed(1) + '" y2="' + gy + '" stroke="' + gridCol + '" stroke-width="1" />' +
+            '<text x="' + (padL + pw + 6) + '" y="' + (Number(gy) + 3.5).toFixed(1) + '" font-size="9" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtAx(lv)) + '</text>';
+        }).join('');
+        // Last-price dashed line + tag
+        var lastV = vals[vals.length - 1];
+        var lastY = yOf(lastV).toFixed(1);
+        var tag = esc(fmtAx(lastV));
+        var tagW = 8 + tag.length * 5.6;
+        var tagX = padL + pw + 4;
+        var lastLine =
+          '<line x1="' + padL + '" y1="' + lastY + '" x2="' + (padL + pw).toFixed(1) + '" y2="' + lastY + '" stroke="' + col + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.8" />' +
+          '<rect x="' + tagX.toFixed(1) + '" y="' + (Number(lastY) - 9).toFixed(1) + '" width="' + tagW.toFixed(1) + '" height="18" rx="4" fill="' + col + '" />' +
+          '<text x="' + (tagX + 4).toFixed(1) + '" y="' + (Number(lastY) + 3.5).toFixed(1) + '" font-size="9" font-weight="700" fill="#121212" font-family="Sora,sans-serif">' + tag + '</text>';
+        // Time labels: first / last observation
+        var t0 = points[0] ? points[0].t : null;
+        var t1 = points[points.length - 1] ? points[points.length - 1].t : null;
+        var times = '<text x="' + padL + '" y="' + (h - 4) + '" font-size="9" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtTime(t0)) + '</text>' +
+          '<text x="' + (padL + pw).toFixed(1) + '" y="' + (h - 4) + '" font-size="9" text-anchor="end" fill="' + txtCol + '" font-family="Sora,sans-serif">' + esc(fmtTime(t1)) + '</text>';
         drawerChartEl.innerHTML =
-          '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="80" preserveAspectRatio="none" style="display:block;">' +
-          '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + col + '" stop-opacity="0.32"/><stop offset="100%" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>' +
-          grid +
-          '<path d="' + areaPath + '" fill="url(#' + id + ')" />' +
-          '<path d="' + linePath + '" fill="none" stroke="' + col + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />' +
-          '<circle cx="' + coords[coords.length-1].x.toFixed(1) + '" cy="' + coords[coords.length-1].y.toFixed(1) + '" r="3" fill="' + col + '" stroke="var(--umbra-surface)" stroke-width="1.5" />' +
+          '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="110" preserveAspectRatio="none" style="display:block;" role="img" aria-label="Price history chart">' +
+          grid + times +
+          '<path d="' + linePath + '" fill="none" stroke="' + col + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" />' +
+          '<circle cx="' + coords[coords.length - 1].x.toFixed(1) + '" cy="' + coords[coords.length - 1].y.toFixed(1) + '" r="2.5" fill="' + col + '" />' +
+          lastLine +
           '</svg>';
       }
       async function paintDrawerHoldings(symbol) {
