@@ -3084,9 +3084,20 @@
         if (cb) cb.classList.toggle('active', !matched);
         var ci = document.getElementById('slipCustomInput');
         if (ci && document.activeElement !== ci) ci.value = matched ? '' : (stagedSlippage / 100).toString();
+        paintSlipSave();
       }
       // Staged choice: pills/input highlight only, Save applies + closes.
       var stagedSlippage = 50;
+      // Save locks while the custom field holds an out-of-range number.
+      function paintSlipSave() {
+        var btn = document.getElementById('slipSaveBtn');
+        var ci = document.getElementById('slipCustomInput');
+        if (!btn || !ci) return;
+        var raw = (ci.value || '').trim();
+        var v = parseFloat(raw);
+        var bad = raw !== '' && !(isFinite(v) && v >= 0 && v <= 5);
+        btn.disabled = bad;
+      }
       var slipModalEl = document.getElementById('slipModal');
       function openSlipModal() {
         stagedSlippage = slippageBps;
@@ -3107,13 +3118,23 @@
       Array.prototype.forEach.call(document.querySelectorAll('#slipPills button'), function (b) {
         b.addEventListener('click', function () {
           stagedSlippage = Math.max(0, Math.min(500, Number(b.getAttribute('data-bps')) || 0));
+          var ci0 = document.getElementById('slipCustomInput');
+          if (ci0) ci0.value = '';
           paintSlipModal();
         });
       });
       on('slipSaveBtn', 'click', function () {
+        var btn = document.getElementById('slipSaveBtn');
+        if (btn && btn.disabled) return;
         applySlippage(stagedSlippage);
         closeSlipModal();
       });
+      on('slipCustomBtn', 'click', function () {
+        var ci = document.getElementById('slipCustomInput');
+        if (ci) ci.focus();
+      });
+      // Live validation: Save locks the moment the custom value goes bad.
+      document.getElementById('slipCustomInput').addEventListener('input', paintSlipSave);
       on('slipCustomBtn', 'click', function () {
         var ci = document.getElementById('slipCustomInput');
         if (ci) ci.focus();
