@@ -422,13 +422,6 @@
       flex: none;
     }
 
-    .sheet-social {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 4px 8px 0;
-    }
-
     body.menu-open .site-header {
       z-index: 60;
     }
@@ -605,26 +598,9 @@
       line-height: 1.15;
       letter-spacing: -0.01em;
       color: var(--umbra-text);
-      min-height: 1.2em;
     }
-    .swap-hero h1 #heroTyped {
-      color: var(--umbra-text);
-    }
-    /* Last word stays green in both headline forms */
     .swap-hero h1 .hl {
       color: var(--umbra-accent);
-    }
-    /* Screen-reader-only fallback text */
-    .swap-hero h1 .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
     }
 
     /* ---------- Swap card (reference look, our colour) ----------
@@ -1881,8 +1857,6 @@
     <div class="sheet-div" aria-hidden="true"></div>
     <div class="mobile-foot">
       <span class="mobile-chain" title="Solana is the only network"><span class="mchain-disc"><img src="./assets/solana-mark.png" alt="" /></span>Mainnet</span>
-    </div>
-    <div class="sheet-social">
       <a class="x-link" href="https://x.com/umbra_trade" target="_blank" rel="noreferrer" aria-label="Umbra on X"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.3L1.2 2h6.4l4.4 5.9L18.9 2zm-1.1 17.8h1.7L7.1 3.9H5.3l12.5 16z"/></svg></a>
     </div>
   </div>
@@ -1892,7 +1866,7 @@
     <section id="swap" class="page-section active" aria-label="Swap">
       <div class="swap-wrap">
         <div class="swap-hero">
-          <h1 id="heroTitle" aria-label="Stocks to stables."><span id="heroTyped" aria-hidden="true">Stocks to <span class="hl">stables.</span></span><span class="sr-only">Stocks to stables.</span></h1>
+          <h1>Swap in <span class="hl">seconds.</span></h1>
         </div>
         <div class="swap-card ox">
           <div class="swap-top">
@@ -2542,49 +2516,6 @@
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
-
-      /* ---------- Hero typewriter (folio pattern, our colours) --------
-         Types each phrase out, holds it, erases fast, repeats forever.
-         Green last word lands when the phrase completes. */
-      (function heroTyper() {
-        var el = document.getElementById('heroTyped');
-        if (!el) return;
-        var phrases = [
-          { t: 'Stocks to stables.', h: 'Stocks to <span class="hl">stables.</span>' },
-          { t: 'Stables to stocks.', h: 'Stables to <span class="hl">stocks.</span>' },
-          { t: 'NVDAx to USDC', h: null },
-          { t: 'METAx to USDT', h: null },
-          { t: 'AMZNx to USDC', h: null },
-          { t: 'MSFTx to USDT', h: null }
-        ];
-        var reduce = false;
-        try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
-        // Reduced motion: full headline with its green word, no animation.
-        if (reduce) {
-          el.innerHTML = phrases[0].h;
-          return;
-        }
-        // Start empty like folio (no-JS still shows the static headline).
-        el.innerHTML = '';
-        var pi = 0, chars = 0, dir = 1, timer = null;
-        function step() {
-          var ph = phrases[pi];
-          chars += dir;
-          if (dir === 1 && chars >= ph.t.length) {
-            el.innerHTML = ph.h || ph.t;
-            dir = -1;
-            timer = setTimeout(step, 2600);
-          } else if (dir === -1 && chars <= 0) {
-            dir = 1;
-            pi = (pi + 1) % phrases.length;
-            timer = setTimeout(step, 700);
-          } else {
-            el.textContent = ph.t.slice(0, chars);
-            timer = setTimeout(step, dir === 1 ? 85 : 40);
-          }
-        }
-        timer = setTimeout(step, 400);
-      })();
 
       /* ---------- Swap card ---------- */
       var sellSym = 'NVDAx';
