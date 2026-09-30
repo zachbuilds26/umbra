@@ -3240,7 +3240,7 @@
         tokenSearchEl.value = '';
         tokenSearchEl.placeholder = 'Search tokens';
         renderTokenList('');
-        paintChainBtn();
+        paintChainBox();
         paintChainBox();
         tokenModalEl.classList.add('open');
         // Focus the sheet itself, never a row: focusing the first option
@@ -5053,7 +5053,7 @@
             // A completed summary with no liquidity is a real "not published"
             // and earns a dash. While the request is outstanding the skeleton
             // stays, because a dash would claim we looked and found nothing.
-            var liqVal = (s.asset && s.asset.liquidity) || cachedLiq(symbol);
+            var liqVal = (s.asset && s.asset.liquidity) || null;
             if (liqVal) {
               liqEl.textContent = '$' + Number(liqVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
             } else {
@@ -5134,7 +5134,7 @@
               tokenSearchEl.value = '';
               tokenSearchEl.placeholder = 'Search chains…';
               modalSide = 'bridgeChain';
-              paintChainBtn();
+              paintChainBox();
               tokenModalEl.classList.add('open');
               Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain]'), function (el) {
                 el.addEventListener('click', function () {
@@ -5167,7 +5167,7 @@
           tokenSearchEl.value = '';
           tokenSearchEl.placeholder = 'Search assets…';
           modalSide = 'bridgeAsset';
-          paintChainBtn();
+          paintChainBox();
           tokenModalEl.classList.add('open');
           Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-symbol]'), function (el) {
             el.addEventListener('click', function () {
