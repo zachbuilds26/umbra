@@ -1553,6 +1553,110 @@
     @media (prefers-reduced-motion: reduce) {
       #tokenModal.open .token-modal { animation: none; }
     }
+    /* Chain box + network drawer inside the token picker */
+    #chainModal { z-index: 65; }
+    .chain-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: calc(100% - 24px);
+      margin: 12px 12px 0;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      font-family: var(--umbra-font-body);
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+    .chain-box:hover { background: var(--umbra-secondary-hover); }
+    .chain-box > svg:last-child { margin-left: auto; color: var(--umbra-muted); flex: none; }
+    .chain-box-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      position: relative;
+    }
+    .chain-box-icon img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .chain-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px 0 16px;
+    }
+    .chain-head b { font-size: 20px; font-weight: 700; }
+    .chain-x {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--umbra-secondary);
+      color: var(--umbra-text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex: none;
+    }
+    .chain-x:hover { background: var(--umbra-secondary-hover); }
+    .chain-pick-coin {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--umbra-accent-soft);
+      color: var(--umbra-accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      position: relative;
+      flex: none;
+    }
+    .chain-pick-coin img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .chain-check { color: var(--umbra-accent); margin-left: auto; flex: none; display: inline-flex; }
+    .token-opt:disabled { opacity: 0.45; cursor: not-allowed; }
+    .token-opt:disabled:hover { background: transparent; }
+    @media (max-width: 640px) {
+      #chainModal { align-items: flex-end; padding: 0; }
+      #chainModal .token-modal.token-sheet {
+        max-width: none;
+        width: 100%;
+        max-height: 85dvh;
+        border-radius: 22px 22px 0 0;
+        border-bottom: 0;
+        padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      }
+      #chainModal.open .token-modal { animation: sheetUp 0.25s ease; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #chainModal.open .token-modal { animation: none; }
+    }
     /* Touch screens stick hover/focus washes after a tap — never show them */
     @media (hover: none) {
       .token-opt:hover { background: transparent; }
@@ -2407,11 +2511,33 @@
   <div class="modal-backdrop" id="tokenModal">
     <div class="token-modal token-sheet" role="dialog" aria-label="Select token" tabindex="-1">
       <span class="sheet-handle" aria-hidden="true"></span>
+      <button class="chain-box" id="chainBox" type="button" aria-label="Select network">
+        <span class="chain-box-icon" id="chainBoxIcon"></span>
+        <span id="chainBoxName">All Chains</span>
+        <i data-lucide="chevron-down" width="18" height="18"></i>
+      </button>
       <div class="token-search">
         <i data-lucide="search" width="18" height="18"></i>
         <input id="tokenSearch" type="text" placeholder="Search tokens" autocomplete="off" aria-label="Search tokens" />
       </div>
       <div class="token-list" id="tokenList"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="chainModal">
+    <div class="token-modal token-sheet" role="dialog" aria-label="Select network" tabindex="-1">
+      <span class="sheet-handle" aria-hidden="true"></span>
+      <div class="chain-head">
+        <b>Select Network</b>
+        <button class="chain-x" id="chainClose" type="button" aria-label="Close network picker">
+          <i data-lucide="x" width="18" height="18"></i>
+        </button>
+      </div>
+      <div class="token-search">
+        <i data-lucide="search" width="18" height="18"></i>
+        <input id="chainSearch" type="text" placeholder="Search Network" autocomplete="off" aria-label="Search networks" />
+      </div>
+      <div class="token-list" id="chainList"></div>
     </div>
   </div>
 
@@ -2928,6 +3054,91 @@
       var tokenModalEl = document.getElementById('tokenModal');
       var tokenSearchEl = document.getElementById('tokenSearch');
       var tokenListEl = document.getElementById('tokenList');
+      var chainModalEl = document.getElementById('chainModal');
+      var chainSearchEl = document.getElementById('chainSearch');
+      var chainListEl = document.getElementById('chainList');
+      var chainBoxEl = document.getElementById('chainBox');
+      // Networks drawer: Solana is live; Monad and BNB are visible but locked
+      // until those chains are integrated.
+      var CHAIN_LIST = [
+        { name: 'Solana', img: './assets/chains/Solana.png', live: true },
+        { name: 'BNB Chain', img: './assets/chains/BnbChain.png', live: false },
+        { name: 'Monad', img: './assets/chains/Monad.png', live: false },
+      ];
+      var selectedChain = 'All Chains';
+      function chainCoinHtml(ch, cls) {
+        var letter = esc(ch.name.charAt(0));
+        var img = ch.img ? '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />' : '';
+        return '<span class="' + cls + '">' + letter + img + '</span>';
+      }
+      function paintChainBox() {
+        if (!chainBoxEl) return;
+        var show = (modalSide === 'sell' || modalSide === 'buy');
+        chainBoxEl.style.display = show ? '' : 'none';
+        if (!show) return;
+        var boxIcon = document.getElementById('chainBoxIcon');
+        var boxName = document.getElementById('chainBoxName');
+        var ch = null;
+        if (selectedChain !== 'All Chains') {
+          CHAIN_LIST.forEach(function (c) { if (c.name === selectedChain) ch = c; });
+        }
+        if (boxIcon) {
+          boxIcon.innerHTML = ch && ch.img
+            ? esc(ch.name.charAt(0)) + '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />'
+            : '<i data-lucide="globe" width="18" height="18"></i>';
+        }
+        if (boxName) boxName.textContent = ch ? ch.name : 'All Chains';
+        if (window.lucide) window.lucide.createIcons();
+      }
+      function openChainModal() {
+        if (!chainModalEl) return;
+        chainSearchEl.value = '';
+        renderNetworkList('');
+        chainModalEl.classList.add('open');
+      }
+      function closeChainModal() {
+        if (!chainModalEl || !chainModalEl.classList.contains('open')) return;
+        chainModalEl.classList.remove('open');
+        chainSearchEl.value = '';
+      }
+      function renderNetworkList(filter) {
+        var f = (filter || '').trim().toUpperCase();
+        var match = function (n) { return !f || n.toUpperCase().indexOf(f) >= 0; };
+        var html = '';
+        if (match('All Chains')) {
+          html += '<button type="button" class="token-opt" data-network="All Chains">' +
+            '<span class="chain-pick-coin"><i data-lucide="globe" width="18" height="18"></i></span>' +
+            '<span class="meta"><b>All Chains</b></span>' +
+            (selectedChain === 'All Chains' ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '') +
+            '</button>';
+        }
+        CHAIN_LIST.forEach(function (ch) {
+          if (!match(ch.name)) return;
+          var right = ch.live
+            ? (ch.name === selectedChain ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '')
+            : '<span class="soon-badge">soon</span>';
+          var dis = ch.live ? '' : ' disabled aria-disabled="true" title="Coming soon"';
+          html += '<button type="button" class="token-opt" data-network="' + esc(ch.name) + '"' + dis + '>' +
+            chainCoinHtml(ch, 'chain-pick-coin') +
+            '<span class="meta"><b>' + esc(ch.name) + '</b></span>' + right + '</button>';
+        });
+        chainListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">No networks found.</div>';
+        Array.prototype.forEach.call(chainListEl.querySelectorAll('[data-network]'), function (btn) {
+          btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            var name = btn.getAttribute('data-network');
+            if (name !== 'All Chains') {
+              var ch = null;
+              CHAIN_LIST.forEach(function (c) { if (c.name === name) ch = c; });
+              if (!ch || !ch.live) return;
+            }
+            selectedChain = name;
+            paintChainBox();
+            closeChainModal();
+          });
+        });
+        if (window.lucide) window.lucide.createIcons();
+      }
 
       function coinHtml(symbol) {
         return tkIcon(symbol, 'tk-36');
@@ -3027,7 +3238,10 @@
         // otherwise focus lands on <body> and keyboard users restart at the top.
         modalReturnFocus = document.activeElement;
         tokenSearchEl.value = '';
+        tokenSearchEl.placeholder = 'Search tokens';
         renderTokenList('');
+        paintChainBtn();
+        paintChainBox();
         tokenModalEl.classList.add('open');
         // Focus the sheet itself, never a row: focusing the first option
         // paints it as if selected. Keyboard users Tab into the list, and
@@ -3109,7 +3323,20 @@
         if (e.target === tokenModalEl) closeModal();
       });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeModal();
+        if (e.key !== 'Escape') return;
+        if (chainModalEl.classList.contains('open')) { closeChainModal(); return; }
+        closeModal();
+      });
+      on('chainBox', 'click', function () {
+        if (modalSide !== 'sell' && modalSide !== 'buy') return;
+        openChainModal();
+      });
+      on('chainClose', 'click', closeChainModal);
+      chainModalEl.addEventListener('click', function (e) {
+        if (e.target === chainModalEl) closeChainModal();
+      });
+      chainSearchEl.addEventListener('input', function () {
+        renderNetworkList(chainSearchEl.value);
       });
 
       on('flipBtn', 'click', function () {
@@ -4907,6 +5134,7 @@
               tokenSearchEl.value = '';
               tokenSearchEl.placeholder = 'Search chains…';
               modalSide = 'bridgeChain';
+              paintChainBtn();
               tokenModalEl.classList.add('open');
               Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain]'), function (el) {
                 el.addEventListener('click', function () {
@@ -4939,6 +5167,7 @@
           tokenSearchEl.value = '';
           tokenSearchEl.placeholder = 'Search assets…';
           modalSide = 'bridgeAsset';
+          paintChainBtn();
           tokenModalEl.classList.add('open');
           Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-symbol]'), function (el) {
             el.addEventListener('click', function () {
