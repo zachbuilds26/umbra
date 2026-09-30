@@ -1215,6 +1215,15 @@
       color: #f6465d;
     }
 
+    /* Error rows render as a tinted card, not bare text */
+    .quote-lines .row.row-error {
+      display: block;
+      background: rgba(246, 70, 93, 0.1);
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
     /* Swap details rows: plain rows under the summary.
        (Bridge lines keep the plain base style above.) */
     #swapView .quote-lines {
@@ -1386,6 +1395,8 @@
 
     /* Hairline between detail rows */
     .quote-lines .row + .row { border-top: 1px solid var(--umbra-border); padding-top: 8px; }
+    .quote-lines .row.row-error,
+    .quote-lines .row + .row.row-error { border-top: 0; }
     .swap-explorer-btn {
       display: inline-flex;
       align-items: center;
@@ -3531,7 +3542,7 @@
         msg = (sellSym === buySym)
           ? 'Same token — choose a different token to swap.'
           : friendlyQuoteError(code, msg);
-        quoteLinesEl.innerHTML = '<div class="row"><span class="error">' + esc(msg) + '</span></div>';
+        quoteLinesEl.innerHTML = '<div class="row row-error"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
         setDetailsVisible(true);
         setBuyDots(false);
@@ -3713,13 +3724,13 @@
             '<div class="row"><span>Price impact</span><span class="' + impactCls + '">' + impact + '</span></div>' +
             (data.routeVenue ? '<div class="row"><span>Route</span><span>via ' + esc(String(data.routeVenue)) + '</span></div>' : '') +
             '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(data.minimumReceived) + ' ' + esc(data.receive.symbol) + '</span></div>' +
-            (impactNote ? '<div class="row"><span class="error">' + esc(impactNote) + '</span></div>' : '') +
+            (impactNote ? '<div class="row row-error"><span class="error">' + esc(impactNote) + '</span></div>' : '') +
             '</div>';
           quoteLinesEl.innerHTML = html;
           // No balance lecture here: the action button already says
           // Insufficient funds. Other block reasons still get their line.
           if (blockCode && blockCode !== 'INSUFFICIENT_BALANCE') {
-            quoteLinesEl.innerHTML += '<div class="row"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
+            quoteLinesEl.innerHTML += '<div class="row row-error"><span class="error">' + esc(blockMsg || 'Insufficient funds.') + '</span></div>';
           }
           var moreBtn = document.getElementById('quoteMoreBtn');
           if (moreBtn) moreBtn.addEventListener('click', function () {
