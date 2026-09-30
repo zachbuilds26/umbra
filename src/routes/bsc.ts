@@ -7,6 +7,7 @@ import {
   buildBscSwap,
   getBscApprove,
   getBscTxStatus,
+  simulateBscTx,
   toBaseUnits,
   fromBaseUnits,
 } from '../services/binance/trading.service.js';
@@ -179,6 +180,31 @@ export async function bscRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const q = z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash.') }).parse(req.query);
       return getBscTxStatus(q.txHash);
+    },
+  );
+
+  // POST /api/bsc/simulate { tx: { from, to, data, value } } -> dry-run.
+  // Call with the EXACT tx the wallet is about to send, after any approval.
+  // A FAILED prediction means the swap would revert: do not send it.
+  app.post(
+    '/api/bsc/simulate',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const body = z
+        .object({
+          tx: z.object({
+            from: z.string().regex(WALLET_RE, 'Invalid wallet address.'),
+            to: z.string().regex(WALLET_RE, 'Invalid address.'),
+            data: z.string().regex(/^0x[0-9a-fA-F]*$/, 'Invalid calldata.').max(16384),
+            value: z.string().regex(/^\d{1,78}$/, 'Invalid value.'),
+          }),
+        })
+        .parse(req.body);
+      const result = await simulateBscTx(body.tx);
+      if (!result.ok) {
+        throw badRequest('TRANSACTION_FAILED', 'Simulation failed — try again.');
+      }
+      return { ok: true };
     },
   );
 }

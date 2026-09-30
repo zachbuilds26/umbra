@@ -4395,7 +4395,21 @@
             if (!aRcpt || aRcpt.status === '0x0' || aRcpt.status === 0) throw new Error('Approval failed — try again.');
             if (evmAddr() !== evm) throw new Error('Wallet changed — try again.');
           }
-          // 3) Sign + send the swap
+          // 3) Dry-run the exact bytes before the wallet signs anything
+          paintSwapTitle('Checking on-chain…', '');
+          var simRes = await fetch(API_BASE + '/api/bsc/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tx: { from: evm, to: tx.to, data: tx.data, value: String(tx.value || '0') } }),
+          });
+          if (!simRes.ok) {
+            var simData = null;
+            try { simData = await simRes.json(); } catch (_) {}
+            var simErr = new Error((simData && simData.error && simData.error.message) || 'Simulation failed — try again.');
+            simErr.umbraCode = simData && simData.error && simData.error.code;
+            throw simErr;
+          }
+          // 4) Sign + send the swap
           paintSwapTitle('Confirm in wallet', '');
           paintSwapState('wallet', 'accent pulse');
           var txParams = { from: evm, to: tx.to, data: tx.data, value: decToHex(tx.value || '0') };
@@ -4410,7 +4424,7 @@
           paintSwapState('send', 'accent', false);
           setSwapBusy(true);
           var hash = await provider.request({ method: 'eth_sendTransaction', params: [txParams] });
-          // 4) Poll to finality through our status route
+          // 5) Poll to finality through our status route
           paintSwapTitle('Confirming on BNB Chain…', '');
           paintSwapState('loader-circle', 'accent', true);
           var final = 'unknown';

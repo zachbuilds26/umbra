@@ -1,5 +1,5 @@
 import Decimal from '../../utils/decimal.js';
-import { BSC_CHAIN_ID, binanceGet, isBinanceEnabled } from './client.js';
+import { BSC_CHAIN_ID, binanceGet, binancePost, isBinanceEnabled } from './client.js';
 import { getBscTokens } from './rwa.service.js';
 import { TtlCache } from '../../utils/cache.js';
 import { HttpError, badRequest } from '../../utils/errors.js';
@@ -241,8 +241,40 @@ export async function getBscApprove(args: {
   };
 }
 
-export async function getBscTxStatus(txHash: string): Promise<{ status: 'pending' | 'success' | 'fail' | 'unknown' }> {
+/** Tolerant parse of the simulate envelope (field names vary by chain). */
+export function parseSimResult(raw: unknown): { ok: boolean; failReason: string | null } {
+  const rec = (typeof raw === 'object' && raw !== null ? raw : null) as Record<string, unknown> | null;
+  const status = rec && typeof rec['status'] === 'string' ? (rec['status'] as string).toUpperCase() : '';
+  if (status === 'SUCCESS') return { ok: true, failReason: null };
+  if (status === 'FAILED') {
+    const reason = rec && typeof rec['failReason'] === 'string' ? (rec['failReason'] as string) : '';
+    return { ok: false, failReason: reason || null };
+  }
+  return { ok: false, failReason: null };
+}
+
+/**
+ * Off-chain dry-run of an exact EVM tx (the same bytes the wallet would send).
+ * Read-only: nothing is signed or broadcast. A FAILED prediction means the
+ * swap would revert — the frontend must not send it.
+ */
+export async function simulateBscTx(tx: { from: string; to: string; data: string; value: string }): Promise<{ ok: boolean; failReason: string | null }> {
   ensureEnabled();
+  if (!ETH_ADDRESS_RE.test(tx.from) || !ETH_ADDRESS_RE.test(tx.to)) {
+    throw badRequest('VALIDATION_ERROR', 'Invalid wallet address.');
+  }
+  if (!/^0x[0-9a-fA-F]*$/.test(tx.data) || !/^\d+$/.test(tx.value)) {
+    throw badRequest('VALIDATION_ERROR', 'Invalid request.');
+  }
+  const data = await binancePost<unknown>(
+    '/api/v1/dex/pre-transaction/simulate',
+    {},
+    { binanceChainId: BSC_CHAIN_ID, evmTx: { from: tx.from, to: tx.to, value: tx.value, data: tx.data } },
+  );
+  return parseSimResult(data);
+}
+
+export async function getBscTxStatus(txHash: string): Promise<{ status: 'pending' | 'success' | 'fail' | 'unknown' }> {  ensureEnabled();
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw badRequest('VALIDATION_ERROR', 'Invalid transaction hash.');
   const data = await binanceGet<Array<Record<string, unknown>>>(
     '/api/v1/dex/post-transaction/transaction-detail-by-txhash',

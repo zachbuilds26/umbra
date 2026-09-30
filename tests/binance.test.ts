@@ -68,3 +68,26 @@ describe('binance client', () => {
     assert.equal(typeof isBinanceEnabled(), 'boolean');
   });
 });
+
+describe('bsc simulate parser', () => {
+  it('parses SUCCESS / FAILED envelopes tolerantly', async () => {
+    const { parseSimResult } = await import('../src/services/binance/trading.service.js');
+    assert.deepEqual(parseSimResult({ status: 'SUCCESS' }), { ok: true, failReason: null });
+    assert.deepEqual(parseSimResult({ status: 'FAILED', failReason: 'execution reverted: nope' }), {
+      ok: false,
+      failReason: 'execution reverted: nope',
+    });
+    assert.deepEqual(parseSimResult({ status: 'FAILED' }), { ok: false, failReason: null });
+    assert.deepEqual(parseSimResult({}), { ok: false, failReason: null });
+    assert.deepEqual(parseSimResult(null), { ok: false, failReason: null });
+  });
+
+  it('converts display amounts to base units without float', async () => {
+    const { toBaseUnits, fromBaseUnits } = await import('../src/services/binance/trading.service.js');
+    assert.equal(toBaseUnits('5', 18), '5000000000000000000');
+    assert.equal(toBaseUnits('0.07', 18), '70000000000000000');
+    assert.equal(fromBaseUnits('14135177854857122', 18), '0.014135177854857122');
+    assert.throws(() => toBaseUnits('abc', 18));
+    assert.throws(() => toBaseUnits('0', 18));
+  });
+});
