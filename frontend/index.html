@@ -3257,8 +3257,11 @@
       function refreshSelectors() {
         sellSymbolEl.textContent = sellSym;
         buySymbolEl.textContent = buySym;
-        sellCoinEl.innerHTML = coinHtml(sellSym);
-        buyCoinEl.innerHTML = coinHtml(buySym);
+        // Pair-aware badges: inside a BSC pair the stables are the BSC side.
+        var pairNet = null;
+        try { pairNet = isBscPair() ? 'bsc' : null; } catch (_) {}
+        sellCoinEl.innerHTML = coinHtml(sellSym, pairNet || dirNet(sellSym));
+        buyCoinEl.innerHTML = coinHtml(buySym, pairNet || dirNet(buySym));
       }
       // Paint real icons on the very first frame (preloaded files + inline
       // manifest — no fetch needed), instead of waiting for the directory.
@@ -3390,11 +3393,15 @@
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
+        // Badge context: under BNB Chain every row is the BSC side (stables
+        // included); under Solana everything is Solana; under All Chains each
+        // token shows its home network (stables keep the legacy Solana badge).
+        var listNet = selectedChain === 'BNB Chain' ? 'bsc' : (selectedChain === 'Solana' ? 'sol' : null);
         var html = rows
           .map(function (t) {
             return (
               '<button class="token-opt" data-symbol="' + esc(t.symbol) + '">' +
-              coinHtml28(t.symbol, t.net || dirNet(t.symbol)) +
+              coinHtml28(t.symbol, listNet || t.net || dirNet(t.symbol)) +
               '<span class="meta"><b>' + esc(t.symbol) + '</b><span>' + esc(t.name || '') + '</span></span>' +
               '<span class="tag">' + esc(t.kind) + '</span>' +
               '</button>'
