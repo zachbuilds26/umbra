@@ -32,20 +32,6 @@ const envSchema = z.object({
 
   XSTOCKS_API_BASE_URL: httpsUrl.default('https://api.xstocks.fi/api/v2'),
 
-  // Binance Web3 API (BSC tokenized-stocks leg). Key + secret from
-  // https://web3.binance.com/en/dev-portal — server-side only, never sent to
-  // the frontend. Empty = BSC leg disabled, Solana keeps working.
-  BINANCE_API_KEY: z.string().optional().default(''),
-  BINANCE_API_SECRET: z.string().optional().default(''),
-  BINANCE_BASE_URL: httpsUrl.default('https://web3.binance.com/build'),
-  // Allowed timestamp drift (ms) sent as X-OC-RECV-WINDOW. Default 15s: the
-  // gateway default of 5s is tight for a proxied Railway dyno.
-  BINANCE_RECV_WINDOW: z.coerce.number().int().min(1000).max(60000).default(15000),
-  // Comma-separated DNS servers for Binance API resolution only. Some ISPs
-  // filter Binance domains at the DNS level (local lookups time out while
-  // public resolvers answer). Empty = system DNS. Local-dev override only.
-  BINANCE_DNS_SERVERS: z.string().optional().default(''),
-
   DATABASE_URL: z.string().optional().default(''),
 
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
