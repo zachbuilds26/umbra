@@ -1555,28 +1555,23 @@
     }
     /* Chain box + network drawer inside the token picker */
     #chainModal { z-index: 65; }
-    .chain-box {
-      display: flex;
+    .chain-btn {
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      width: calc(100% - 24px);
-      margin: 12px 12px 0;
-      padding: 10px 14px;
+      gap: 2px;
+      padding: 4px 8px 4px 4px;
       border: 0;
-      border-radius: 14px;
+      border-radius: 999px;
       background: var(--umbra-secondary);
       color: var(--umbra-text);
-      font-family: var(--umbra-font-body);
-      font-size: 18px;
-      font-weight: 600;
       cursor: pointer;
-      text-align: left;
+      flex: none;
     }
-    .chain-box:hover { background: var(--umbra-secondary-hover); }
-    .chain-box > svg:last-child { margin-left: auto; color: var(--umbra-muted); flex: none; }
+    .chain-btn:hover { background: var(--umbra-secondary-hover); }
+    .chain-btn svg { color: var(--umbra-muted); flex: none; }
     .chain-box-icon {
-      width: 32px;
-      height: 32px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       overflow: hidden;
       background: var(--umbra-accent-soft);
@@ -2511,14 +2506,13 @@
   <div class="modal-backdrop" id="tokenModal">
     <div class="token-modal token-sheet" role="dialog" aria-label="Select token" tabindex="-1">
       <span class="sheet-handle" aria-hidden="true"></span>
-      <button class="chain-box" id="chainBox" type="button" aria-label="Select network">
-        <span class="chain-box-icon" id="chainBoxIcon"></span>
-        <span id="chainBoxName">All Chains</span>
-        <i data-lucide="chevron-down" width="18" height="18"></i>
-      </button>
       <div class="token-search">
         <i data-lucide="search" width="18" height="18"></i>
         <input id="tokenSearch" type="text" placeholder="Search tokens" autocomplete="off" aria-label="Search tokens" />
+        <button class="chain-btn" id="chainBox" type="button" aria-label="Select network" title="Select network">
+          <span class="chain-btn-icon" id="chainBoxIcon">S</span>
+          <i data-lucide="chevron-down" width="14" height="14"></i>
+        </button>
       </div>
       <div class="token-list" id="tokenList"></div>
     </div>
@@ -3077,7 +3071,6 @@
         chainBoxEl.style.display = show ? '' : 'none';
         if (!show) return;
         var boxIcon = document.getElementById('chainBoxIcon');
-        var boxName = document.getElementById('chainBoxName');
         var ch = null;
         if (selectedChain !== 'All Chains') {
           CHAIN_LIST.forEach(function (c) { if (c.name === selectedChain) ch = c; });
@@ -3085,9 +3078,8 @@
         if (boxIcon) {
           boxIcon.innerHTML = ch && ch.img
             ? esc(ch.name.charAt(0)) + '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />'
-            : '<i data-lucide="globe" width="18" height="18"></i>';
+            : '<i data-lucide="globe" width="14" height="14"></i>';
         }
-        if (boxName) boxName.textContent = ch ? ch.name : 'All Chains';
         if (window.lucide) window.lucide.createIcons();
       }
       function openChainModal() {
