@@ -3151,6 +3151,9 @@
           var data = await res.json();
           (data.tokens || []).forEach(function (t) {
             if (!t || !t.symbol || !t.address) return;
+            // Picker lists only what the swap engine can execute today:
+            // bStocks (SWAP mode). Ondo is RFQ-only until the order flow lands.
+            if (t.platform && t.platform !== 'bstock') return;
             var sym = String(t.symbol).toUpperCase();
             bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym };
             var dup = false;
