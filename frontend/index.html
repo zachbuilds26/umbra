@@ -3407,6 +3407,12 @@
 
       function renderTokenList(filter) {
         var f = (filter || '').trim().toUpperCase();
+        // BNB Chain skeleton: while bStocks load, paint placeholders like the
+        // Solana shelf does — never a stables-only list with a late text line.
+        if (selectedChain === 'BNB Chain' && (bscState === 'loading' || bscState === 'idle')) {
+          tokenListEl.innerHTML = stockSkeletonRows(6);
+          return;
+        }
         // Both boxes list the whole shelf: every stable and every stock. Picking
         // an unsupported pair is caught by the router, which explains why it
         // cannot execute — the list is not second-guessed for the user.
@@ -3433,12 +3439,10 @@
             );
           })
           .join('');
-        // BSC status line: the merge is slower than the Solana shelf, so say
-        // so instead of showing stables-only with no explanation. Solana-only
-        // view never mentions it.
-        if (selectedChain !== 'Solana' && bscState === 'loading') {
-          html += '<div style="padding:16px; text-align:center; color:var(--umbra-muted); font-size:13px;">Loading BNB Chain stocks…</div>';
-        } else if (selectedChain !== 'Solana' && bscState === 'error') {
+        // BSC failure line: the Solana rows still show, so say what is
+        // missing instead of silently dropping the stocks. Solana-only view
+        // never mentions it.
+        if (selectedChain !== 'Solana' && bscState === 'error') {
           html += '<div style="padding:16px; text-align:center; color:var(--umbra-muted); font-size:13px;">Could not load BNB Chain stocks.</div>';
         }
         var emptyCopy = 'No matches found.';
