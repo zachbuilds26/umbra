@@ -3012,9 +3012,15 @@
       // Badged icon: token logo (or letter) + Solana mark pinned bottom-right
       function tkIcon(symbol, size, net) {
         symbol = String(symbol || '');
+        // BSC logos come from the token feed (remote URL); Solana from the
+        // baked-in manifest. Either way a broken image falls back to a letter.
+        var bscLogo = '';
+        try {
+          if (typeof bscMeta !== 'undefined' && bscMeta[symbol] && bscMeta[symbol].logo) bscLogo = bscMeta[symbol].logo;
+        } catch (_) {}
         var file = manifest[symbol]
           ? './assets/tokens/' + encodeURIComponent(manifest[symbol])
-          : '';
+          : (bscLogo || '');
         var main = file
           ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
@@ -3162,7 +3168,7 @@
             // bStocks (SWAP mode). Ondo is RFQ-only until the order flow lands.
             if (t.platform && t.platform !== 'bstock') return;
             var sym = String(t.symbol).toUpperCase();
-            bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym };
+            bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym, logo: t.logoUrl || null };
             var dup = false;
             for (var i = 0; i < directory.length; i++) {
               if (directory[i].symbol.toUpperCase() === sym && directory[i].net === 'bsc') { dup = true; break; }
