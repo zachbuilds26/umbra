@@ -1516,6 +1516,7 @@
     .token-sheet:focus, .token-sheet:focus-visible { outline: none; }
     .token-sheet .sheet-handle { display: none; }
     .token-search {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1553,8 +1554,11 @@
     @media (prefers-reduced-motion: reduce) {
       #tokenModal.open .token-modal { animation: none; }
     }
-    /* Chain box + network drawer inside the token picker */
-    #chainModal { z-index: 65; }
+    /* Chain dropdown card anchored to the picker search row */
+    #chainMenu { left: auto; right: 0; min-width: 210px; }
+    #chainMenu .token-opt { padding: 8px 10px; }
+    #chainMenu .token-opt .meta b { font-size: 14px; }
+    #chainMenu .chain-pick-coin { width: 24px; height: 24px; font-size: 11px; }
     .chain-btn {
       display: inline-flex;
       align-items: center;
@@ -1590,27 +1594,6 @@
       object-fit: cover;
       display: block;
     }
-    .chain-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 12px 0 16px;
-    }
-    .chain-head b { font-size: 20px; font-weight: 700; }
-    .chain-x {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 0;
-      background: var(--umbra-secondary);
-      color: var(--umbra-text);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex: none;
-    }
-    .chain-x:hover { background: var(--umbra-secondary-hover); }
     .chain-pick-coin {
       width: 30px;
       height: 30px;
@@ -1637,21 +1620,6 @@
     .chain-check { color: var(--umbra-accent); margin-left: auto; flex: none; display: inline-flex; }
     .token-opt:disabled { opacity: 0.45; cursor: not-allowed; }
     .token-opt:disabled:hover { background: transparent; }
-    @media (max-width: 640px) {
-      #chainModal { align-items: flex-end; padding: 0; }
-      #chainModal .token-modal.token-sheet {
-        max-width: none;
-        width: 100%;
-        max-height: 85dvh;
-        border-radius: 22px 22px 0 0;
-        border-bottom: 0;
-        padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
-      }
-      #chainModal.open .token-modal { animation: sheetUp 0.25s ease; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      #chainModal.open .token-modal { animation: none; }
-    }
     /* Touch screens stick hover/focus washes after a tap — never show them */
     @media (hover: none) {
       .token-opt:hover { background: transparent; }
@@ -2513,25 +2481,9 @@
           <span class="chain-btn-icon" id="chainBoxIcon">S</span>
           <i data-lucide="chevron-down" width="14" height="14"></i>
         </button>
+        <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       </div>
       <div class="token-list" id="tokenList"></div>
-    </div>
-  </div>
-
-  <div class="modal-backdrop" id="chainModal">
-    <div class="token-modal token-sheet" role="dialog" aria-label="Select network" tabindex="-1">
-      <span class="sheet-handle" aria-hidden="true"></span>
-      <div class="chain-head">
-        <b>Select Network</b>
-        <button class="chain-x" id="chainClose" type="button" aria-label="Close network picker">
-          <i data-lucide="x" width="18" height="18"></i>
-        </button>
-      </div>
-      <div class="token-search">
-        <i data-lucide="search" width="18" height="18"></i>
-        <input id="chainSearch" type="text" placeholder="Search Network" autocomplete="off" aria-label="Search networks" />
-      </div>
-      <div class="token-list" id="chainList"></div>
     </div>
   </div>
 
@@ -3048,9 +3000,7 @@
       var tokenModalEl = document.getElementById('tokenModal');
       var tokenSearchEl = document.getElementById('tokenSearch');
       var tokenListEl = document.getElementById('tokenList');
-      var chainModalEl = document.getElementById('chainModal');
-      var chainSearchEl = document.getElementById('chainSearch');
-      var chainListEl = document.getElementById('chainList');
+      var chainMenuEl = document.getElementById('chainMenu');
       var chainBoxEl = document.getElementById('chainBox');
       // Networks drawer: Solana is live; Monad and BNB are visible but locked
       // until those chains are integrated.
@@ -3082,30 +3032,13 @@
         }
         if (window.lucide) window.lucide.createIcons();
       }
-      function openChainModal() {
-        if (!chainModalEl) return;
-        chainSearchEl.value = '';
-        renderNetworkList('');
-        chainModalEl.classList.add('open');
-      }
-      function closeChainModal() {
-        if (!chainModalEl || !chainModalEl.classList.contains('open')) return;
-        chainModalEl.classList.remove('open');
-        chainSearchEl.value = '';
-      }
-      function renderNetworkList(filter) {
-        var f = (filter || '').trim().toUpperCase();
-        var match = function (n) { return !f || n.toUpperCase().indexOf(f) >= 0; };
-        var html = '';
-        if (match('All Chains')) {
-          html += '<button type="button" class="token-opt" data-network="All Chains">' +
-            '<span class="chain-pick-coin"><i data-lucide="globe" width="18" height="18"></i></span>' +
-            '<span class="meta"><b>All Chains</b></span>' +
-            (selectedChain === 'All Chains' ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '') +
-            '</button>';
-        }
+      function renderChainMenu() {
+        var html = '<button type="button" class="token-opt" data-network="All Chains">' +
+          '<span class="chain-pick-coin"><i data-lucide="globe" width="18" height="18"></i></span>' +
+          '<span class="meta"><b>All Chains</b></span>' +
+          (selectedChain === 'All Chains' ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '') +
+          '</button>';
         CHAIN_LIST.forEach(function (ch) {
-          if (!match(ch.name)) return;
           var right = ch.live
             ? (ch.name === selectedChain ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '')
             : '<span class="soon-badge">soon</span>';
@@ -3114,8 +3047,8 @@
             chainCoinHtml(ch, 'chain-pick-coin') +
             '<span class="meta"><b>' + esc(ch.name) + '</b></span>' + right + '</button>';
         });
-        chainListEl.innerHTML = html || '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">No networks found.</div>';
-        Array.prototype.forEach.call(chainListEl.querySelectorAll('[data-network]'), function (btn) {
+        chainMenuEl.innerHTML = html;
+        Array.prototype.forEach.call(chainMenuEl.querySelectorAll('[data-network]'), function (btn) {
           btn.addEventListener('click', function () {
             if (btn.disabled) return;
             var name = btn.getAttribute('data-network');
@@ -3126,7 +3059,7 @@
             }
             selectedChain = name;
             paintChainBox();
-            closeChainModal();
+            chainMenuEl.style.display = 'none';
           });
         });
         if (window.lucide) window.lucide.createIcons();
@@ -3251,6 +3184,7 @@
 
       function closeModal() {
         tokenModalEl.classList.remove('open');
+        if (chainMenuEl) chainMenuEl.style.display = 'none';
         if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') {
           try { modalReturnFocus.focus(); } catch (_) {}
         }
@@ -3315,20 +3249,18 @@
         if (e.target === tokenModalEl) closeModal();
       });
       document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Escape') return;
-        if (chainModalEl.classList.contains('open')) { closeChainModal(); return; }
-        closeModal();
+        if (e.key === 'Escape') closeModal();
       });
-      on('chainBox', 'click', function () {
+      on('chainBox', 'click', function (e) {
         if (modalSide !== 'sell' && modalSide !== 'buy') return;
-        openChainModal();
+        e.stopPropagation();
+        renderChainMenu();
+        var isOpen = chainMenuEl.style.display === 'block';
+        chainMenuEl.style.display = isOpen ? 'none' : 'block';
       });
-      on('chainClose', 'click', closeChainModal);
-      chainModalEl.addEventListener('click', function (e) {
-        if (e.target === chainModalEl) closeChainModal();
-      });
-      chainSearchEl.addEventListener('input', function () {
-        renderNetworkList(chainSearchEl.value);
+      document.addEventListener('click', function (e) {
+        var box = document.getElementById('chainBox');
+        if (box && !box.contains(e.target) && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
       });
 
       on('flipBtn', 'click', function () {
