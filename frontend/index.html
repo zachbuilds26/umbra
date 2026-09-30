@@ -4353,7 +4353,7 @@
         var provider = window.umbraEvmProvider;
         if (!provider || typeof provider.request !== 'function') {
           resetRetryBtn();
-          swapFail('Wallet cannot sign.', true);
+          swapFail('EVM wallet coming soon.', true);
           return;
         }
         try {
@@ -5806,7 +5806,6 @@
     "imports": {
       "@reown/appkit": "https://esm.sh/@reown/appkit@1.8.24",
       "@reown/appkit-adapter-solana": "https://esm.sh/@reown/appkit-adapter-solana@1.8.24",
-      "@reown/appkit-adapter-wagmi": "https://esm.sh/@reown/appkit-adapter-wagmi@1.8.24",
       "@reown/appkit/networks": "https://esm.sh/@reown/appkit@1.8.24/networks",
       "@solana/web3.js": "https://esm.sh/@solana/web3.js@1.98.0"
     }
@@ -5815,28 +5814,27 @@
   <script type="module">
     import { createAppKit } from '@reown/appkit';
     import { SolanaAdapter } from '@reown/appkit-adapter-solana';
-    import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-    import { solana, bsc } from '@reown/appkit/networks';
+    import { solana } from '@reown/appkit/networks';
     import { VersionedTransaction, Connection } from '@solana/web3.js';
 
     window.umbraReown = { ready: false };
     window.umbraReownSigner = null;
-    // EVM (BSC) session, parallel to the Solana one. umbraWallet keeps meaning
-    // "the address on the chip" (Solana base58 OR 0x); umbraEvmWallet is the
-    // 0x address or null, umbraEvmProvider the EIP-1193 provider or null.
+    // EVM (BSC) session — DISABLED for now (the Wagmi adapter load broke the
+    // connect module). Re-enable by adding @reown/appkit-adapter-wagmi to the
+    // importmap, constructing WagmiAdapter, and restoring the eip155 tracking
+    // below. Main-script EVM guards treat null provider as "coming soon".
     window.umbraEvmWallet = null;
     window.umbraEvmProvider = null;
     try {
       var metadata = {
         name: 'Umbra',
-        description: 'Dex aggregator for tokenized stocks on Solana and BNB Chain',
+        description: 'Dex aggregator for tokenized stocks on Solana',
         url: window.location.origin,
         icons: [window.location.origin + '/assets/logo-white.png']
       };
-      var wagmiAdapter = new WagmiAdapter({ networks: [bsc], projectId: '99d43dc670342b0063917d5178d86816' });
       var modal = createAppKit({
-        adapters: [new SolanaAdapter(), wagmiAdapter],
-        networks: [solana, bsc],
+        adapters: [new SolanaAdapter()],
+        networks: [solana],
         metadata: metadata,
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
@@ -5844,36 +5842,11 @@
         themeVariables: { '--w3m-accent': '#55B98A' }
       });
       var solProvider = null;
-      var evmProvider = null;
       try {
         modal.subscribeProviders(function (state) {
           try { solProvider = (state && state.solana) || null; } catch (_) { solProvider = null; }
-          try { evmProvider = (state && state.eip155) || null; } catch (_) { evmProvider = null; }
-          try { window.umbraEvmProvider = evmProvider; } catch (_) {}
-          try { syncEvmAccount(); } catch (_) {}
         });
       } catch (_) {}
-      // EVM address is read deterministically (eth_accounts), never guessed
-      // from AppKit's account state shape, which differs per namespace.
-      var syncEvmAccount = function () {
-        var done = function (addr) {
-          try {
-            window.umbraEvmWallet = addr;
-            var h = window.umbraWalletHooks || {};
-            if (addr && !window.umbraWallet && h.connected) { try { h.connected(addr); } catch (_) {} }
-            if (!addr && window.umbraWallet && /^0x/i.test(window.umbraWallet) && h.disconnected) {
-              try { h.disconnected(); } catch (_) {}
-            }
-          } catch (_) {}
-        };
-        try {
-          var p = evmProvider || window.umbraEvmProvider;
-          if (!p || typeof p.request !== 'function') { done(null); return; }
-          p.request({ method: 'eth_accounts' }).then(function (accs) {
-            done(accs && accs.length ? String(accs[0]) : null);
-          }).catch(function () { done(null); });
-        } catch (_) { done(null); }
-      };
       var readAddress = function (s) {
         try {
           if (!s) return null;
@@ -6011,7 +5984,6 @@
       };
       try {
         modal.subscribeAccount(function (s) {
-          try { syncEvmAccount(); } catch (_) {}
           var addr = readAddress(s);
           var h = window.umbraWalletHooks || {};
           if (addr) {
@@ -6034,7 +6006,6 @@
         disconnect: async function () {
           try { if (typeof modal.disconnect === 'function') await modal.disconnect(); } catch (_) {}
           try { if (solProvider && typeof solProvider.disconnect === 'function') await solProvider.disconnect(); } catch (_) {}
-          try { window.umbraEvmWallet = null; window.umbraEvmProvider = null; } catch (_) {}
           window.umbraWallet = null;
           var h = window.umbraWalletHooks || {};
           if (h.disconnected) { try { h.disconnected(); } catch (_) {} }
