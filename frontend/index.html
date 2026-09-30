@@ -3122,6 +3122,9 @@
         USDC: { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', name: 'USD Coin' },
         USDT: { address: '0x55d398326f99059fF775485246999027B3197955', name: 'Tether USD' },
       };
+      // 'idle' | 'loading' | 'ready' | 'error' — the BSC merge is slower than
+      // the Solana shelf, so the picker shows its own status line for it.
+      var bscState = 'idle';
       function evmAddr() {
         if (window.umbraEvmWallet && /^0x/i.test(window.umbraEvmWallet)) return window.umbraEvmWallet;
         if (window.umbraWallet && /^0x/i.test(window.umbraWallet)) return window.umbraWallet;
@@ -3145,6 +3148,10 @@
         return (a === 'bsc' && b === 'sol') || (a === 'sol' && b === 'bsc');
       }
       async function loadBscDirectory() {
+        // One flight at a time; error state retries on next open.
+        if (bscState === 'loading' || bscState === 'ready') return;
+        bscState = 'loading';
+        try { if (tokenModalEl.classList.contains('open')) renderTokenList(tokenSearchEl.value || ''); } catch (_) {}
         try {
           var res = await fetch(API_BASE + '/api/bsc/tokens');
           if (!res.ok) throw new Error('bsc ' + res.status);
@@ -3162,7 +3169,13 @@
             }
             if (!dup) directory.push({ symbol: sym, name: bscMeta[sym].name, kind: 'BSTOCK', net: 'bsc' });
           });
-        } catch (_) { /* BSC unavailable: picker stays Solana-only */ }
+          bscState = 'ready';
+        } catch (_) {
+          bscState = 'error';
+        }
+        // The merge lands after the first paint — re-render the open picker
+        // so rows appear instead of waiting for the next keystroke.
+        try { if (tokenModalEl.classList.contains('open')) renderTokenList(tokenSearchEl.value || ''); } catch (_) {}
       }
       // Exact decimal-string math for 18-decimal EVM tokens (no binary float).
       function displayToBase(display, decimals) {
@@ -3370,7 +3383,10 @@
           loadDirectory().then(function () {
             renderTokenList(tokenSearchEl.value || '');
           });
-          try { loadBscDirectory().then(function () { renderTokenList(tokenSearchEl.value || ''); }); } catch (_) {}
+        }
+        // BSC rows merge late — kick the load and re-render when it lands.
+        if (bscState !== 'ready' && bscState !== 'loading') {
+          try { loadBscDirectory(); } catch (_) {}
         }
       }
 
@@ -3411,6 +3427,14 @@
             );
           })
           .join('');
+        // BSC status line: the merge is slower than the Solana shelf, so say
+        // so instead of showing stables-only with no explanation. Solana-only
+        // view never mentions it.
+        if (selectedChain !== 'Solana' && bscState === 'loading') {
+          html += '<div style="padding:16px; text-align:center; color:var(--umbra-muted); font-size:13px;">Loading BNB Chain stocks…</div>';
+        } else if (selectedChain !== 'Solana' && bscState === 'error') {
+          html += '<div style="padding:16px; text-align:center; color:var(--umbra-muted); font-size:13px;">Could not load BNB Chain stocks.</div>';
+        }
         var emptyCopy = 'No matches found.';
         if (directoryState === 'error') {
           emptyCopy = 'Asset list failed to load.';
