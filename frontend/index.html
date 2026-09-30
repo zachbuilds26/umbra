@@ -1565,7 +1565,15 @@
     }
     /* Chain dropdown card anchored to the picker search row */
     #chainMenu { left: auto; right: 0; min-width: 210px; }
-    #chainMenu .token-opt { padding: 8px 10px; }
+    /* tx-menu buttons are display:block — override so rows stay horizontal */
+    #chainMenu .token-opt {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      background: transparent;
+      padding: 8px 10px;
+    }
     #chainMenu .token-opt .meta b { font-size: 14px; }
     #chainMenu .chain-pick-coin { width: 24px; height: 24px; font-size: 11px; }
     .chain-btn {
