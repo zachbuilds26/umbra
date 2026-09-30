@@ -839,7 +839,7 @@
     }
 
     .ox-balance {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--umbra-muted);
       display: flex;
       align-items: center;
@@ -849,7 +849,7 @@
     .ox-balance button {
       background: none;
       border: 0;
-      color: var(--umbra-accent);
+      color: var(--umbra-muted);
       font-family: var(--umbra-font-body);
       font-size: 13px;
       font-weight: 600;
@@ -858,7 +858,8 @@
     }
 
     .ox-balance button:hover:not([disabled]) {
-      opacity: 0.85;
+      color: var(--umbra-text);
+      opacity: 1;
     }
 
     /* Sell / Receive panels: faint fill, no outline */
@@ -891,7 +892,8 @@
     }
 
     .ox-side-label {
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 500;
       color: var(--umbra-muted);
       padding: 2px 0 6px;
     }
@@ -1050,7 +1052,7 @@
     .ox-balance button {
       background: none;
       border: 0;
-      color: var(--umbra-accent);
+      color: var(--umbra-muted);
       font-family: var(--umbra-font-body);
       font-size: 13px;
       font-weight: 600;
@@ -1059,7 +1061,8 @@
     }
 
     .ox-balance button:hover:not([disabled]) {
-      opacity: 0.85;
+      color: var(--umbra-text);
+      opacity: 1;
     }
 
     .token-select {
@@ -1118,10 +1121,10 @@
       outline: none;
       text-align: right;
       font-family: var(--umbra-font-body);
-      font-weight: 400;
+      font-weight: 600;
       color: var(--umbra-text);
-      font-size: 32px;
-      height: 38px;
+      font-size: 36px;
+      height: 44px;
       padding-right: 0;
     }
 
@@ -1152,7 +1155,7 @@
     }
 
     .usd-line {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--umbra-muted);
       white-space: nowrap;
       overflow: hidden;
@@ -1903,7 +1906,7 @@
       /* Phone swap rows: compact pills so the full symbol shows next to
          the big amount (reference proportions), instead of truncating. */
       .swap-card { padding: 16px 14px; }
-      .amount-wrap input { font-size: 34px; height: 40px; }
+      .amount-wrap input { font-size: 36px; height: 44px; }
       .amount-wrap .usd-line { font-size: 14px; }
       .token-select { padding: 8px 10px; gap: 8px; max-width: 55%; }
       .swap-card .tk-36 { width: 32px; height: 32px; }
