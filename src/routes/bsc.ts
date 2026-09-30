@@ -1,9 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getBscPlatforms, getBscTokens, searchBscTokens, getBscPrices } from '../services/binance/rwa.service.js';
+import {
+  resolveBscToken,
+  getBscQuote,
+  buildBscSwap,
+  getBscApprove,
+  getBscTxStatus,
+  toBaseUnits,
+  fromBaseUnits,
+} from '../services/binance/trading.service.js';
 import { badRequest } from '../utils/errors.js';
 
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
 
 // BSC tokenized-stocks leg (Binance Web3 API: RWA Data). Read-only market
 // data; the secret never leaves the backend — the browser only sees these
@@ -57,6 +67,114 @@ export async function bscRoutes(app: FastifyInstance): Promise<void> {
         }
       }
       return { prices: await getBscPrices(addresses) };
+    },
+  );
+
+  const pairQuery = z.object({
+    sell: z.string().min(1).max(16),
+    buy: z.string().min(1).max(16),
+    amount: z.string().min(1).max(32),
+    wallet: z.string().regex(WALLET_RE, 'Invalid wallet address.').optional(),
+    slippage: z.coerce.number().min(0).max(50).default(0.5),
+  });
+
+  // GET /api/bsc/quote?sell=USDC&buy=NVDAx&amount=500[&wallet=0x..][&slippage=0.5]
+  app.get(
+    '/api/bsc/quote',
+    { config: { rateLimit: { max: 40, timeWindow: '1 minute' } } },
+    async (req) => {
+      const q = pairQuery.parse(req.query);
+      if (q.sell.toUpperCase() === q.buy.toUpperCase()) {
+        throw badRequest('VALIDATION_ERROR', 'Choose a different token.');
+      }
+      const [sell, buy] = await Promise.all([resolveBscToken(q.sell), resolveBscToken(q.buy)]);
+      // xStocks quote RFQ-side and demand a receiver wallet; stables and
+      // bStocks quote wallet-free. Fail with the connect line, not a param error.
+      if (!q.wallet && (sell.kind === 'xstock' || buy.kind === 'xstock')) {
+        throw badRequest('VALIDATION_ERROR', 'Connect a wallet first.');
+      }
+      const quote = await getBscQuote({
+        sell,
+        buy,
+        amountBaseUnits: toBaseUnits(q.amount, sell.decimals),
+        wallet: q.wallet,
+      });
+      return {
+        sell: sell.symbol,
+        buy: buy.symbol,
+        sellAmount: q.amount,
+        buyAmount: fromBaseUnits(quote.buyAmountBaseUnits, quote.buyDecimals),
+        buyAmountBaseUnits: quote.buyAmountBaseUnits,
+        vendor: quote.vendorName,
+        executionMode: quote.executionMode,
+        priceImpactPercent: quote.priceImpactPercent,
+        approveTarget: quote.approveTarget,
+        // Provider quoteIds live ~30s; the build step re-quotes, so this id is
+        // informational — the frontend never sends it back.
+        expiresIn: 30,
+      };
+    },
+  );
+
+  // GET /api/bsc/swap-build?sell=USDC&buy=NVDAx&amount=500&wallet=0x..[&slippage=0.5]
+  // Re-quotes fresh inside the 30s window, then builds the unsigned EVM tx the
+  // wallet signs via eth_sendTransaction. Nothing is broadcast here.
+  app.get(
+    '/api/bsc/swap-build',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const q = pairQuery.parse(req.query);
+      if (!q.wallet) throw badRequest('VALIDATION_ERROR', 'Connect a wallet first.');
+      if (q.sell.toUpperCase() === q.buy.toUpperCase()) {
+        throw badRequest('VALIDATION_ERROR', 'Choose a different token.');
+      }
+      const [sell, buy] = await Promise.all([resolveBscToken(q.sell), resolveBscToken(q.buy)]);
+      const quote = await getBscQuote({
+        sell,
+        buy,
+        amountBaseUnits: toBaseUnits(q.amount, sell.decimals),
+        wallet: q.wallet,
+      });
+      const tx = await buildBscSwap({
+        quote,
+        sell,
+        buy,
+        wallet: q.wallet,
+        slippagePercent: String(q.slippage),
+      });
+      return {
+        sell: sell.symbol,
+        buy: buy.symbol,
+        tx,
+        minReceiveAmount: tx.minReceiveAmount,
+        minReceiveDisplay: fromBaseUnits(tx.minReceiveAmount, quote.buyDecimals),
+      };
+    },
+  );
+
+  // GET /api/bsc/approve?sell=USDC&amount=500 -> spender + calldata for the
+  // ERC-20 approve tx. The wallet sends it only when allowance is short.
+  app.get(
+    '/api/bsc/approve',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req) => {
+      const q = z.object({ sell: z.string().min(1).max(16), amount: z.string().min(1).max(32) }).parse(req.query);
+      const token = await resolveBscToken(q.sell);
+      return {
+        token: token.symbol,
+        tokenAddress: token.address,
+        ...(await getBscApprove({ token, amountBaseUnits: toBaseUnits(q.amount, token.decimals) })),
+      };
+    },
+  );
+
+  // GET /api/bsc/status?txHash=0x.. -> pending | success | fail | unknown
+  app.get(
+    '/api/bsc/status',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req) => {
+      const q = z.object({ txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid transaction hash.') }).parse(req.query);
+      return getBscTxStatus(q.txHash);
     },
   );
 }

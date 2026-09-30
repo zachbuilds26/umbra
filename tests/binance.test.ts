@@ -59,6 +59,7 @@ describe('binance client', () => {
     assert.equal(mapBinanceCode(40401).code, 'QUOTE_EXPIRED');
     assert.equal(mapBinanceCode(40367).code, 'SWAP_UNAVAILABLE');
     assert.equal(mapBinanceCode(40369).code, 'SWAP_UNAVAILABLE');
+    assert.equal(mapBinanceCode(40374).code, 'INSUFFICIENT_LIQUIDITY');
     assert.equal(mapBinanceCode(40001).code, 'VALIDATION_ERROR');
     assert.equal(mapBinanceCode(99999).code, 'PROVIDER_ERROR');
   });

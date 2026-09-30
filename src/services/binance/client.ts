@@ -162,6 +162,8 @@ export function mapBinanceCode(code: number): HttpError {
     case 40367: // Ondo outside market hours
     case 40369: // BStock outside market hours
       return badRequest('SWAP_UNAVAILABLE', 'Market closed for this token right now.');
+    case 40374: // insufficient RFQ/AMM liquidity for the size
+      return badRequest('INSUFFICIENT_LIQUIDITY', 'The pool for this pair is too thin for this size right now.');
     default:
       return new HttpError(502, 'PROVIDER_ERROR', 'Our data provider did not respond.');
   }
