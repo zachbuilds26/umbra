@@ -14,6 +14,7 @@ import { assetRoutes } from './routes/assets.js';
 import { swapRoutes } from './routes/swaps.js';
 import { bridgeRoutes } from './routes/bridges.js';
 import { walletRoutes } from './routes/wallet.js';
+import { bscRoutes } from './routes/bsc.js';
 
 /**
  * Which address the rate limiter keys on.
@@ -153,6 +154,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(swapRoutes);
   await app.register(bridgeRoutes);
   await app.register(walletRoutes);
+  await app.register(bscRoutes);
 
   // Single-service deploy (Render free): the backend serves the frontend
   // bundle so API + app share one origin (no CORS, one sleep schedule).
