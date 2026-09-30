@@ -2886,6 +2886,8 @@
       async function refreshWalletBalances() {
         var w = window.umbraWallet;
         if (!w) return;
+        // 0x session: balances come from BSC via eth_call, not the Solana ledger.
+        if (/^0x/i.test(w)) { try { await refreshBscBalance(w); } catch (_) {} return; }
         // A response for a wallet we already left must not repopulate state:
         // Max would then spend the previous account's balance.
         var mySeq = ++balancesSeq;
@@ -3045,11 +3047,11 @@
       var tokenListEl = document.getElementById('tokenList');
       var chainMenuEl = document.getElementById('chainMenu');
       var chainBoxEl = document.getElementById('chainBox');
-      // Networks drawer: Solana is live; Monad and BNB are visible but locked
-      // until those chains are integrated.
+      // Networks drawer: Solana + BNB Chain live; Monad visible but locked
+      // until that chain is integrated.
       var CHAIN_LIST = [
         { name: 'Solana', img: './assets/chains/Solana.png', live: true },
-        { name: 'BNB Chain', img: './assets/chains/BnbChain.png', live: false },
+        { name: 'BNB Chain', img: './assets/chains/BnbChain.png', live: true },
         { name: 'Monad', img: './assets/chains/Monad.png', live: false },
       ];
       var selectedChain = 'All Chains';
@@ -3103,11 +3105,145 @@
             selectedChain = name;
             paintChainBox();
             chainMenuEl.style.display = 'none';
+            try { renderTokenList(tokenSearchEl.value || ''); } catch (_) {}
           });
         });
         if (window.lucide) window.lucide.createIcons();
       }
 
+      /* ---------- BSC leg (Binance Web3 API: bStocks on BNB Chain) ----------
+         bStocks execute on BSC through /api/bsc/*; everything else stays on
+         Solana. A pair involving a BSTOCK symbol is a BSC pair. */
+      var BSC_CHAIN_HEX = '0x38'; // 56
+      var bscMeta = {
+        USDC: { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', name: 'USD Coin' },
+        USDT: { address: '0x55d398326f99059fF775485246999027B3197955', name: 'Tether USD' },
+      };
+      function evmAddr() {
+        if (window.umbraEvmWallet && /^0x/i.test(window.umbraEvmWallet)) return window.umbraEvmWallet;
+        if (window.umbraWallet && /^0x/i.test(window.umbraWallet)) return window.umbraWallet;
+        return null;
+      }
+      // Network of a directory symbol: 'bsc' | 'sol' | 'both' (stables live
+      // on both chains). Unknown symbols stay Solana — legacy behavior.
+      function dirNet(sym) {
+        var u = String(sym || '').toUpperCase();
+        if (u === 'USDC' || u === 'USDT') return 'both';
+        for (var i = 0; i < directory.length; i++) {
+          if (directory[i].symbol.toUpperCase() === u) return directory[i].net || 'sol';
+        }
+        return 'sol';
+      }
+      function isBscPair() {
+        return dirNet(sellSym) === 'bsc' || dirNet(buySym) === 'bsc';
+      }
+      function isMixedPair() {
+        var a = dirNet(sellSym), b = dirNet(buySym);
+        return (a === 'bsc' && b === 'sol') || (a === 'sol' && b === 'bsc');
+      }
+      async function loadBscDirectory() {
+        try {
+          var res = await fetch(API_BASE + '/api/bsc/tokens');
+          if (!res.ok) throw new Error('bsc ' + res.status);
+          var data = await res.json();
+          (data.tokens || []).forEach(function (t) {
+            if (!t || !t.symbol || !t.address) return;
+            var sym = String(t.symbol).toUpperCase();
+            bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym };
+            var dup = false;
+            for (var i = 0; i < directory.length; i++) {
+              if (directory[i].symbol.toUpperCase() === sym && directory[i].net === 'bsc') { dup = true; break; }
+            }
+            if (!dup) directory.push({ symbol: sym, name: bscMeta[sym].name, kind: 'BSTOCK', net: 'bsc' });
+          });
+        } catch (_) { /* BSC unavailable: picker stays Solana-only */ }
+      }
+      // Exact decimal-string math for 18-decimal EVM tokens (no binary float).
+      function displayToBase(display, decimals) {
+        var parts = String(display == null ? '' : display).trim().split('.');
+        var intPart = (parts[0] || '0').replace(/\D/g, '') || '0';
+        var frac = ((parts[1] || '').replace(/\D/g, '') + '000000000000000000000000000000000000').slice(0, decimals);
+        try {
+          return (BigInt(intPart) * (BigInt(10) ** BigInt(decimals)) + BigInt(frac || '0')).toString();
+        } catch (_) { return '0'; }
+      }
+      function baseToDisplay(base, decimals) {
+        try {
+          var b = BigInt(String(base).split('.')[0] || '0');
+          var neg = b < BigInt(0);
+          if (neg) b = -b;
+          var s = b.toString();
+          while (s.length <= decimals) s = '0' + s;
+          var intPart = s.slice(0, s.length - decimals);
+          var frac = s.slice(s.length - decimals).replace(/0+$/, '');
+          return (neg ? '-' : '') + intPart + (frac ? '.' + frac : '');
+        } catch (_) { return '0'; }
+      }
+      function decToHex(s) {
+        try { return '0x' + BigInt(String(s).split('.')[0] || '0').toString(16); }
+        catch (_) { return '0x0'; }
+      }
+      function pad32(hexAddr) {
+        var h = String(hexAddr || '').replace(/^0x/, '').toLowerCase();
+        while (h.length < 64) h = '0' + h;
+        return h;
+      }
+      async function bscEnsureChain(provider) {
+        var id = null;
+        try { id = await provider.request({ method: 'eth_chainId' }); } catch (_) {}
+        if (id === BSC_CHAIN_HEX || String(id) === '56') return;
+        try {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BSC_CHAIN_HEX }] });
+        } catch (e) {
+          if (e && (e.code === 4902 || (e.data && e.data.originalError && e.data.originalError.code === 4902))) {
+            await provider.request({ method: 'wallet_addEthereumChain', params: [{ chainId: BSC_CHAIN_HEX, chainName: 'BNB Smart Chain', nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 }, rpcUrls: ['https://bsc-dataseed.binance.org/'], blockExplorerUrls: ['https://bscscan.com'] }] });
+          } else {
+            throw e;
+          }
+        }
+      }
+      async function bscTokenBalance(token, owner) {
+        var p = window.umbraEvmProvider;
+        if (!p || typeof p.request !== 'function') throw new Error('no provider');
+        var raw = await p.request({ method: 'eth_call', params: [{ to: token, data: '0x70a08231' + pad32(owner) }, 'latest'] });
+        return baseToDisplay(raw, 18);
+      }
+      async function bscAllowance(token, owner, spender) {
+        var p = window.umbraEvmProvider;
+        if (!p || typeof p.request !== 'function') throw new Error('no provider');
+        var raw = await p.request({ method: 'eth_call', params: [{ to: token, data: '0xdd62ed3e' + pad32(owner) + pad32(spender) }, 'latest'] });
+        try { return BigInt(raw); } catch (_) { return BigInt(0); }
+      }
+      async function bscWaitReceipt(provider, hash, timeoutMs) {
+        var start = Date.now();
+        for (;;) {
+          var r = null;
+          try { r = await provider.request({ method: 'eth_getTransactionReceipt', params: [hash] }); } catch (_) {}
+          if (r && r.blockNumber) return r;
+          if (Date.now() - start > (timeoutMs || 90000)) return null;
+          await new Promise(function (res) { setTimeout(res, 3000); });
+        }
+      }
+      async function refreshBscBalance(w) {
+        var mySeq = ++balancesSeq;
+        paintSellBalance('Loading…');
+        try {
+          var meta = bscMeta[String(sellSym || '').toUpperCase()];
+          if (!meta || !window.umbraEvmProvider) {
+            if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
+            paintSellBalance('—');
+            return;
+          }
+          var bal = await bscTokenBalance(meta.address, evmAddr() || w);
+          if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
+          window.umbraBalances = [{ symbol: sellSym, display: bal }];
+          window.umbraBalancesPartial = false;
+          paintSellBalance(fmtAmt(bal) + ' ' + sellSym);
+        } catch (e) {
+          if (mySeq !== balancesSeq || window.umbraWallet !== w) return;
+          paintSellBalance('—');
+        }
+      }
       function coinHtml(symbol) {
         return tkIcon(symbol, 'tk-36');
       }
@@ -3147,7 +3283,10 @@
             })
             .map(function (a) {
               var kind = a.symbol === 'USDC' || a.symbol === 'USDT' ? 'STABLE' : (/x$/.test(a.symbol) ? 'XSTOCK' : 'PRE-IPO');
-              return { symbol: a.symbol, name: a.name, kind: kind };
+              // Stables are dual-net (both chains); Solana shelf is sol-only.
+              // bStocks merge in later via loadBscDirectory with net 'bsc'.
+              var net = (a.symbol === 'USDC' || a.symbol === 'USDT') ? 'both' : 'sol';
+              return { symbol: a.symbol, name: a.name, kind: kind, net: net };
             });
           directoryState = 'ready';
         } catch (e) {
@@ -3222,6 +3361,7 @@
           loadDirectory().then(function () {
             renderTokenList(tokenSearchEl.value || '');
           });
+          try { loadBscDirectory().then(function () { renderTokenList(tokenSearchEl.value || ''); }); } catch (_) {}
         }
       }
 
@@ -3239,8 +3379,11 @@
         // Both boxes list the whole shelf: every stable and every stock. Picking
         // an unsupported pair is caught by the router, which explains why it
         // cannot execute — the list is not second-guessed for the user.
+        // The chain box narrows by execution network (stables show everywhere).
         var rows = directory
           .filter(function (t) {
+            if (selectedChain === 'Solana' && !(t.net === 'sol' || t.net === 'both' || !t.net)) return false;
+            if (selectedChain === 'BNB Chain' && t.net !== 'bsc' && t.net !== 'both') return false;
             return !f || t.symbol.toUpperCase().indexOf(f) >= 0 || (t.name || '').toUpperCase().indexOf(f) >= 0;
           })
           .slice(0, 60);
@@ -3423,6 +3566,27 @@
         var mySeq = ++sellUsdSeq;
         if (mySym === 'USDC' || mySym === 'USDT') {
           sellUsdPer = 1;
+        } else if (dirNet(mySym) === 'bsc') {
+          // bStocks price from the RWA feed (on-chain USD).
+          try {
+            var bmeta = bscMeta[mySym.toUpperCase()];
+            if (!bmeta) {
+              sellUsdPer = 0;
+            } else {
+              var bres = await fetch(API_BASE + '/api/bsc/prices?addresses=' + encodeURIComponent(bmeta.address));
+              if (mySeq !== sellUsdSeq || sellSym !== mySym) return;
+              if (bres.ok) {
+                var bdata = await bres.json();
+                if (mySeq !== sellUsdSeq || sellSym !== mySym) return;
+                sellUsdPer = (bdata.prices && bdata.prices.length && Number(bdata.prices[0].tokenPrice)) || 0;
+              } else {
+                sellUsdPer = 0;
+              }
+            }
+          } catch (e) {
+            if (mySeq !== sellUsdSeq || sellSym !== mySym) return;
+            sellUsdPer = 0;
+          }
         } else {
           try {
             var res = await fetch(API_BASE + '/api/assets/' + encodeURIComponent(mySym) + '/price');
@@ -3584,6 +3748,155 @@
         quoteLinesEl.hidden = !v;
       }
 
+      // BSC quote: same card, same one-line errors, different backend.
+      // lastQuote carries everything executeBscSwapFlow needs (the build
+      // step re-quotes server-side, so no quoteId crosses the wire).
+      async function runBscQuote(mySeq, amt, buyLoadingEl) {
+        try {
+          var evm = null;
+          try { evm = evmAddr(); } catch (_) {}
+          var slipPct = String((typeof slippageBps === 'number' ? slippageBps : 50) / 100);
+          var url = API_BASE + '/api/bsc/quote?sell=' + encodeURIComponent(sellSym) +
+            '&buy=' + encodeURIComponent(buySym) + '&amount=' + encodeURIComponent(amt) +
+            '&slippage=' + encodeURIComponent(slipPct) +
+            (evm ? '&wallet=' + encodeURIComponent(evm) : '');
+          var res = await fetch(url);
+          var data = await res.json();
+          if (mySeq !== quoteSeq) return;
+          buyAmountEl.placeholder = '0.00';
+          if (!res.ok) {
+            buyAmountEl.value = '';
+            buyUsdEl.textContent = '$0.00';
+            lastQuote = null;
+            if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+            var errCode = data.error && data.error.code;
+            quoteError(data.error && data.error.message, errCode);
+            return;
+          }
+          // Buy-side USD for the rate line: one cached price lookup.
+          var buyUsdPer = 0;
+          try {
+            var pr = await fetch(API_BASE + '/api/bsc/prices?addresses=' + encodeURIComponent(data.buyTokenAddress));
+            if (mySeq !== quoteSeq) return;
+            var pj = await pr.json();
+            if (pr.ok && pj.prices && pj.prices.length && Number(pj.prices[0].tokenPrice)) {
+              buyUsdPer = Number(pj.prices[0].tokenPrice);
+            }
+          } catch (_) {}
+          if (mySeq !== quoteSeq) return;
+          var buyAmt = String(data.buyAmount);
+          var buyUsd = buyUsdPer > 0
+            ? Number(buyAmt) * buyUsdPer
+            : (sellUsdPer > 0 ? Number(amt) * sellUsdPer : 0);
+          var prevRecv = window.umbraLastReceive || null;
+          buyAmountEl.value = fmtAmt(buyAmt);
+          buyUsdEl.textContent = fmtMoney(buyUsd);
+          if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+          setBuyDots(false);
+          if (prevRecv !== null && prevRecv !== buyAmt) {
+            try {
+              var oldN = Number(prevRecv);
+              var newN = Number(buyAmt);
+              if (isFinite(oldN) && isFinite(newN) && oldN > 0 && Math.abs(newN - oldN) / oldN > 0.0005) {
+                buyAmountEl.classList.remove('bump');
+                void buyAmountEl.offsetWidth;
+                buyAmountEl.classList.add('bump');
+                setTimeout(function () { buyAmountEl.classList.remove('bump'); }, 650);
+              }
+            } catch (e2) { /* cosmetic only */ }
+          }
+          window.umbraLastReceive = buyAmt;
+          var pct = Number(data.priceImpactPercent);
+          // Provider percent -> bps, the unit the card paints in.
+          var bps = isFinite(pct) ? pct * 100 : null;
+          var slipN = Number(slipPct);
+          var minRecv = (isFinite(Number(buyAmt)) && isFinite(slipN))
+            ? String(Number(buyAmt) * (1 - slipN / 100)) : buyAmt;
+          var perUnit = (isFinite(Number(buyAmt)) && Number(amt) > 0) ? Number(buyAmt) / Number(amt) : 0;
+          var unitUsd = buyUsdPer > 0 ? perUnit * buyUsdPer : 0;
+          lastQuote = {
+            bsc: true,
+            quoteId: null,
+            sell: { amount: amt, symbol: sellSym },
+            buy: buySym,
+            receive: { amount: buyAmt, symbol: buySym, usdValue: buyUsd },
+            rate: '1 ' + sellSym + ' = ' + perUnit + ' ' + buySym + ' ($' + unitUsd + ')',
+            minimumReceived: minRecv,
+            at: Date.now(),
+            key: amt + '|' + sellSym + '|' + buySym + '|' + slippageBps,
+            slippageBps: slippageBps,
+            priceImpactBps: bps,
+            routeVenue: data.vendor || null,
+            networkLine: '<div class="swap-hero-line"><span>Network</span><span class="val">BNB Chain <img src="./assets/chains/BnbChain.png" alt="" /></span></div>',
+            sellTokenAddress: data.sellTokenAddress,
+            buyTokenAddress: data.buyTokenAddress,
+            sellDecimals: data.sellDecimals,
+            buyDecimals: data.buyDecimals,
+          };
+          swapBlocked = null;
+          swapBlockedMsg = '';
+          try { updateActionBtn(); } catch (_) {}
+          var impactRaw = bps;
+          var impactAbs = (impactRaw !== null && isFinite(impactRaw)) ? Math.abs(impactRaw) : null;
+          var impact = impactAbs === null ? '—' : (impactRaw / 100).toFixed(2) + '%';
+          var impactCls = '';
+          var impactNote = '';
+          if (impactAbs !== null && impactAbs >= 2000) {
+            impactCls = 'bad';
+            impactNote = 'Impact too high — reduce amount.';
+            lastQuote = null;
+            swapBlocked = 'HIGH_IMPACT';
+            try { updateActionBtn(); } catch (_) {}
+          } else if (impactAbs !== null && impactAbs >= 500) {
+            impactCls = 'warn';
+            impactNote = 'High price impact — thin liquidity on this size.';
+          }
+          var moreOpen = quoteMoreOpen ? '' : ' hidden';
+          var moreLabel = quoteMoreOpen ? 'Hide details' : 'Show details';
+          var moreExp = quoteMoreOpen ? 'true' : 'false';
+          var shim = {
+            rate: lastQuote ? lastQuote.rate : '',
+            routeVenue: data.vendor || null,
+            minimumReceived: minRecv,
+            receive: { symbol: buySym },
+          };
+          var html =
+            '<div class="qsum"><span>' + esc(fmtRate(shim.rate)) + '</span>' +
+            '<button class="qmore" id="quoteMoreBtn" aria-expanded="' + moreExp + '">' + moreLabel + ' <span class="css-chev" aria-hidden="true"></span></button></div>' +
+            '<div class="qextra" id="quoteExtra"' + moreOpen + '>' +
+            '<div class="row"><span>Price impact</span><span class="' + impactCls + '">' + impact + '</span></div>' +
+            (shim.routeVenue ? '<div class="row"><span>Route</span><span>via ' + esc(String(shim.routeVenue)) + '</span></div>' : '') +
+            '<div class="row"><span>Minimum received' + infoIcon('The least you will receive after slippage tolerance.') + '</span><span>' + fmtAmt(shim.minimumReceived) + ' ' + esc(shim.receive.symbol) + '</span></div>' +
+            (impactNote ? '<div class="row row-error"><span class="error">' + esc(impactNote) + '</span></div>' : '') +
+            '</div>';
+          quoteLinesEl.innerHTML = html;
+          var moreBtn = document.getElementById('quoteMoreBtn');
+          if (moreBtn) moreBtn.addEventListener('click', function () {
+            var ex = document.getElementById('quoteExtra');
+            var open = ex && ex.hidden;
+            quoteMoreOpen = !!open;
+            if (ex) ex.hidden = !open;
+            moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            moreBtn.innerHTML = (open ? 'Hide details ' : 'Show details ') + '<span class="css-chev" aria-hidden="true"></span>';
+          });
+          setDetailsVisible(true);
+          if (window.lucide) window.lucide.createIcons();
+          (function paintValueDiff() {
+            if (mySeq !== quoteSeq) return;
+            var b = lastQuote && lastQuote.priceImpactBps;
+            var vd = (b === null || b === undefined || !isFinite(Number(b))) ? null : -Number(b) / 100;
+            setBuyChange(vd);
+          })();
+        } catch (e) {
+          if (mySeq !== quoteSeq) return;
+          buyAmountEl.value = '';
+          buyAmountEl.placeholder = '0.00';
+          buyUsdEl.textContent = '$0.00';
+          lastQuote = null;
+          quoteError(null, 'PROVIDER_ERROR');
+        }
+      }
+
       async function runQuote() {
         var mySeq = ++quoteSeq;
         var amt = (sellAmountEl.value || '').trim();
@@ -3608,6 +3921,26 @@
           resetQuoteSummary();
           return;
         }
+        // BSC leg: a pair touching bStocks quotes through /api/bsc/* instead
+        // of Jupiter. Mixed Solana/BSC pairs cannot execute cross-chain.
+        if (isMixedPair()) {
+          if (mySeq !== quoteSeq) return;
+          if (buyLoadingEl) buyLoadingEl.style.display = 'none';
+          buyAmountEl.value = '';
+          buyUsdEl.textContent = '$0.00';
+          lastQuote = null;
+          swapBlocked = null;
+          swapBlockedMsg = '';
+          try { updateActionBtn(); } catch (_) {}
+          window.umbraLastReceive = null;
+          resetQuoteSummary();
+          quoteError(null, 'UNSUPPORTED_ASSET');
+          return;
+        }
+        if (isBscPair()) {
+          try { await runBscQuote(mySeq, amt, buyLoadingEl); } catch (_) {}
+          return;
+        }
         try {
           // Ask for the quote WITH the wallet address when one is connected. That
           // way Jupiter builds the transaction during the quote, and the swap we
@@ -3623,7 +3956,7 @@
             encodeURIComponent(amt) +
             '&slippageBps=' +
             slippageBps +
-            (window.umbraWallet ? '&userPublicKey=' + encodeURIComponent(window.umbraWallet) : '');
+            (window.umbraWallet && !/^0x/i.test(window.umbraWallet) ? '&userPublicKey=' + encodeURIComponent(window.umbraWallet) : '');
           var res = await fetch(url);
           var data = await res.json();
           if (mySeq !== quoteSeq) return; // superseded by newer typing — never paint stale
@@ -3947,7 +4280,7 @@
           '<div class="swap-hero-row recv">' + tkIcon(q.receive.symbol, 'tk-36') +
           '<span class="pos">+' + fmtAmt(recvN) + '</span><span class="sym">' + esc(q.receive.symbol) + '</span></div>' +
           '<div class="swap-hero-hair"></div>' +
-          '<div class="swap-hero-line"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>' +
+          (q.networkLine || '<div class="swap-hero-line"><span>Network</span><span class="val">Solana <img src="./assets/solana-mark.png" alt="" /></span></div>') +
           '<div class="swap-hero-line"><span>Rate</span><span class="val">1 ' + esc(q.sell.symbol) + ' ≈ ' + per + ' ' + esc(q.receive.symbol) + '</span></div>' +
           '<div class="swap-hero-line"><span>Price impact</span><span class="val">' + esc(heroImpact) + '</span></div>' +
           '<div class="swap-hero-line"><span>Slippage</span><span class="val">' + esc(heroSlip) + '</span></div>' +
@@ -4006,6 +4339,115 @@
         return 'unknown';
       }
 
+      // BSC execution: unsigned EVM tx from /api/bsc/swap-build, signed and
+      // sent by the EVM wallet itself (eth_sendTransaction signs+broadcasts).
+      // Approve-first when the router allowance is short, then poll status.
+      async function executeBscSwapFlow(wallet, amt) {
+        var evm = null;
+        try { evm = evmAddr(); } catch (_) {}
+        if (!evm) { resetRetryBtn(); connectWallet(); return; }
+        var provider = window.umbraEvmProvider;
+        if (!provider || typeof provider.request !== 'function') {
+          resetRetryBtn();
+          swapFail('Wallet cannot sign.', true);
+          return;
+        }
+        try {
+          executing = true;
+          if (!retrying) {
+            swapErrorEl.style.display = 'none';
+            swapRetryBtn.style.display = 'none';
+            swapExplorerEl.style.display = 'none';
+          }
+          openSwapModal();
+          var q = lastQuote;
+          paintSwapHero(q);
+          paintSwapTitle('Confirm in wallet', '');
+          paintSwapState('wallet', 'accent pulse');
+          setSwapBusy(false);
+          await bscEnsureChain(provider);
+          if (evmAddr() !== evm) throw new Error('Wallet changed — try again.');
+          // 1) Unsigned swap tx from our backend (re-quoted fresh server-side)
+          var slipPct = String((typeof slippageBps === 'number' ? slippageBps : 50) / 100);
+          var bRes = await fetch(API_BASE + '/api/bsc/swap-build?sell=' + encodeURIComponent(sellSym) +
+            '&buy=' + encodeURIComponent(buySym) + '&amount=' + encodeURIComponent(amt) +
+            '&wallet=' + encodeURIComponent(evm) + '&slippage=' + encodeURIComponent(slipPct));
+          var bData = await bRes.json();
+          if (!bRes.ok) {
+            var bErr = new Error((bData.error && bData.error.message) || 'Could not build transaction.');
+            bErr.umbraCode = bData.error && bData.error.code;
+            throw bErr;
+          }
+          var tx = bData.tx;
+          // 2) ERC-20 allowance: approve the router only when short
+          var sellBase = displayToBase(amt, (q && q.sellDecimals) || 18);
+          var allowed = await bscAllowance(q.sellTokenAddress, evm, tx.to);
+          if (allowed < BigInt(sellBase)) {
+            paintSwapTitle('Approve in wallet', '');
+            var aRes = await fetch(API_BASE + '/api/bsc/approve?sell=' + encodeURIComponent(sellSym) +
+              '&amount=' + encodeURIComponent(amt));
+            var aData = await aRes.json();
+            if (!aRes.ok) throw new Error('Could not build transaction.');
+            var aHash = await provider.request({ method: 'eth_sendTransaction', params: [{ from: evm, to: aData.tokenAddress, data: aData.calldata }] });
+            paintSwapTitle('Confirming approval…', '');
+            paintSwapState('loader-circle', 'accent', true);
+            var aRcpt = await bscWaitReceipt(provider, aHash, 120000);
+            if (!aRcpt || aRcpt.status === '0x0' || aRcpt.status === 0) throw new Error('Approval failed — try again.');
+            if (evmAddr() !== evm) throw new Error('Wallet changed — try again.');
+          }
+          // 3) Sign + send the swap
+          paintSwapTitle('Confirm in wallet', '');
+          paintSwapState('wallet', 'accent pulse');
+          var txParams = { from: evm, to: tx.to, data: tx.data, value: decToHex(tx.value || '0') };
+          if (tx.gas && tx.gas !== '0') txParams.gas = decToHex(tx.gas);
+          if (tx.maxPriorityFeePerGas) {
+            txParams.maxFeePerGas = decToHex(tx.gasPrice || '0');
+            txParams.maxPriorityFeePerGas = decToHex(tx.maxPriorityFeePerGas);
+          } else if (tx.gasPrice && tx.gasPrice !== '0') {
+            txParams.gasPrice = decToHex(tx.gasPrice);
+          }
+          paintSwapTitle('Submitting…', '');
+          paintSwapState('send', 'accent', false);
+          setSwapBusy(true);
+          var hash = await provider.request({ method: 'eth_sendTransaction', params: [txParams] });
+          // 4) Poll to finality through our status route
+          paintSwapTitle('Confirming on BNB Chain…', '');
+          paintSwapState('loader-circle', 'accent', true);
+          var final = 'unknown';
+          for (var i = 0; i < 30; i++) {
+            await new Promise(function (r) { setTimeout(r, 3000); });
+            try {
+              var sRes = await fetch(API_BASE + '/api/bsc/status?txHash=' + encodeURIComponent(hash));
+              var sData = await sRes.json();
+              if (sRes.ok && (sData.status === 'success' || sData.status === 'fail')) { final = sData.status; break; }
+            } catch (_) { /* keep polling */ }
+          }
+          swapExplorerLink.href = 'https://bscscan.com/tx/' + hash;
+          swapExplorerEl.style.display = 'block';
+          if (final === 'success') {
+            executing = false;
+            paintSwapTitle('Swap confirmed', 'ok');
+            paintSwapState('circle-check', 'ok', false);
+            retrying = false;
+            swapRetryBtn.style.display = 'none';
+            if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+            if (typeof refreshSellUsd === 'function') refreshSellUsd();
+            try { scheduleQuote(); } catch (_) {}
+          } else if (final === 'fail') {
+            swapFail('Failed on-chain — funds are safe.', false);
+          } else {
+            swapFail('Timed out — check the explorer.', false);
+          }
+        } catch (e) {
+          var msg = (e && e.message) || String(e);
+          if (/rejected|denied|declin|closed|cancel/i.test(msg) || (e && e.code === 4001)) {
+            swapFail('Rejected — nothing was sent.', true);
+          } else {
+            swapFail(msg, true, e && e.umbraCode);
+          }
+        }
+      }
+
       async function executeSwap() {
         if (executing) return;
         if (!window.umbraWallet) { resetRetryBtn(); connectWallet(); return; }
@@ -4029,6 +4471,19 @@
         if (window.umbraWallet !== wallet) {
           resetRetryBtn();
           swapFail('Wallet changed — try again.', true);
+          return;
+        }
+        // BSC pairs never touch the Solana stack below.
+        if (isBscPair()) {
+          if (!lastQuote || !lastQuote.bsc || Date.now() - lastQuote.at > 45000 || lastQuote.key !== wantKey) {
+            try { await runQuote(); } catch (_) { /* runQuote already paints card error */ }
+            if (!lastQuote || !lastQuote.bsc || Date.now() - lastQuote.at > 45000 || lastQuote.key !== wantKey) {
+              if (retrying) swapFail('Quote is out of date — try again.', true);
+              else resetRetryBtn();
+              return;
+            }
+          }
+          await executeBscSwapFlow(wallet, amt);
           return;
         }
         if (!window.solanaWeb3) {
@@ -4564,7 +5019,9 @@
         if (connectEl) connectEl.style.display = isConnected ? 'none' : 'flex';
         if (wrapEl) wrapEl.style.display = isConnected ? 'flex' : 'none';
         var ex = document.getElementById('activityExplorer');
-        if (ex && isConnected) ex.href = 'https://explorer.solana.com/address/' + window.umbraWallet;
+        if (ex && isConnected) ex.href = /^0x/i.test(window.umbraWallet || '')
+          ? 'https://bscscan.com/address/' + window.umbraWallet
+          : 'https://explorer.solana.com/address/' + window.umbraWallet;
         if (isConnected) refreshActivity();
       }
       var activitySeq = 0;
@@ -5312,6 +5769,8 @@
         refreshStocksCards();
         refreshActivity();
       });
+      // BSC token universe merges into the picker (stays Solana-only on failure).
+      try { loadBscDirectory().then(function () { try { refreshSellUsd(); } catch (_) {} }); } catch (_) {}
       // Also refresh cards when returning to those tabs
       var origSetActive = setActive;
       setActive = function (hash) {
@@ -5329,6 +5788,7 @@
     "imports": {
       "@reown/appkit": "https://esm.sh/@reown/appkit@1.8.24",
       "@reown/appkit-adapter-solana": "https://esm.sh/@reown/appkit-adapter-solana@1.8.24",
+      "@reown/appkit-adapter-wagmi": "https://esm.sh/@reown/appkit-adapter-wagmi@1.8.24",
       "@reown/appkit/networks": "https://esm.sh/@reown/appkit@1.8.24/networks",
       "@solana/web3.js": "https://esm.sh/@solana/web3.js@1.98.0"
     }
@@ -5337,21 +5797,28 @@
   <script type="module">
     import { createAppKit } from '@reown/appkit';
     import { SolanaAdapter } from '@reown/appkit-adapter-solana';
-    import { solana } from '@reown/appkit/networks';
+    import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+    import { solana, bsc } from '@reown/appkit/networks';
     import { VersionedTransaction, Connection } from '@solana/web3.js';
 
     window.umbraReown = { ready: false };
     window.umbraReownSigner = null;
+    // EVM (BSC) session, parallel to the Solana one. umbraWallet keeps meaning
+    // "the address on the chip" (Solana base58 OR 0x); umbraEvmWallet is the
+    // 0x address or null, umbraEvmProvider the EIP-1193 provider or null.
+    window.umbraEvmWallet = null;
+    window.umbraEvmProvider = null;
     try {
       var metadata = {
         name: 'Umbra',
-        description: 'Dex aggregator for tokenized stocks on Solana',
+        description: 'Dex aggregator for tokenized stocks on Solana and BNB Chain',
         url: window.location.origin,
         icons: [window.location.origin + '/assets/logo-white.png']
       };
+      var wagmiAdapter = new WagmiAdapter({ networks: [bsc], projectId: '99d43dc670342b0063917d5178d86816' });
       var modal = createAppKit({
-        adapters: [new SolanaAdapter()],
-        networks: [solana],
+        adapters: [new SolanaAdapter(), wagmiAdapter],
+        networks: [solana, bsc],
         metadata: metadata,
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
@@ -5359,11 +5826,36 @@
         themeVariables: { '--w3m-accent': '#55B98A' }
       });
       var solProvider = null;
+      var evmProvider = null;
       try {
         modal.subscribeProviders(function (state) {
           try { solProvider = (state && state.solana) || null; } catch (_) { solProvider = null; }
+          try { evmProvider = (state && state.eip155) || null; } catch (_) { evmProvider = null; }
+          try { window.umbraEvmProvider = evmProvider; } catch (_) {}
+          try { syncEvmAccount(); } catch (_) {}
         });
       } catch (_) {}
+      // EVM address is read deterministically (eth_accounts), never guessed
+      // from AppKit's account state shape, which differs per namespace.
+      var syncEvmAccount = function () {
+        var done = function (addr) {
+          try {
+            window.umbraEvmWallet = addr;
+            var h = window.umbraWalletHooks || {};
+            if (addr && !window.umbraWallet && h.connected) { try { h.connected(addr); } catch (_) {} }
+            if (!addr && window.umbraWallet && /^0x/i.test(window.umbraWallet) && h.disconnected) {
+              try { h.disconnected(); } catch (_) {}
+            }
+          } catch (_) {}
+        };
+        try {
+          var p = evmProvider || window.umbraEvmProvider;
+          if (!p || typeof p.request !== 'function') { done(null); return; }
+          p.request({ method: 'eth_accounts' }).then(function (accs) {
+            done(accs && accs.length ? String(accs[0]) : null);
+          }).catch(function () { done(null); });
+        } catch (_) { done(null); }
+      };
       var readAddress = function (s) {
         try {
           if (!s) return null;
@@ -5501,6 +5993,7 @@
       };
       try {
         modal.subscribeAccount(function (s) {
+          try { syncEvmAccount(); } catch (_) {}
           var addr = readAddress(s);
           var h = window.umbraWalletHooks || {};
           if (addr) {
@@ -5523,6 +6016,7 @@
         disconnect: async function () {
           try { if (typeof modal.disconnect === 'function') await modal.disconnect(); } catch (_) {}
           try { if (solProvider && typeof solProvider.disconnect === 'function') await solProvider.disconnect(); } catch (_) {}
+          try { window.umbraEvmWallet = null; window.umbraEvmProvider = null; } catch (_) {}
           window.umbraWallet = null;
           var h = window.umbraWalletHooks || {};
           if (h.disconnected) { try { h.disconnected(); } catch (_) {} }
