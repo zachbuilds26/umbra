@@ -1222,6 +1222,13 @@
       border: 0;
       border-radius: 10px;
       padding: 10px 12px;
+      margin-top: 10px;
+    }
+    .quote-lines .row.row-error .error {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Swap details rows: plain rows under the summary.
@@ -1672,6 +1679,7 @@
     }
     /* Keep drawer height steady while searching: few results must not shrink it */
     #tokenModal .token-list { min-height: 300px; }
+    #tokenModal .token-modal.token-sheet { min-height: min(480px, 80dvh); }
     .token-list::-webkit-scrollbar {
       width: 6px;
     }
@@ -2494,7 +2502,7 @@
               <div class="stocks-list" id="activityList" style="max-height:420px; min-height:0;"></div>
               <div id="activityEmpty" style="display:none; min-height:320px; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 16px;">
                 <div style="width:72px; height:72px; margin:0 auto 16px; border-radius:50%; background:var(--umbra-secondary); display:flex; align-items:center; justify-content:center; color:var(--umbra-muted);"><i data-lucide="inbox" width="32" height="32"></i></div>
-                <div id="activityEmptyText" style="font-size:14px; font-weight:600; margin-bottom:16px;">No records found in the last 90 days</div>
+                <div id="activityEmptyText" style="font-size:14px; font-weight:600; margin-bottom:16px;">No records yet.</div>
                 <a id="activityExplorer" href="#" target="_blank" rel="noreferrer" class="tx-explorer">Check on Explorer</a>
               </div>
             </div>
@@ -3249,7 +3257,7 @@
           .join('');
         var emptyCopy = 'No matches found.';
         if (directoryState === 'error') {
-          emptyCopy = 'Could not load the asset list. Check your connection and try again.';
+          emptyCopy = 'Asset list failed to load.';
           tokenListEl.innerHTML = '<div style="padding:24px 16px; text-align:center; color:var(--umbra-muted); font-size:13px;">' + esc(emptyCopy) + '</div>';
         } else if (!html && !f && directoryState !== 'ready') {
           tokenListEl.innerHTML = stockSkeletonRows(6);
@@ -3510,29 +3518,29 @@
         // problem into "thin liquidity — try a smaller amount", which sent people
         // to shrink an amount that was never the cause.
         if (code === 'INSUFFICIENT_BALANCE') {
-          return msg || 'Insufficient funds — top up SOL to swap.';
+          return msg || 'Insufficient funds — top up SOL.';
         }
         if (code === 'NO_ROUTE') {
-          return msg || 'No route is currently available for this pair.';
+          return msg || 'No route for this pair right now.';
         }
         if (code === 'INSUFFICIENT_LIQUIDITY') {
-          return msg || 'The pool for this pair is too thin for this size right now. Try a smaller amount or the reverse direction.';
+          return msg || 'Pool too thin — try a smaller amount.';
         }
         if (thin && code === 'SWAP_UNAVAILABLE') {
-          return 'This pair is hard to route right now. Try a smaller amount or the reverse direction.';
+          return 'No route — try a smaller amount.';
         }
-        if (code === 'RATE_LIMITED') return 'Quoting is busy right now — wait a moment and try again.';
+        if (code === 'RATE_LIMITED') return 'Quoting is busy — try again shortly.';
         if (code === 'QUOTE_UNAVAILABLE') {
-          return (sym ? sym + ' pricing is' : 'This pair\'s pricing is') + ' temporarily unavailable. Try again shortly, or pick another asset.';
+          return (sym ? sym + ' is down — try again soon.' : 'Pricing is down — try again soon.');
         }
-        if (code === 'UNSUPPORTED_ASSET') return 'Umbra swaps only stock against USDC or USDT.';
-        if (code === 'VALIDATION_ERROR') return 'That amount is not valid — enter a different amount.';
-        if (code === 'QUOTE_EXPIRED') return 'That quote went stale — we are fetching a fresh one.';
+        if (code === 'UNSUPPORTED_ASSET') return 'Stocks swap against USDC or USDT.';
+        if (code === 'VALIDATION_ERROR') return 'Invalid amount.';
+        if (code === 'QUOTE_EXPIRED') return 'Quote went stale — refreshing.';
         if (code === 'SWAP_UNAVAILABLE' || code === 'PROVIDER_ERROR') {
-          return 'Our quote provider did not respond. Try again in a moment.';
+          return 'No quote response — try again.';
         }
         // Unknown code: show a fixed line, never an unvetted server string.
-        return 'Quote unavailable right now — try again in a moment.';
+        return 'Quote unavailable — try again.';
       }
       function quoteError(msg, code) {
         swapBlocked = code === 'INSUFFICIENT_BALANCE' ? code : null;
@@ -3540,7 +3548,7 @@
         try { updateActionBtn(); } catch (_) {}
         // Same token both sides is not an amount problem — say exactly that.
         msg = (sellSym === buySym)
-          ? 'Same token — choose a different token to swap.'
+          ? 'Choose a different token.'
           : friendlyQuoteError(code, msg);
         quoteLinesEl.innerHTML = '<div class="row row-error"><span class="error">' + esc(msg) + '</span></div>';
         resetQuoteSummary();
@@ -3702,7 +3710,7 @@
           var impactNote = '';
           if (impactAbs !== null && impactAbs >= 2000) {
             impactCls = 'bad';
-            impactNote = 'Price impact too high — reduce the amount.';
+            impactNote = 'Impact too high — reduce amount.';
             if (!swapBlocked) {
               lastQuote = null;
               swapBlocked = 'HIGH_IMPACT';
@@ -4024,7 +4032,7 @@
           return;
         }
         if (!window.solanaWeb3) {
-          swapFail('Swap library failed to load (check connection and refresh).', false);
+          swapFail('Swap library failed — reload to retry.', false);
           return;
         }
         // From here on every exit must clear this, including a failure while
@@ -4061,7 +4069,7 @@
           if ((!walletProvider || !walletProvider.signTransaction) && typeof resolveReownSigner === 'function') resolveReownSigner();
           if (!walletProvider || !walletProvider.signTransaction) throw new Error('Connected wallet cannot sign.');
           var signed = await walletProvider.signTransaction(vtx);
-          if (window.umbraWallet !== wallet) throw new Error('Wallet changed — nothing was sent.');
+          if (window.umbraWallet !== wallet) throw new Error('Wallet changed — nothing sent.');
           // 3) Always tell the backend which transaction was submitted.
           //
           // Some providers broadcast inside signTransaction and then return only
@@ -4121,11 +4129,11 @@
               swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
               swapExplorerEl.style.display = 'block';
               executing = false;
-              paintSwapTitle('Swap submitted — not yet recorded', '');
+              paintSwapTitle('Submitted, not recorded.', '');
               paintSwapState('clock', 'accent', false);
               swapErrorEl.style.display = 'flex';
               swapErrorEl.classList.remove('shake', 'tone-bad');
-              swapErrorEl.textContent = 'Your transaction was sent. Umbra could not save it to your activity yet — check the explorer link for its status.';
+              swapErrorEl.textContent = 'Sent — check explorer for status.';
               swapRetryBtn.style.display = 'none';
               if (typeof refreshActivity === 'function') refreshActivity();
               if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
@@ -4150,16 +4158,16 @@
             if (typeof refreshActivity === 'function') refreshActivity();
             if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
           } else if (final === 'failed') {
-            swapFail('Transaction landed but failed on-chain. Funds stay in your wallet (minus network fee).', false);
+            swapFail('Failed on-chain — funds are safe.', false);
           } else if (final === 'expired') {
-            swapFail('Timed out waiting for confirmation — check the explorer; it may still confirm.', false);
+            swapFail('Timed out — check the explorer.', false);
           } else {
-            swapFail('Lost track of the transaction — check the explorer with the link above.', false);
+            swapFail('Lost track — check the explorer.', false);
           }
         } catch (e) {
           var msg = (e && e.message) || String(e);
           if (/rejected|denied|declin|closed|cancel/i.test(msg) || (e && e.code === 4001)) {
-            swapFail('Signature rejected in wallet — nothing was sent.', true);
+            swapFail('Rejected — nothing was sent.', true);
           } else {
             swapFail(msg, true, e && e.umbraCode);
           }
@@ -4266,7 +4274,7 @@
           // stocks..." forever.
           var emptyMsg;
           if (stocksLoadFailed) {
-            emptyMsg = 'Could not load the stocks list. Check your connection and try again.';
+            emptyMsg = 'Stocks list failed to load.';
           } else if (!stocksCache.length) {
             el.innerHTML = stockSkeletonRows(8);
             return;
@@ -4507,15 +4515,14 @@
           listEl.style.display = 'none';
           if (emptyEl) {
             emptyEl.style.display = 'flex';
-            var rangeTxt = txView.range === 'all' ? '' : ' in the last ' + txView.range + ' days';
             // A failed fetch must never read as "no records".
             var emptyText = document.getElementById('activityEmptyText');
             if (activityError) {
               emptyText.textContent = activityError;
             } else if (txView.range !== 'all' || txView.type !== 'all' || txView.status !== 'all') {
-              emptyText.textContent = 'No matching records for these filters.';
+              emptyText.textContent = 'No matches for these filters.';
             } else {
-              emptyText.textContent = 'No records yet' + rangeTxt + '.';
+              emptyText.textContent = txView.range === 'all' ? 'No records yet.' : 'No records in the last ' + txView.range + ' days.';
             }
           }
           return;
@@ -4595,7 +4602,7 @@
             // A failed request is not an empty history. Keep whatever was last
             // shown and say the refresh failed, rather than telling the user
             // they have no records.
-            activityError = 'Could not load activity. Check your connection and try again.';
+            activityError = 'Could not load activity.';
             renderActivity(allTransactions);
           });
       }
