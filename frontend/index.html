@@ -3254,6 +3254,16 @@
       function isBscPair() {
         return dirNet(sellSym) === 'bsc' || dirNet(buySym) === 'bsc';
       }
+      // Badge truth for bStocks, independent of filter/picker state: a symbol
+      // the BSC merge knows is definitionally a BSC token. This beats any
+      // stale selectedChain/listNet value to the correct badge.
+      function bscBadge(sym) {
+        try {
+          var u = String(sym || '').toUpperCase();
+          if (u !== 'USDC' && u !== 'USDT' && typeof bscMeta !== 'undefined' && bscMeta[u]) return 'bsc';
+        } catch (_) {}
+        return null;
+      }
       function isMixedPair() {
         var a = dirNet(sellSym), b = dirNet(buySym);
         return (a === 'bsc' && b === 'sol') || (a === 'sol' && b === 'bsc');
@@ -3386,17 +3396,20 @@
         });
       }
       function coinHtml(symbol, net) {
-        return tkIcon(symbol, 'tk-36');
+        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || dirNet(symbol));
       }
-      function coinHtml28(symbol) {
-        return tkIcon(symbol, 'tk-36');
+      function coinHtml28(symbol, net) {
+        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || dirNet(symbol));
       }
 
       function refreshSelectors() {
         sellSymbolEl.textContent = sellSym;
         buySymbolEl.textContent = buySym;
-        sellCoinEl.innerHTML = coinHtml(sellSym);
-        buyCoinEl.innerHTML = coinHtml(buySym);
+        // Pair-aware badges: inside a BSC pair the stables are the BSC side.
+        var pairNet = null;
+        try { pairNet = isBscPair() ? 'bsc' : null; } catch (_) {}
+        sellCoinEl.innerHTML = coinHtml(sellSym, pairNet || bscBadge(sellSym) || dirNet(sellSym));
+        buyCoinEl.innerHTML = coinHtml(buySym, pairNet || bscBadge(buySym) || dirNet(buySym));
       }
       // Paint real icons on the very first frame (preloaded files + inline
       // manifest — no fetch needed), instead of waiting for the directory.
