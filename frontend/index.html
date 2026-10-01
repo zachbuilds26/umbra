@@ -2877,6 +2877,8 @@
         refreshWalletBalances();
         updateActionBtn();
         if (typeof updateActivityView === 'function') updateActivityView();
+        // Re-paint through the unified chip (BSC view shows the EVM address).
+        try { paintConnectBtn(); } catch (_) {}
       }
       function setDisconnected() {
         window.umbraWallet = null;
@@ -2899,10 +2901,17 @@
         document.getElementById('sellBalance').textContent = '—';
         updateActionBtn();
         if (typeof updateActivityView === 'function') updateActivityView();
+        // Solana left, but an EVM session may still be live — repaint the
+        // chip for it and refresh its balances instead of going dark.
+        try { paintConnectBtn(); } catch (_) {}
+        try { if (typeof refreshWalletBalances === 'function') refreshWalletBalances(); } catch (_) {}
       }
       function updateActionBtn() {
         var action = document.getElementById('actionBtn');
-        if (window.umbraWallet) {
+        // EVM-only counts as connected on the BSC view (mirrors the chip).
+        var bscReady = false;
+        try { bscReady = isBscView() && !!window.umbraEvmWallet; } catch (_) {}
+        if (window.umbraWallet || bscReady) {
           if (typeof swapBlocked !== 'undefined' && swapBlocked) {
             var blockedFunds = swapBlocked === 'INSUFFICIENT_BALANCE';
             var blockedImpact = swapBlocked === 'HIGH_IMPACT';
@@ -2976,6 +2985,119 @@
         } catch (_) {}
         return !!(walletProvider && typeof walletProvider.signTransaction === 'function');
       }
+      // ---------- Unified connect: Solana (Reown) + EVM (injected) ----------
+      // One entry point, two independent sessions. The chip always shows the
+      // ACTIVE view's address; each view uses what it has and prompts only
+      // for what it needs (EVM prompts solely on explicit user action).
+      function activeViewAddr() {
+        try {
+          if (isBscView()) return window.umbraEvmWallet || null;
+        } catch (_) {}
+        return window.umbraWallet || null;
+      }
+      function paintConnectBtn() {
+        var addr = null;
+        try { addr = activeViewAddr(); } catch (_) {}
+        var chev = '<span class="dd-chev"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>';
+        var btn = document.getElementById('connectBtn');
+        var mbtn = document.getElementById('menuConnectBtn');
+        if (addr && btn) {
+          btn.innerHTML = esc(shortKey(addr)) + chev;
+          btn.classList.add('connected');
+          btn.classList.remove('flipped');
+          btn.title = addr + ' — click for account';
+          btn.setAttribute('aria-label', 'Connected ' + addr);
+        } else if (btn) {
+          btn.classList.remove('connected', 'flipped');
+          btn.innerHTML = '<span class="full">Connect Wallet</span><span class="short">Connect</span>';
+          btn.title = 'Connect wallet';
+          btn.setAttribute('aria-label', 'Connect wallet');
+        }
+        if (mbtn) {
+          if (addr) {
+            mbtn.innerHTML = esc(shortKey(addr)) + chev;
+            mbtn.classList.add('connected');
+            mbtn.classList.remove('flipped');
+          } else {
+            mbtn.classList.remove('connected', 'flipped');
+            mbtn.textContent = 'Connect Wallet';
+          }
+        }
+        // 50%/Max follow EITHER wallet — whichever view is live spends it.
+        try {
+          var half = document.getElementById('halfBtn');
+          var max = document.getElementById('maxBtn');
+          var anyWallet = !!(window.umbraWallet || window.umbraEvmWallet);
+          if (half && max) {
+            if (anyWallet) {
+              half.removeAttribute('disabled');
+              max.removeAttribute('disabled');
+              half.removeAttribute('hidden');
+              if (max) max.removeAttribute('hidden');
+              half.title = 'Fill 50% of balance';
+              max.title = 'Fill full balance';
+            } else {
+              half.setAttribute('disabled', '');
+              max.setAttribute('disabled', '');
+              half.setAttribute('hidden', '');
+              if (max) max.setAttribute('hidden', '');
+              half.title = 'Needs a connected wallet';
+              max.title = 'Needs a connected wallet';
+            }
+          }
+        } catch (_) {}
+        try { updateActionBtn(); } catch (_) {}
+      }
+      // Silent EVM sync (never prompts): boot restore, chain switch, and the
+      // account/chain listeners below. Returns the address or null.
+      function syncEvmState() {
+        return evmAccount(false).then(function (addr) {
+          try { window.umbraEvmWallet = addr; } catch (_) {}
+          try { watchEvmProvider(); } catch (_) {}
+          try { paintConnectBtn(); } catch (_) {}
+          return addr;
+        }).catch(function () { return null; });
+      }
+      // Explicit EVM connect (may prompt): Swap button and connect chip only.
+      function requestEvmConnect() {
+        var p = null;
+        try { p = evmProvider(); } catch (_) {}
+        if (!p) {
+          try {
+            var cb = document.getElementById('connectBtn');
+            if (cb) cb.title = 'No EVM wallet found — install Binance Wallet or MetaMask, then try again.';
+          } catch (_) {}
+          return Promise.resolve(null);
+        }
+        return evmAccount(true).then(function (addr) {
+          try { window.umbraEvmWallet = addr; } catch (_) {}
+          try { watchEvmProvider(); } catch (_) {}
+          try { paintConnectBtn(); } catch (_) {}
+          try { refreshWalletBalances(); } catch (_) {}
+          try { scheduleQuote(); } catch (_) {}
+          return addr;
+        }).catch(function () { return null; });
+      }
+      // Mid-session EVM switches must repaint + refresh (once per provider).
+      function watchEvmProvider() {
+        var p = null;
+        try { p = evmProvider(); } catch (_) {}
+        if (!p || p.__umbraWatched) return;
+        try {
+          p.__umbraWatched = true;
+          if (typeof p.on === 'function') {
+            p.on('accountsChanged', function () {
+              try { syncEvmState(); } catch (_) {}
+              try { refreshWalletBalances(); } catch (_) {}
+              try { scheduleQuote(); } catch (_) {}
+            });
+            p.on('chainChanged', function () {
+              try { refreshWalletBalances(); } catch (_) {}
+              try { scheduleQuote(); } catch (_) {}
+            });
+          }
+        } catch (_) {}
+      }
       function connectWallet() {
         try {
           if (window.umbraReown && window.umbraReown.ready) { window.umbraReown.open(); return; }
@@ -3016,6 +3138,10 @@
         } catch (_) {}
       }
       on('connectBtn', 'click', function () {
+        // BSC view onboards EVM here; Solana view keeps the Reown modal.
+        var bsc = false;
+        try { bsc = isBscView(); } catch (_) {}
+        if (bsc) { try { requestEvmConnect(); } catch (_) {} return; }
         if (window.umbraWallet) openAccount();
         else connectWallet();
       });
@@ -3024,6 +3150,9 @@
         // menu-open dim overlay + scroll lock underneath the Reown modal, and
         // closing Reown lands back on a "stuck dim" page.
         try { closeMenu(); } catch (_) {}
+        var bsc = false;
+        try { bsc = isBscView(); } catch (_) {}
+        if (bsc) { try { requestEvmConnect(); } catch (_) {} return; }
         if (window.umbraWallet) openAccount();
         else connectWallet();
       });
@@ -3189,6 +3318,7 @@
               if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
               scheduleQuote();
               syncSwapUrl();
+              syncEvmState();
             } catch (_) {}
             // Picker open on another tab already lists everything; refresh so
             // the new filter applies without retyping.
@@ -4639,19 +4769,27 @@
       // sending, then poll status. Nothing here touches Solana state.
       async function executeBscSwapFlow(wallet, amt) {
         var evm = await evmAccount(true);
-        if (!evm) { resetRetryBtn(); swapFail('No EVM wallet found.', true); return; }
-        var provider = evmProvider();
-        if (!provider) {
+        if (!evm || !evmProvider()) {
+          // No EVM account reachable: open the modal so the message + wallet
+          // link are actually visible, instead of failing behind a closed card.
           resetRetryBtn();
+          try { openSwapModal(); } catch (_) {}
           swapFail('No EVM wallet found.', true);
+          try {
+            swapExplorerLink.href = 'https://www.binance.com/en/web3wallet';
+            swapExplorerLink.textContent = 'Get an EVM wallet ↗';
+            swapExplorerEl.style.display = 'block';
+          } catch (_) {}
           return;
         }
+        var provider = evmProvider();
         try {
           executing = true;
           if (!retrying) {
             swapErrorEl.style.display = 'none';
             swapRetryBtn.style.display = 'none';
             swapExplorerEl.style.display = 'none';
+            swapExplorerLink.textContent = 'View on Explorer ↗';
           }
           openSwapModal();
           var q = lastQuote;
@@ -4731,6 +4869,7 @@
             } catch (_) { /* keep polling */ }
           }
           swapExplorerLink.href = 'https://bscscan.com/tx/' + hash;
+          swapExplorerLink.textContent = 'View on Explorer ↗';
           swapExplorerEl.style.display = 'block';
           if (final === 'success') {
             executing = false;
@@ -4811,6 +4950,7 @@
             swapErrorEl.style.display = 'none';
             swapRetryBtn.style.display = 'none';
             swapExplorerEl.style.display = 'none';
+            swapExplorerLink.textContent = 'View on Explorer ↗';
           }
           openSwapModal();
           var q = lastQuote;
@@ -4894,6 +5034,7 @@
             // trade a second time.
             if (sig) {
               swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
+              swapExplorerLink.textContent = 'View on Explorer ↗';
               swapExplorerEl.style.display = 'block';
               executing = false;
               paintSwapTitle('Submitted, not recorded.', '');
@@ -4915,6 +5056,7 @@
           paintSwapState('loader-circle', 'accent', true);
           var final = await pollTx(subData.id, wallet);
           swapExplorerLink.href = 'https://explorer.solana.com/tx/' + sig;
+          swapExplorerLink.textContent = 'View on Explorer ↗';
           swapExplorerEl.style.display = 'block';
           if (final === 'confirmed') {
             executing = false;
@@ -6086,6 +6228,8 @@
         refreshSellUsd();
         scheduleQuote();
       } catch (_) {}
+      // Silent EVM restore (never prompts): refresh survivors keep BSC.
+      try { syncEvmState(); } catch (_) {}
       loadDirectory().then(function () {
         refreshSellUsd();
         refreshStocksCards();
