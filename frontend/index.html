@@ -3917,6 +3917,11 @@
         if (!isFinite(num)) return rate;
         return parts[0].replace('=', '≈').trim() + ' ($' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
       }
+      // Summary line shows no parenthesized USD tail — the amounts above it
+      // already carry their dollar values.
+      function stripRateUsd(rate) {
+        return String(rate == null ? '' : rate).replace(/\s*\(\$[^)]*\)\s*$/, '');
+      }
 
       // Every failure the user can see, in language a trader can act on. Raw
       // provider text (timeouts, aborts, upstream payloads) is never shown.
@@ -4061,8 +4066,9 @@
           // Keep the rate to one line: trimmed unit price, USD tail only when
           // the price lookup actually answered.
           var perUnitStr = perUnit > 0 ? fmtAmt(perUnit) : '—';
-          var rateStr = '1 ' + sellSym + ' = ' + perUnitStr + ' ' + buySym +
-            (unitUsd > 0 ? ' ($' + unitUsd.toFixed(2) + ')' : '');
+          // No USD tail on the summary line: both amounts above it already
+          // carry their dollar values.
+          var rateStr = '1 ' + sellSym + ' = ' + perUnitStr + ' ' + buySym;
           lastQuote = {
             bsc: true,
             quoteId: null,
@@ -4331,7 +4337,7 @@
           var moreLabel = quoteMoreOpen ? 'Hide details' : 'Show details';
           var moreExp = quoteMoreOpen ? 'true' : 'false';
           var html =
-            '<div class="qsum"><span>' + esc(fmtRate(data.rate)) + '</span>' +
+            '<div class="qsum"><span>' + esc(fmtRate(stripRateUsd(data.rate))) + '</span>' +
             '<button class="qmore" id="quoteMoreBtn" aria-expanded="' + moreExp + '">' + moreLabel + ' <span class="css-chev" aria-hidden="true"></span></button></div>' +
             '<div class="qextra" id="quoteExtra"' + moreOpen + '>' +
             '<div class="row"><span>Price impact</span><span class="' + impactCls + '">' + impact + '</span></div>' +
