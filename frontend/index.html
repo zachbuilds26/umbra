@@ -1142,7 +1142,7 @@
       font-family: var(--umbra-font-body);
       font-weight: 600;
       color: var(--umbra-text);
-      font-size: 36px;
+      font-size: 28px;
       height: 44px;
       padding-right: 0;
     }
@@ -3162,11 +3162,22 @@
       function validSwapSym(s) {
         return typeof s === 'string' && /^[A-Za-z0-9]{2,12}$/.test(s.trim());
       }
+      // Manifest keys are case-sensitive ('NVDAx' ≠ 'NVDAX'): resolve URL
+      // input against them case-insensitively so deep links keep their icons.
+      function canonicalSym(s) {
+        var t = String(s || '').trim();
+        if (!validSwapSym(t)) return null;
+        var keys = Object.keys(manifest || {});
+        for (var i = 0; i < keys.length; i++) {
+          if (keys[i].toUpperCase() === t.toUpperCase()) return keys[i];
+        }
+        return t;
+      }
       function syncSwapUrl() {
         try {
           var qs = new URLSearchParams();
-          if (validSwapSym(sellSym)) qs.set('sell', sellSym.trim().toUpperCase());
-          if (validSwapSym(buySym)) qs.set('buy', buySym.trim().toUpperCase());
+          if (validSwapSym(sellSym)) qs.set('sell', sellSym.trim());
+          if (validSwapSym(buySym)) qs.set('buy', buySym.trim());
           var amt = (sellAmountEl.value || '').trim();
           if (amt && Number(amt) > 0) qs.set('amount', amt);
           qs.set('chain', chainSlug(selectedChain) || 'solana');
@@ -3181,8 +3192,10 @@
         if (!params) return;
         var s = params.get('sell');
         var b = params.get('buy');
-        if (validSwapSym(s)) sellSym = s.trim().toUpperCase();
-        if (validSwapSym(b) && b.trim().toUpperCase() !== sellSym) buySym = b.trim().toUpperCase();
+        var cs = canonicalSym(s);
+        var cb = canonicalSym(b);
+        if (cs) sellSym = cs;
+        if (cb && cb !== sellSym) buySym = cb;
         var c = params.get('chain');
         if (c) {
           CHAIN_LIST.forEach(function (ch) {
