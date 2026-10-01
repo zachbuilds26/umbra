@@ -2916,9 +2916,9 @@
       }
       async function refreshWalletBalances() {
         var w = window.umbraWallet;
-        // BSC pairs read balances from the injected EVM wallet, not the
-        // Solana ledger — works even before any Solana wallet connects.
-        try { if (isBscPair()) { await refreshBscBalance(w); return; } } catch (_) {}
+        // BSC view reads balances from the injected EVM wallet (BSC contracts),
+        // never the Solana ledger — works even before any Solana wallet connects.
+        try { if (isBscView()) { await refreshBscBalance(w); return; } } catch (_) {}
         if (!w) return;
         // A response for a wallet we already left must not repopulate state:
         // Max would then spend the previous account's balance.
@@ -3254,6 +3254,15 @@
       function isBscPair() {
         return dirNet(sellSym) === 'bsc' || dirNet(buySym) === 'bsc';
       }
+      // Full BSC view: a bStock pair anywhere, or the BNB filter active
+      // (stables-only pairs are chain-ambiguous, so the switch decides).
+      function isBscView() {
+        try {
+          if (isBscPair()) return true;
+          if (selectedChain === 'BNB Chain') return true;
+        } catch (_) {}
+        return false;
+      }
       // Badge truth for bStocks, independent of filter/picker state: a symbol
       // the BSC merge knows is definitionally a BSC token. This beats any
       // stale selectedChain/listNet value to the correct badge.
@@ -3429,7 +3438,7 @@
         buySymbolEl.textContent = buySym;
         // Pair-aware badges: inside a BSC pair the stables are the BSC side.
         var pairNet = null;
-        try { pairNet = isBscPair() ? 'bsc' : null; } catch (_) {}
+        try { pairNet = isBscView() ? 'bsc' : null; } catch (_) {}
         sellCoinEl.innerHTML = coinHtml(sellSym, pairNet || bscBadge(sellSym) || dirNet(sellSym));
         buyCoinEl.innerHTML = coinHtml(buySym, pairNet || bscBadge(buySym) || dirNet(buySym));
       }
@@ -4151,7 +4160,7 @@
           quoteError(null, 'UNSUPPORTED_ASSET');
           return;
         }
-        if (isBscPair()) {
+        if (isBscView()) {
           try { await runBscQuote(mySeq, amt, buyLoadingEl); } catch (_) {}
           return;
         }
@@ -4679,10 +4688,10 @@
 
       async function executeSwap() {
         if (executing) return;
-        // BSC pairs execute through the injected EVM wallet — no Solana
+        // BSC view executes through the injected EVM wallet — no Solana
         // wallet needed. Everything else keeps the Solana gate.
         var bsc = false;
-        try { bsc = isBscPair(); } catch (_) {}
+        try { bsc = isBscView(); } catch (_) {}
         if (!bsc && !window.umbraWallet) { resetRetryBtn(); connectWallet(); return; }
         if (swapBlocked) { resetRetryBtn(); return; }
         var amt = (sellAmountEl.value || '').trim();
@@ -4871,10 +4880,10 @@
       }
 
       on('actionBtn', 'click', function () {
-        // BSC pairs onboard through the injected EVM wallet at swap time —
+        // BSC view onboards through the injected EVM wallet at swap time —
         // never bounce them to the Solana connect modal.
         var bsc = false;
-        try { bsc = isBscPair(); } catch (_) {}
+        try { bsc = isBscView(); } catch (_) {}
         if (!window.umbraWallet && !bsc) connectWallet();
         else executeSwap();
       });
