@@ -2267,10 +2267,6 @@
       background: #121212;
       display: block;
     }
-    /* BNB badge without the yellow: monochrome white diamond. */
-    .tk .tk-chain.chain-bnb {
-      filter: grayscale(1) brightness(2.2);
-    }
     }
     .tk-20 { width: 20px; height: 20px; }
     .tk-20 .tk-letter { font-size: 11px; }
@@ -3079,11 +3075,9 @@
         var main = file
           ? '<img class="tk-main' + bstock + '" src="' + esc(file) + '" alt="" loading="lazy" data-letter="' + esc(symbol.charAt(0)) + '" onerror="window.umbraIconRetry(this)" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
-        // Both chains badge their icons; the BNB mark renders monochrome
-        // white (grayscale filter) so no yellow ever touches the artwork.
-        // The header pill already shows the full-color chain logo.
+        // Both chains badge their icons with the full-color chain mark.
         var badge = (net === 'bsc')
-          ? '<img class="tk-chain chain-bnb" src="./assets/chains/BnbChain.png" alt="" loading="lazy" />'
+          ? '<img class="tk-chain" src="./assets/chains/BnbChain.png" alt="" loading="lazy" />'
           : '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" />';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + badge + '</span>';
       }
