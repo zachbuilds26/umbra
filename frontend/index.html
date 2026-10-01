@@ -781,15 +781,22 @@
 
     .swap-card {
       width: 100%;
-      max-width: 28rem;
+      max-width: 416px;
       background: var(--umbra-surface);
-      border: 1px solid var(--umbra-border);
-      border-radius: 20px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      /* Their card: no border, no base shadow — depth comes from tone steps.
+         Soft shadow only on larger screens, exactly their value. */
+      border: 0;
+      border-radius: 24px;
+      box-shadow: none;
       padding: 12px;
       display: flex;
       flex-direction: column;
       position: relative;
+    }
+    @media (min-width: 600px) {
+      .swap-card {
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.08), 0px 8px 16px rgba(0, 0, 0, 0.08);
+      }
     }
 
     /* Card top: mini Swap/Bridge pill tabs + slippage tool */
@@ -805,7 +812,9 @@
       align-items: center;
       gap: 4px;
       border-radius: 999px;
-      background: var(--umbra-bg);
+      /* Their strip shares the inner-panel tone and carries the soft shadow. */
+      background: #0e1511;
+      box-shadow: 0px 4px 24px 0px rgba(0, 0, 0, 0.08);
       padding: 4px;
     }
 
@@ -870,8 +879,9 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 12px 14px;
-      border-radius: 16px;
+      /* Their panels: 12px radius, 16px padding, solid, no border/shadow. */
+      padding: 16px;
+      border-radius: 12px;
       /* Solid step between page and card (their #1C102D between #120B1E and
          #26163C) — never a translucent wash, so it reads the same everywhere. */
       background: #0e1511;
@@ -881,24 +891,25 @@
     /* Token selector: bare icon + bold name + chevron (reference).
        Scoped to the swap rows so bridge/filter pills keep their look. */
     .ox-side .token-select {
-      background: transparent;
+      /* Their Select pill: 12px radius, 4px 8px padding, 16px/700 label. */
+      background: var(--umbra-secondary);
       border: 0;
       box-shadow: none;
-      border-radius: 0;
-      padding: 4px 2px;
-      font-size: 17px;
-      font-weight: 600;
+      border-radius: 12px;
+      padding: 6px 10px;
+      font-size: 16px;
+      font-weight: 700;
       max-width: 55%;
     }
     .ox-side .token-select:hover {
-      background: transparent;
-      opacity: 0.85;
+      background: var(--umbra-secondary-hover);
+      opacity: 1;
     }
 
     .ox-side-label {
       font-size: 14px;
-      font-weight: 500;
-      color: var(--umbra-muted);
+      font-weight: 700;
+      color: var(--umbra-text);
       padding: 2px 0 6px;
     }
 
@@ -908,7 +919,9 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin: 8px 0;
+      /* Their flip overlaps both panels (-12px wrapper margins); the button
+         sits above on z-index, no ring of its own. */
+      margin: -6px 0;
       position: relative;
       z-index: 2;
     }
@@ -922,10 +935,10 @@
 
     .ox-div .flip-btn {
       flex: none;
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      border: 1px solid var(--umbra-border);
+      border: 0;
       box-shadow: none;
       background: var(--umbra-secondary);
       color: #fff;
@@ -1125,9 +1138,10 @@
       outline: none;
       text-align: right;
       font-family: var(--umbra-font-body);
-      font-weight: 600;
+      /* Their amount: 30px/700 (autoshrinks to 20 on overflow). */
+      font-weight: 700;
       color: var(--umbra-text);
-      font-size: 36px;
+      font-size: 30px;
       height: 44px;
       padding-right: 0;
     }
@@ -1275,9 +1289,11 @@
 
     .swap-action {
       width: 100%;
-      height: 56px;
-      margin-top: 12px;
-      border-radius: 16px;
+      /* Their Exchange: 48px high, 24px radius, 16px above, 10px 14px inside. */
+      height: 48px;
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 24px;
       border: 0;
       background: var(--umbra-accent);
       color: var(--umbra-accent-ink);
