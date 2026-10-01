@@ -3077,7 +3077,10 @@
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         // No corner badges on token icons anywhere: the active chain already
         // shows in the header pill, and row tags name the token type.
-        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '</span>';
+        var badge = (net === 'bsc')
+          ? ''
+          : '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" />';
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + badge + '</span>';
       }
       window.umbraIconRetry = function (img) {
         try {
