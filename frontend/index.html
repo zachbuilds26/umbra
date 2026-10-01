@@ -361,6 +361,12 @@
       object-fit: cover;
       display: block;
     }
+    .network-btn .dd-tri {
+      color: var(--umbra-muted);
+      flex: none;
+      transition: transform 0.15s ease;
+    }
+    .network-btn[aria-expanded="true"] .dd-tri { transform: rotate(180deg); }
 
     .icon-btn {
       display: none;
@@ -1596,8 +1602,22 @@
     @media (prefers-reduced-motion: reduce) {
       #tokenModal.open .token-modal { animation: none; }
     }
-    /* Chain dropdown card anchored to the picker search row */
-    #chainMenu { left: auto; right: 0; min-width: 210px; }
+    /* Chain dropdown card anchored to the header pill */
+    #chainMenu {
+      left: auto;
+      right: 0;
+      min-width: 230px;
+      background: #1a1a1a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 6px;
+      max-height: 320px;
+      overflow-y: auto;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    }
+    #chainMenu::-webkit-scrollbar { width: 6px; }
+    #chainMenu::-webkit-scrollbar-track { background: transparent; }
+    #chainMenu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 3px; }
     /* tx-menu buttons are display:block — override so rows stay horizontal */
     #chainMenu .token-opt {
       display: flex;
@@ -1605,10 +1625,12 @@
       gap: 10px;
       width: 100%;
       background: transparent;
-      padding: 8px 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
     }
-    #chainMenu .token-opt .meta b { font-size: 14px; }
-    #chainMenu .chain-pick-coin { width: 24px; height: 24px; font-size: 11px; }
+    #chainMenu .token-opt .meta b { font-size: 14px; font-weight: 600; color: #d7d7de; }
+    #chainMenu .token-opt .meta span { color: var(--umbra-muted); }
+    #chainMenu .chain-pick-coin { width: 26px; height: 26px; font-size: 11px; }
     .chain-btn {
       display: inline-flex;
       align-items: center;
@@ -1647,7 +1669,7 @@
     .chain-pick-coin {
       width: 30px;
       height: 30px;
-      border-radius: 10px;
+      border-radius: 50%;
       overflow: hidden;
       background: #2b2b31;
       color: var(--umbra-accent);
@@ -2271,6 +2293,7 @@
       <button class="network-btn" id="netBtn" type="button" aria-label="Select network" title="Filter tokens by network" aria-expanded="false">
         <span class="disc" id="netDisc">S<img src="./assets/chains/Solana.png" alt="" loading="lazy" onerror="this.remove()" /></span>
         <span class="full" id="netLabel">Solana</span>
+        <svg class="dd-tri" width="10" height="7" viewBox="0 0 10 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1.25 5 5.75 9 1.25"/></svg>
       </button>
       <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
