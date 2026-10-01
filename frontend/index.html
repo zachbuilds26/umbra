@@ -3264,6 +3264,15 @@
         } catch (_) {}
         return null;
       }
+      // Ambient network for dual-net tokens (stables): under the BNB filter
+      // they are the BSC side, under Solana the Solana side.
+      function chainDefaultNet() {
+        try {
+          if (selectedChain === 'BNB Chain') return 'bsc';
+          if (selectedChain === 'Solana') return 'sol';
+        } catch (_) {}
+        return null;
+      }
       function isMixedPair() {
         var a = dirNet(sellSym), b = dirNet(buySym);
         return (a === 'bsc' && b === 'sol') || (a === 'sol' && b === 'bsc');
@@ -3273,27 +3282,40 @@
         if (bscState === 'loading' || bscState === 'ready') return Promise.resolve();
         bscState = 'loading';
         try { if (tokenModalEl.classList.contains('open')) renderTokenList(tokenSearchEl.value || ''); } catch (_) {}
-        return fetch(API_BASE + '/api/bsc/tokens').then(function (res) {
-          if (!res.ok) throw new Error('bsc ' + res.status);
-          return res.json();
-        }).then(function (data) {
-          (data.tokens || []).forEach(function (t) {
-            if (!t || !t.symbol || !t.address) return;
-            // Picker lists only what the swap engine can execute today:
-            // bStocks (SWAP mode). Ondo is RFQ-only until the order flow lands.
-            if (t.platform && t.platform !== 'bstock') return;
-            var sym = String(t.symbol).toUpperCase();
-            bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym };
-            var dup = false;
-            for (var i = 0; i < directory.length; i++) {
-              if (directory[i].symbol.toUpperCase() === sym && directory[i].net === 'bsc') { dup = true; break; }
+        // Hanging fetches used to stall "for minutes" with no recovery: cap
+        // each attempt and retry once before calling it an error.
+        var attempt = function (n) {
+          var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+          var timer = setTimeout(function () { try { if (ctrl) ctrl.abort(); } catch (_) {} }, 25000);
+          var done = function () { try { clearTimeout(timer); } catch (_) {} };
+          return fetch(API_BASE + '/api/bsc/tokens', ctrl ? { signal: ctrl.signal } : undefined).then(function (res) {
+            done();
+            if (!res.ok) throw new Error('bsc ' + res.status);
+            return res.json();
+          }).then(function (data) {
+            (data.tokens || []).forEach(function (t) {
+              if (!t || !t.symbol || !t.address) return;
+              // Picker lists only what the swap engine can execute today:
+              // bStocks (SWAP mode). Ondo is RFQ-only until the order flow lands.
+              if (t.platform && t.platform !== 'bstock') return;
+              var sym = String(t.symbol).toUpperCase();
+              bscMeta[sym] = { address: t.address, name: t.underlyingName || t.name || sym };
+              var dup = false;
+              for (var i = 0; i < directory.length; i++) {
+                if (directory[i].symbol.toUpperCase() === sym && directory[i].net === 'bsc') { dup = true; break; }
+              }
+              if (!dup) directory.push({ symbol: sym, name: bscMeta[sym].name, kind: 'BSTOCK', net: 'bsc' });
+            });
+            bscState = 'ready';
+          }).catch(function () {
+            done();
+            if (n < 1) {
+              return new Promise(function (res) { setTimeout(res, 1000); }).then(function () { return attempt(n + 1); });
             }
-            if (!dup) directory.push({ symbol: sym, name: bscMeta[sym].name, kind: 'BSTOCK', net: 'bsc' });
+            bscState = 'error';
           });
-          bscState = 'ready';
-        }).catch(function () {
-          bscState = 'error';
-        }).then(function () {
+        };
+        return attempt(0).then(function () {
           // The merge lands after the first paint — re-render the open picker
           // so rows appear instead of waiting for the next keystroke.
           try { if (tokenModalEl.classList.contains('open')) renderTokenList(tokenSearchEl.value || ''); } catch (_) {}
@@ -3396,10 +3418,10 @@
         });
       }
       function coinHtml(symbol, net) {
-        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || dirNet(symbol));
+        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || chainDefaultNet() || dirNet(symbol));
       }
       function coinHtml28(symbol, net) {
-        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || dirNet(symbol));
+        return tkIcon(symbol, 'tk-36', net || bscBadge(symbol) || chainDefaultNet() || dirNet(symbol));
       }
 
       function refreshSelectors() {
@@ -3517,6 +3539,16 @@
           });
         }
         // BSC rows merge late — kick the load and re-render when it lands.
+        // Self-heal: "ready" with zero BSC rows is a corrupt/empty merge
+        // (never legitimate), so drop back to idle and reload instead of
+        // showing stables-only forever.
+        try {
+          var hasBsc = false;
+          for (var hi = 0; hi < directory.length; hi++) {
+            if (directory[hi].net === 'bsc') { hasBsc = true; break; }
+          }
+          if (!hasBsc && bscState === 'ready') bscState = 'idle';
+        } catch (_) {}
         if (bscState !== 'ready' && bscState !== 'loading') {
           try { loadBscDirectory(); } catch (_) {}
         }
