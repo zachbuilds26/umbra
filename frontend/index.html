@@ -321,14 +321,14 @@
       background: rgba(85, 185, 138, 0.28);
     }
     .network-btn .short { display: none; }
+    /* Tight bar on small phones: icon-only network pill. */
     @media (max-width: 640px) {
-      .network-btn .full { display: none; }
-      .network-btn .short { display: inline; }
+      #netLabel { display: none; }
+      .network-btn { padding: 8px; }
     }
-    /* On phones the chain pill + Connect live inside the menu sheet;
-       the bar keeps logo, hamburger and network hidden. */
+    /* On phones the Connect button lives inside the menu sheet, but the
+       network pill stays in the bar next to the hamburger. */
     @media (max-width: 768px) {
-      .network-btn { display: none !important; }
       /* Scoped to .nav-right: the Transactions empty-state uses
          .connect-btn too and must stay visible. */
       .nav-right .connect-btn { display: none !important; }
