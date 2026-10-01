@@ -3148,7 +3148,23 @@
             selectedChain = name;
             paintNetBtn();
             setChainMenu(false);
-            try { syncSwapUrl(); } catch (_) {}
+            // Chain switch resets the card to that chain's default pair so the
+            // whole view (pair, badges, quote) flips immediately.
+            if (name === 'BNB Chain') {
+              sellSym = 'USDT';
+              buySym = 'NVDAB';
+            } else if (name === 'Solana') {
+              sellSym = 'NVDAx';
+              buySym = 'USDC';
+            }
+            window.umbraLastReceive = null;
+            try {
+              refreshSelectors();
+              refreshSellUsd();
+              if (typeof refreshWalletBalances === 'function') refreshWalletBalances();
+              scheduleQuote();
+              syncSwapUrl();
+            } catch (_) {}
             // Picker open on another tab already lists everything; refresh so
             // the new filter applies without retyping.
             try {
