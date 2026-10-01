@@ -3062,9 +3062,9 @@
         var main = file
           ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" data-letter="' + esc(symbol.charAt(0)) + '" onerror="window.umbraIconRetry(this)" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
-        // Chain badge follows the token's execution network.
-        var badge = net === 'bsc' ? './assets/chains/BnbChain.png' : './assets/solana-mark.png';
-        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="' + badge + '" alt="" loading="lazy" /></span>';
+        // No corner badges on token icons anywhere: the active chain already
+        // shows in the header pill, and row tags name the token type.
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '</span>';
       }
       window.umbraIconRetry = function (img) {
         try {
