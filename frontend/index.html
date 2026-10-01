@@ -798,7 +798,9 @@
     .swap-card {
       width: 100%;
       max-width: 28rem;
-      background: var(--umbra-surface);
+      /* Hero surface carries the brand family (their card is the violet
+         tone of their site) — green-tinted dark at the same depth. */
+      background: #121916;
       border: 1px solid var(--umbra-border);
       border-radius: 20px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -895,18 +897,20 @@
     /* Token selector: bare icon + bold name + chevron (reference).
        Scoped to the swap rows so bridge/filter pills keep their look. */
     .ox-side .token-select {
-      background: transparent;
+      /* Selector pills carry the brand tint, like their Select pills carry
+         violet — icon, symbol and chevron sit on green-tinted glass. */
+      background: var(--umbra-accent-soft);
       border: 0;
       box-shadow: none;
-      border-radius: 0;
-      padding: 4px 2px;
+      border-radius: 12px;
+      padding: 6px 10px;
       font-size: 17px;
       font-weight: 600;
       max-width: 55%;
     }
     .ox-side .token-select:hover {
-      background: transparent;
-      opacity: 0.85;
+      background: rgba(85, 185, 138, 0.28);
+      opacity: 1;
     }
 
     .ox-side-label {
