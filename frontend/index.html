@@ -3065,10 +3065,12 @@
         // Flaky phone connections can fail an icon once and stick the letter
         // fallback in the DOM. Retry once (cache-busted) before giving up.
         // bStocks logos carry a baked-in yellow ring (Binance icon template):
-        // zoom the image so the ring crops out at the circular edge.
+        // zoom PNGs so the ring crops out at the circular edge. SVGs are
+        // clean vectors and must never be cropped.
         var bstock = '';
         try {
-          if (typeof bscMeta !== 'undefined' && bscMeta[symbol] && symbol !== 'USDC' && symbol !== 'USDT') bstock = ' bstock-logo';
+          var bf = manifest[symbol] || '';
+          if (/\.png$/i.test(bf) && typeof bscMeta !== 'undefined' && bscMeta[symbol] && symbol !== 'USDC' && symbol !== 'USDT') bstock = ' bstock-logo';
         } catch (_) {}
         var main = file
           ? '<img class="tk-main' + bstock + '" src="' + esc(file) + '" alt="" loading="lazy" data-letter="' + esc(symbol.charAt(0)) + '" onerror="window.umbraIconRetry(this)" />'
