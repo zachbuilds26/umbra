@@ -340,17 +340,25 @@
     .network-btn .disc {
       width: 20px;
       height: 20px;
-      border-radius: 50%;
-      background: var(--umbra-accent-soft);
+      border-radius: 7px;
+      background: #2b2b31;
       display: flex;
       align-items: center;
       justify-content: center;
       flex: none;
+      position: relative;
+      overflow: hidden;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--umbra-accent);
     }
 
     .network-btn .disc img {
-      width: 14px;
-      height: 14px;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
       display: block;
     }
 
@@ -1639,9 +1647,9 @@
     .chain-pick-coin {
       width: 30px;
       height: 30px;
-      border-radius: 50%;
+      border-radius: 10px;
       overflow: hidden;
-      background: var(--umbra-accent-soft);
+      background: #2b2b31;
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -2261,8 +2269,8 @@
 
     <div class="nav-right">
       <button class="network-btn" id="netBtn" type="button" aria-label="Select network" title="Filter tokens by network" aria-expanded="false">
-        <span class="disc" id="netDisc"><i data-lucide="globe" width="14" height="14"></i></span>
-        <span class="full" id="netLabel">All Chains</span>
+        <span class="disc" id="netDisc">S<img src="./assets/chains/Solana.png" alt="" loading="lazy" onerror="this.remove()" /></span>
+        <span class="full" id="netLabel">Solana</span>
       </button>
       <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
@@ -2290,7 +2298,6 @@
     <div class="sheet-div" aria-hidden="true"></div>
     <div class="mobile-foot">
       <button class="mobile-connect" id="menuConnectBtn" type="button"><span>Connect Wallet</span></button>
-      <button class="mobile-chain" id="mNetBtn" type="button" aria-label="Select network"><span class="mchain-disc" id="mNetDisc"><i data-lucide="globe" width="16" height="16"></i></span><span id="mNetLabel">All Chains</span></button>
       <a class="x-link" href="https://x.com/umbra_trade" target="_blank" rel="noreferrer" aria-label="Umbra on X"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.3L1.2 2h6.4l4.4 5.9L18.9 2zm-1.1 17.8h1.7L7.1 3.9H5.3l12.5 16z"/></svg></a>
     </div>
   </div>
@@ -3045,7 +3052,6 @@
       var tokenListEl = document.getElementById('tokenList');
       var chainMenuEl = document.getElementById('chainMenu');
       var netBtnEl = document.getElementById('netBtn');
-      var mNetBtnEl = document.getElementById('mNetBtn');
       // Networks drawer: Solana is live; Monad and BNB are visible but locked
       // until those chains are integrated.
       var CHAIN_LIST = [
@@ -3053,38 +3059,29 @@
         { name: 'BNB Chain', img: './assets/chains/BnbChain.png', live: false },
         { name: 'Monad', img: './assets/chains/Monad.png', live: false },
       ];
-      var selectedChain = 'All Chains';
+      var selectedChain = 'Solana';
       function chainCoinHtml(ch, cls) {
         var letter = esc(ch.name.charAt(0));
         var img = ch.img ? '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />' : '';
         return '<span class="' + cls + '">' + letter + img + '</span>';
       }
-      // Header pill (PC) + menu-sheet row (mobile) mirror the same selection.
+      // Header pill mirrors the selection. Letter sits under the logo: if the
+      // image loads it covers the tile, if not the letter shows — never both.
       function paintNetBtn() {
         var ch = null;
-        if (selectedChain !== 'All Chains') {
-          CHAIN_LIST.forEach(function (c) { if (c.name === selectedChain) ch = c; });
-        }
+        CHAIN_LIST.forEach(function (c) { if (c.name === selectedChain) ch = c; });
         var icon = ch && ch.img
           ? esc(ch.name.charAt(0)) + '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />'
-          : '<i data-lucide="globe" width="14" height="14"></i>';
+          : esc(selectedChain.charAt(0));
         var disc = document.getElementById('netDisc');
         var label = document.getElementById('netLabel');
         if (disc) disc.innerHTML = icon;
         if (label) label.textContent = selectedChain;
         if (netBtnEl) netBtnEl.title = 'Filter tokens by network (now: ' + selectedChain + ')';
-        var mDisc = document.getElementById('mNetDisc');
-        var mLabel = document.getElementById('mNetLabel');
-        if (mDisc) mDisc.innerHTML = icon;
-        if (mLabel) mLabel.textContent = selectedChain;
         if (window.lucide) window.lucide.createIcons();
       }
       function renderChainMenu() {
-        var html = '<button type="button" class="token-opt" data-network="All Chains">' +
-          '<span class="chain-pick-coin"><i data-lucide="globe" width="18" height="18"></i></span>' +
-          '<span class="meta"><b>All Chains</b></span>' +
-          (selectedChain === 'All Chains' ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '') +
-          '</button>';
+        var html = '';
         CHAIN_LIST.forEach(function (ch) {
           var right = ch.live
             ? (ch.name === selectedChain ? '<span class="chain-check"><i data-lucide="check" width="20" height="20" stroke-width="3"></i></span>' : '')
@@ -3099,11 +3096,9 @@
           btn.addEventListener('click', function () {
             if (btn.disabled) return;
             var name = btn.getAttribute('data-network');
-            if (name !== 'All Chains') {
-              var ch = null;
-              CHAIN_LIST.forEach(function (c) { if (c.name === name) ch = c; });
-              if (!ch || !ch.live) return;
-            }
+            var ch = null;
+            CHAIN_LIST.forEach(function (c) { if (c.name === name) ch = c; });
+            if (!ch || !ch.live) return;
             selectedChain = name;
             paintNetBtn();
             chainMenuEl.style.display = 'none';
@@ -3312,11 +3307,9 @@
         if (netBtnEl) netBtnEl.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
       }
       on('netBtn', 'click', toggleChainMenu);
-      on('mNetBtn', 'click', toggleChainMenu);
       document.addEventListener('click', function (e) {
         var inNet = netBtnEl && netBtnEl.contains(e.target);
-        var inMNet = mNetBtnEl && mNetBtnEl.contains(e.target);
-        if (!inNet && !inMNet && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
+        if (!inNet && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
       });
 
       on('flipBtn', 'click', function () {
