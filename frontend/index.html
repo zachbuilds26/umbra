@@ -46,23 +46,18 @@
      * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
      * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
      * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
-     * Palette + type are Umbra's own: black-green tonal system (bg, card and
-     * inner panels are layered tones of one green-black family, not flat
-     * neutrals), Sora body, Cinzel wordmark.
+     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
      */
     :root {
-      --umbra-bg: #0b0f0d;
-      --umbra-surface: #121916;
-      /* Restraint rule: generic surfaces stay neutral white-alpha (their
-         pills/rows/inputs are white 4-9%, hover 8-13%). Green lives only on
-         the primary action, selected states, and small highlights. */
+      --umbra-bg: #121212;
+      --umbra-surface: #1a1a1a;
       --umbra-secondary: rgba(255, 255, 255, 0.07);
       --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
       --umbra-accent: #55b98a;
       --umbra-accent-soft: rgba(85, 185, 138, 0.2);
-      --umbra-accent-ink: #0b0f0d;
+      --umbra-accent-ink: #121212;
       --umbra-text: #ffffff;
-      --umbra-muted: rgba(255, 255, 255, 0.64);
+      --umbra-muted: #9aa0a6;
       --umbra-border: rgba(255, 255, 255, 0.08);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -102,23 +97,15 @@
 
     body {
       background:
-        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.3), transparent 35%),
-        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.18), transparent 38%),
-        linear-gradient(#0b0f0d 0%, #0b0f0d 45%, #090d0b 100%);
+        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
+        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
+        linear-gradient(#121212 0%, #121212 45%, #0e1512 100%);
       background-attachment: fixed;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       -webkit-font-smoothing: antialiased;
       scrollbar-width: thin;
       scrollbar-color: #2a2a2a transparent;
-    }
-
-    /* Their corner glows are desktop-only (hidden below 600px) — phones get
-       the flat base, so the wash never blows out small screens. */
-    @media (max-width: 599px) {
-      body {
-        background: #0b0f0d;
-      }
     }
 
     /* ---------- Header ---------- */
@@ -320,7 +307,7 @@
       padding: 8px 16px;
       border-radius: 8px;
       border: 0;
-      background: var(--umbra-secondary);
+      background: var(--umbra-accent-soft);
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       font-size: 14px;
@@ -330,7 +317,7 @@
     }
 
     .network-btn:hover {
-      background: var(--umbra-secondary-hover);
+      background: rgba(85, 185, 138, 0.28);
     }
     .network-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -353,7 +340,7 @@
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: var(--umbra-secondary);
+      background: var(--umbra-accent-soft);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -671,7 +658,7 @@
       width: 26px;
       height: 26px;
       border-radius: 50%;
-      background: var(--umbra-secondary);
+      background: var(--umbra-accent-soft);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -694,7 +681,7 @@
       pointer-events: none;
       background-image:
         radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px),
-        linear-gradient(rgba(85, 185, 138, 0.07), transparent 60%);
+        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
       background-size:
         22px 22px,
         auto;
@@ -792,22 +779,15 @@
 
     .swap-card {
       width: 100%;
-      max-width: 416px;
+      max-width: 28rem;
       background: var(--umbra-surface);
-      /* Their card: no border, no base shadow — depth comes from tone steps.
-         Soft shadow only on larger screens, exactly their value. */
-      border: 0;
-      border-radius: 24px;
-      box-shadow: none;
+      border: 1px solid var(--umbra-border);
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
       padding: 12px;
       display: flex;
       flex-direction: column;
       position: relative;
-    }
-    @media (min-width: 600px) {
-      .swap-card {
-        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.08), 0px 8px 16px rgba(0, 0, 0, 0.08);
-      }
     }
 
     /* Card top: mini Swap/Bridge pill tabs + slippage tool */
@@ -823,9 +803,7 @@
       align-items: center;
       gap: 4px;
       border-radius: 999px;
-      /* Their strip shares the CARD tone (surface2 = card), not the panels. */
-      background: var(--umbra-surface);
-      box-shadow: 0px 4px 24px 0px rgba(0, 0, 0, 0.08);
+      background: var(--umbra-bg);
       padding: 4px;
     }
 
@@ -843,9 +821,7 @@
     }
 
     .swap-tab.active {
-      /* Their active tab: neutral white-alpha bg, accent TEXT. The accent
-         concentrates on the label, not a tinted wash. */
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--umbra-accent-soft);
       color: var(--umbra-accent);
     }
 
@@ -892,36 +868,33 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      /* Their panels sit LIGHTER than the card (paper over default) — solid,
-         no border, no shadow. Same step up, in our green. */
-      padding: 16px;
-      border-radius: 12px;
-      background: #18271d;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.025);
       border: 0;
     }
 
     /* Token selector: bare icon + bold name + chevron (reference).
        Scoped to the swap rows so bridge/filter pills keep their look. */
     .ox-side .token-select {
-      /* Their Select pill: 12px radius, 4px 8px padding, 16px/700 label. */
-      background: var(--umbra-secondary);
+      background: transparent;
       border: 0;
       box-shadow: none;
-      border-radius: 12px;
-      padding: 6px 10px;
-      font-size: 16px;
-      font-weight: 700;
+      border-radius: 0;
+      padding: 4px 2px;
+      font-size: 17px;
+      font-weight: 600;
       max-width: 55%;
     }
     .ox-side .token-select:hover {
-      background: var(--umbra-secondary-hover);
-      opacity: 1;
+      background: transparent;
+      opacity: 0.85;
     }
 
     .ox-side-label {
       font-size: 14px;
-      font-weight: 700;
-      color: var(--umbra-text);
+      font-weight: 500;
+      color: var(--umbra-muted);
       padding: 2px 0 6px;
     }
 
@@ -931,9 +904,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      /* Their flip overlaps both panels (-12px wrapper margins); the button
-         sits above on z-index, no ring of its own. */
-      margin: -6px 0;
+      margin: 8px 0;
       position: relative;
       z-index: 2;
     }
@@ -947,13 +918,12 @@
 
     .ox-div .flip-btn {
       flex: none;
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
-      border: 0;
+      border: 1px solid var(--umbra-border);
       box-shadow: none;
-      /* Their flip matches the panels it overlaps. */
-      background: #18271d;
+      background: var(--umbra-secondary);
       color: #fff;
       display: inline-flex;
       align-items: center;
@@ -1151,10 +1121,9 @@
       outline: none;
       text-align: right;
       font-family: var(--umbra-font-body);
-      /* Their amount: 30px/700 (autoshrinks to 20 on overflow). */
-      font-weight: 700;
+      font-weight: 600;
       color: var(--umbra-text);
-      font-size: 30px;
+      font-size: 36px;
       height: 44px;
       padding-right: 0;
     }
@@ -1302,11 +1271,9 @@
 
     .swap-action {
       width: 100%;
-      /* Their Exchange: 48px high, 24px radius, 16px above, 10px 14px inside. */
-      height: 48px;
-      margin-top: 16px;
-      padding: 10px 14px;
-      border-radius: 24px;
+      height: 56px;
+      margin-top: 12px;
+      border-radius: 16px;
       border: 0;
       background: var(--umbra-accent);
       color: var(--umbra-accent-ink);
@@ -1649,7 +1616,7 @@
       height: 20px;
       border-radius: 50%;
       overflow: hidden;
-      background: var(--umbra-secondary);
+      background: var(--umbra-accent-soft);
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -1670,7 +1637,7 @@
       height: 30px;
       border-radius: 50%;
       overflow: hidden;
-      background: var(--umbra-secondary);
+      background: var(--umbra-accent-soft);
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -2247,7 +2214,7 @@
       height: 42%;
       border-radius: 50%;
       border: 2px solid var(--umbra-surface);
-      background: #0b0f0d;
+      background: #121212;
       object-fit: contain;
       display: block;
     }
@@ -5105,7 +5072,7 @@
           var file = (name||'').replace(/\s+/g,'');
           var src = './assets/chains/' + file + '.png';
           // Fallback to colored letter if image fails
-          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#151b18;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#151b18\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
         }
         function chainIconImg(name) {
           var file = (name||'').replace(/\s+/g,'');
