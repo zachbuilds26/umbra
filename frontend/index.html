@@ -3933,7 +3933,7 @@
       function fmtRate(rate) {
         // "1 NVDAx = $220.277848..." -> "1 NVDAx ≈ ($220.28)"
         var parts = String(rate).split('$');
-        if (parts.length < 2) return rate;
+        if (parts.length < 2) return String(rate).replace('=', '≈');
         var num = Number(parts[1]);
         if (!isFinite(num)) return rate;
         return parts[0].replace('=', '≈').trim() + ' ($' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ')';
