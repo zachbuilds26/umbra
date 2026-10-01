@@ -3756,7 +3756,7 @@
               if (bres.ok) {
                 var bdata = await bres.json();
                 if (mySeq !== sellUsdSeq || sellSym !== mySym) return;
-                sellUsdPer = (bdata.prices && bdata.prices.length && Number(bdata.prices[0].tokenPrice)) || 0;
+                sellUsdPer = (bdata.prices && bdata.prices.length && Number(bdata.prices[0].priceUsd)) || 0;
               } else {
                 sellUsdPer = 0;
               }
@@ -3956,8 +3956,8 @@
             var pr = await fetch(API_BASE + '/api/bsc/prices?addresses=' + encodeURIComponent(data.buyTokenAddress));
             if (mySeq !== quoteSeq) return;
             var pj = await pr.json();
-            if (pr.ok && pj.prices && pj.prices.length && Number(pj.prices[0].tokenPrice)) {
-              buyUsdPer = Number(pj.prices[0].tokenPrice);
+            if (pr.ok && pj.prices && pj.prices.length && Number(pj.prices[0].priceUsd)) {
+              buyUsdPer = Number(pj.prices[0].priceUsd);
             }
           } catch (_) {}
           if (mySeq !== quoteSeq) return;
@@ -3991,13 +3991,18 @@
             ? String(Number(buyAmt) * (1 - slipN / 100)) : buyAmt;
           var perUnit = (isFinite(Number(buyAmt)) && Number(amt) > 0) ? Number(buyAmt) / Number(amt) : 0;
           var unitUsd = buyUsdPer > 0 ? perUnit * buyUsdPer : 0;
+          // Keep the rate to one line: trimmed unit price, USD tail only when
+          // the price lookup actually answered.
+          var perUnitStr = perUnit > 0 ? fmtAmt(perUnit) : '—';
+          var rateStr = '1 ' + sellSym + ' = ' + perUnitStr + ' ' + buySym +
+            (unitUsd > 0 ? ' ($' + unitUsd.toFixed(2) + ')' : '');
           lastQuote = {
             bsc: true,
             quoteId: null,
             sell: { amount: amt, symbol: sellSym },
             buy: buySym,
             receive: { amount: buyAmt, symbol: buySym, usdValue: buyUsd },
-            rate: '1 ' + sellSym + ' = ' + perUnit + ' ' + buySym + ' ($' + unitUsd + ')',
+            rate: rateStr,
             minimumReceived: minRecv,
             at: Date.now(),
             key: amt + '|' + sellSym + '|' + buySym + '|' + slippageBps,
