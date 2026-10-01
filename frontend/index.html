@@ -132,6 +132,7 @@
     .nav-right {
       display: flex;
       align-items: center;
+      position: relative;
     }
 
     .nav-left {
@@ -312,7 +313,7 @@
       font-family: var(--umbra-font-body);
       font-size: 14px;
       font-weight: 500;
-      cursor: default;
+      cursor: pointer;
       transition: background 0.15s ease;
     }
 
@@ -648,10 +649,13 @@
       gap: 8px;
       color: var(--umbra-text);
       background: var(--umbra-secondary);
+      border: 0;
       border-radius: 12px;
       padding: 6px 12px 6px 6px;
       font-size: 13px;
       font-weight: 600;
+      font-family: var(--umbra-font-body);
+      cursor: pointer;
     }
 
     .mobile-chain .mchain-disc {
@@ -2256,10 +2260,11 @@
     </div>
 
     <div class="nav-right">
-      <span class="network-btn" title="Solana is the only network on Umbra">
-        <span class="disc"><img src="./assets/solana-mark.png" alt="" /></span>
-        <span class="full">Solana Mainnet</span><span class="short">Mainnet</span>
-      </span>
+      <button class="network-btn" id="netBtn" type="button" aria-label="Select network" title="Filter tokens by network" aria-expanded="false">
+        <span class="disc" id="netDisc"><i data-lucide="globe" width="14" height="14"></i></span>
+        <span class="full" id="netLabel">All Chains</span>
+      </button>
+      <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
         <span class="full">Connect Wallet</span><span class="short">Connect</span>
       </button>
@@ -2285,7 +2290,7 @@
     <div class="sheet-div" aria-hidden="true"></div>
     <div class="mobile-foot">
       <button class="mobile-connect" id="menuConnectBtn" type="button"><span>Connect Wallet</span></button>
-      <span class="mobile-chain" title="Solana is the only network"><span class="mchain-disc"><img src="./assets/solana-mark.png" alt="" /></span>Mainnet</span>
+      <button class="mobile-chain" id="mNetBtn" type="button" aria-label="Select network"><span class="mchain-disc" id="mNetDisc"><i data-lucide="globe" width="16" height="16"></i></span><span id="mNetLabel">All Chains</span></button>
       <a class="x-link" href="https://x.com/umbra_trade" target="_blank" rel="noreferrer" aria-label="Umbra on X"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.3L1.2 2h6.4l4.4 5.9L18.9 2zm-1.1 17.8h1.7L7.1 3.9H5.3l12.5 16z"/></svg></a>
     </div>
   </div>
@@ -2520,11 +2525,6 @@
           <i data-lucide="search" width="18" height="18"></i>
           <input id="tokenSearch" type="text" placeholder="Search tokens" autocomplete="off" aria-label="Search tokens" />
         </div>
-        <button class="chain-btn" id="chainBox" type="button" aria-label="Select network" title="Select network">
-          <span class="chain-btn-icon" id="chainBoxIcon">S</span>
-          <i data-lucide="chevron-down" width="14" height="14"></i>
-        </button>
-        <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       </div>
       <div class="token-list" id="tokenList"></div>
     </div>
@@ -3044,7 +3044,8 @@
       var tokenSearchEl = document.getElementById('tokenSearch');
       var tokenListEl = document.getElementById('tokenList');
       var chainMenuEl = document.getElementById('chainMenu');
-      var chainBoxEl = document.getElementById('chainBox');
+      var netBtnEl = document.getElementById('netBtn');
+      var mNetBtnEl = document.getElementById('mNetBtn');
       // Networks drawer: Solana is live; Monad and BNB are visible but locked
       // until those chains are integrated.
       var CHAIN_LIST = [
@@ -3058,21 +3059,24 @@
         var img = ch.img ? '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />' : '';
         return '<span class="' + cls + '">' + letter + img + '</span>';
       }
-      function paintChainBox() {
-        if (!chainBoxEl) return;
-        var show = (modalSide === 'sell' || modalSide === 'buy');
-        chainBoxEl.style.display = show ? '' : 'none';
-        if (!show) return;
-        var boxIcon = document.getElementById('chainBoxIcon');
+      // Header pill (PC) + menu-sheet row (mobile) mirror the same selection.
+      function paintNetBtn() {
         var ch = null;
         if (selectedChain !== 'All Chains') {
           CHAIN_LIST.forEach(function (c) { if (c.name === selectedChain) ch = c; });
         }
-        if (boxIcon) {
-          boxIcon.innerHTML = ch && ch.img
-            ? esc(ch.name.charAt(0)) + '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />'
-            : '<i data-lucide="globe" width="14" height="14"></i>';
-        }
+        var icon = ch && ch.img
+          ? esc(ch.name.charAt(0)) + '<img src="' + esc(ch.img) + '" alt="" loading="lazy" onerror="this.remove()" />'
+          : '<i data-lucide="globe" width="14" height="14"></i>';
+        var disc = document.getElementById('netDisc');
+        var label = document.getElementById('netLabel');
+        if (disc) disc.innerHTML = icon;
+        if (label) label.textContent = selectedChain;
+        if (netBtnEl) netBtnEl.title = 'Filter tokens by network (now: ' + selectedChain + ')';
+        var mDisc = document.getElementById('mNetDisc');
+        var mLabel = document.getElementById('mNetLabel');
+        if (mDisc) mDisc.innerHTML = icon;
+        if (mLabel) mLabel.textContent = selectedChain;
         if (window.lucide) window.lucide.createIcons();
       }
       function renderChainMenu() {
@@ -3101,8 +3105,14 @@
               if (!ch || !ch.live) return;
             }
             selectedChain = name;
-            paintChainBox();
+            paintNetBtn();
             chainMenuEl.style.display = 'none';
+            if (netBtnEl) netBtnEl.setAttribute('aria-expanded', 'false');
+            // Picker open on another tab already lists everything; refresh so
+            // the new filter applies without retyping.
+            try {
+              if (tokenModalEl.classList.contains('open')) renderTokenList(tokenSearchEl.value || '');
+            } catch (_) {}
           });
         });
         if (window.lucide) window.lucide.createIcons();
@@ -3124,6 +3134,7 @@
       // Paint real icons on the very first frame (preloaded files + inline
       // manifest — no fetch needed), instead of waiting for the directory.
       try { refreshSelectors(); } catch (_) {}
+      try { paintNetBtn(); } catch (_) {}
 
       // 'idle' | 'loading' | 'ready' | 'error'. An empty directory used to double
       // as "still loading", so a failed fetch left the picker saying
@@ -3208,8 +3219,7 @@
         tokenSearchEl.value = '';
         tokenSearchEl.placeholder = 'Search tokens';
         renderTokenList('');
-        paintChainBox();
-        paintChainBox();
+        try { paintNetBtn(); } catch (_) {}
         tokenModalEl.classList.add('open');
         // Focus the sheet itself, never a row: focusing the first option
         // paints it as if selected. Keyboard users Tab into the list, and
@@ -3292,18 +3302,21 @@
         if (e.target === tokenModalEl) closeModal();
       });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') { closeModal(); if (chainMenuEl) chainMenuEl.style.display = 'none'; }
       });
-      on('chainBox', 'click', function (e) {
-        if (modalSide !== 'sell' && modalSide !== 'buy') return;
-        e.stopPropagation();
+      function toggleChainMenu(e) {
+        if (e) e.stopPropagation();
         renderChainMenu();
         var isOpen = chainMenuEl.style.display === 'block';
         chainMenuEl.style.display = isOpen ? 'none' : 'block';
-      });
+        if (netBtnEl) netBtnEl.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      }
+      on('netBtn', 'click', toggleChainMenu);
+      on('mNetBtn', 'click', toggleChainMenu);
       document.addEventListener('click', function (e) {
-        var box = document.getElementById('chainBox');
-        if (box && !box.contains(e.target) && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
+        var inNet = netBtnEl && netBtnEl.contains(e.target);
+        var inMNet = mNetBtnEl && mNetBtnEl.contains(e.target);
+        if (!inNet && !inMNet && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
       });
 
       on('flipBtn', 'click', function () {
@@ -5099,9 +5112,9 @@
               tokenListEl.innerHTML = html;
               tokenSearchEl.value = '';
               tokenSearchEl.placeholder = 'Search chains…';
-              modalSide = 'bridgeChain';
-              paintChainBox();
-              tokenModalEl.classList.add('open');
+            modalSide = 'bridgeChain';
+            try { paintNetBtn(); } catch (_) {}
+            tokenModalEl.classList.add('open');
               Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-chain]'), function (el) {
                 el.addEventListener('click', function () {
                   fromChain = el.getAttribute('data-chain');
@@ -5132,9 +5145,9 @@
           tokenListEl.innerHTML = html;
           tokenSearchEl.value = '';
           tokenSearchEl.placeholder = 'Search assets…';
-          modalSide = 'bridgeAsset';
-          paintChainBox();
-          tokenModalEl.classList.add('open');
+            modalSide = 'bridgeAsset';
+            try { paintNetBtn(); } catch (_) {}
+            tokenModalEl.classList.add('open');
           Array.prototype.forEach.call(tokenListEl.querySelectorAll('[data-symbol]'), function (el) {
             el.addEventListener('click', function () {
               bridgeAsset = el.getAttribute('data-symbol');
