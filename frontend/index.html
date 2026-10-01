@@ -53,13 +53,16 @@
     :root {
       --umbra-bg: #0b0f0d;
       --umbra-surface: #121916;
-      --umbra-secondary: rgba(85, 185, 138, 0.09);
-      --umbra-secondary-hover: rgba(85, 185, 138, 0.15);
+      /* Restraint rule: generic surfaces stay neutral white-alpha (their
+         pills/rows/inputs are white 4-9%, hover 8-13%). Green lives only on
+         the primary action, selected states, and small highlights. */
+      --umbra-secondary: rgba(255, 255, 255, 0.07);
+      --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
       --umbra-accent: #55b98a;
       --umbra-accent-soft: rgba(85, 185, 138, 0.2);
       --umbra-accent-ink: #0b0f0d;
       --umbra-text: #ffffff;
-      --umbra-muted: #98a39d;
+      --umbra-muted: rgba(255, 255, 255, 0.64);
       --umbra-border: rgba(255, 255, 255, 0.08);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -317,7 +320,7 @@
       padding: 8px 16px;
       border-radius: 8px;
       border: 0;
-      background: var(--umbra-accent-soft);
+      background: var(--umbra-secondary);
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       font-size: 14px;
@@ -327,7 +330,7 @@
     }
 
     .network-btn:hover {
-      background: rgba(85, 185, 138, 0.28);
+      background: var(--umbra-secondary-hover);
     }
     .network-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -350,7 +353,7 @@
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: var(--umbra-accent-soft);
+      background: var(--umbra-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -668,7 +671,7 @@
       width: 26px;
       height: 26px;
       border-radius: 50%;
-      background: var(--umbra-accent-soft);
+      background: var(--umbra-secondary);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -840,7 +843,9 @@
     }
 
     .swap-tab.active {
-      background: var(--umbra-accent-soft);
+      /* Their active tab: neutral white-alpha bg, accent TEXT. The accent
+         concentrates on the label, not a tinted wash. */
+      background: rgba(255, 255, 255, 0.08);
       color: var(--umbra-accent);
     }
 
@@ -1644,7 +1649,7 @@
       height: 20px;
       border-radius: 50%;
       overflow: hidden;
-      background: var(--umbra-accent-soft);
+      background: var(--umbra-secondary);
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -1665,7 +1670,7 @@
       height: 30px;
       border-radius: 50%;
       overflow: hidden;
-      background: var(--umbra-accent-soft);
+      background: var(--umbra-secondary);
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
