@@ -327,83 +327,15 @@
       #netLabel { display: none; }
       .network-btn { padding: 8px; }
     }
-    /* On phones Connect moves to the header (compact) and nav moves to the
-       bottom tab bar — the hamburger retires. */
+    /* On phones the Connect button lives inside the menu sheet, but the
+       network pill stays in the bar next to the hamburger. */
     @media (max-width: 768px) {
-      /* Header wallet becomes a compact icon button (address pill connected). */
-      .nav-right .connect-btn {
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        min-width: 40px;
-        height: 40px;
-        padding: 0 10px;
-        border-radius: 999px;
-      }
-      .nav-right .connect-btn .full { display: none; }
-      .nav-right .connect-btn .short { display: none; }
-      .nav-right .connect-btn .wicon { display: none; align-items: center; }
-      .nav-right .connect-btn:not(.connected) .wicon { display: inline-flex; }
-      /* Logo only: wordmark hides to make room. */
+      /* Scoped to .nav-right: the Transactions empty-state uses
+         .connect-btn too and must stay visible. */
+      .nav-right .connect-btn { display: none !important; }
+      /* Logo only: wordmark hides, hamburger sits close to the mark. */
       .brand > span:last-child { display: none; }
       .brand { margin-right: 4px; }
-      #menuBtn { display: none !important; }
-    }
-
-    /* Mobile bottom tab bar (PancakeSwap-style): thumb-reach nav, center
-       Swap action. Desktop keeps the top nav only. */
-    .tabbar { display: none; }
-    @media (max-width: 768px) {
-      .tabbar {
-        display: flex;
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 60;
-        background: var(--umbra-surface);
-        border-top: 1px solid var(--umbra-border);
-        padding: 8px 6px max(10px, env(safe-area-inset-bottom, 0px));
-        align-items: flex-end;
-        justify-content: space-around;
-      }
-      body { padding-bottom: 86px; }
-      body.menu-open .tabbar { display: none; }
-      .tab {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 3px;
-        flex: 1;
-        background: none;
-        border: 0;
-        border-radius: 12px;
-        padding: 6px 4px;
-        color: var(--umbra-muted);
-        font-family: var(--umbra-font-body);
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      .tab.active { color: var(--umbra-accent); background: var(--umbra-accent-soft); }
-      .tabfab {
-        flex: none;
-        width: 58px;
-        height: 58px;
-        border-radius: 50%;
-        border: 0;
-        margin-top: -26px;
-        background: var(--umbra-accent);
-        color: var(--umbra-accent-ink);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-      }
-      .tabfab:active { transform: scale(0.94); }
-      /* More sheet shows overflow rows only (main nav lives in the bar). */
-      .mobile-menu.more .main-nav { display: none; }
     }
 
     .network-btn .disc {
@@ -430,8 +362,6 @@
       object-fit: cover;
       display: block;
     }
-    /* Header wallet icon slot: mobile-only (see media query below). */
-    .connect-btn .wicon { display: none; }
     .network-btn .dd-tri {
       color: var(--umbra-muted);
       flex: none;
@@ -2383,7 +2313,7 @@
       </button>
       <div class="tx-menu" id="chainMenu" style="display:none;"></div>
       <button class="connect-btn" type="button" id="connectBtn" title="Connect wallet" aria-label="Connect wallet">
-        <span class="wicon"><i data-lucide="wallet" width="18" height="18"></i></span><span class="full">Connect Wallet</span><span class="short">Connect</span>
+        <span class="full">Connect Wallet</span><span class="short">Connect</span>
       </button>
       <button class="icon-btn menu-btn" type="button" id="menuBtn" aria-label="Open menu" aria-expanded="false">
         <span id="menuIconOpen"><i data-lucide="menu" width="23" height="23"></i></span>
@@ -2394,15 +2324,15 @@
 
   <div class="mobile-menu" id="mobileMenu">
     <span class="sheet-handle" aria-hidden="true"></span>
-    <button class="mrow trade-toggle main-nav" id="tradeToggle" aria-expanded="false" aria-controls="tradeSub">
+    <button class="mrow trade-toggle" id="tradeToggle" aria-expanded="false" aria-controls="tradeSub">
       <span class="micon"><i data-lucide="chart-candlestick" width="19" height="19" stroke-width="2.5"></i></span><span>Trade</span><span class="css-chev trade-chev" aria-hidden="true"></span>
     </button>
-    <div class="trade-sub main-nav" id="tradeSub" hidden>
+    <div class="trade-sub" id="tradeSub" hidden>
       <a href="#swap" class="mrow sub active"><span class="micon"><i data-lucide="repeat" width="15" height="15" stroke-width="2.5"></i></span><span>Swap</span></a>
       <span class="mrow sub is-off" aria-disabled="true" title="Bridge coming soon"><span class="micon"><i data-lucide="arrow-left-right" width="15" height="15" stroke-width="2.5"></i></span><span>Bridge</span><span class="soon-badge">soon</span></span>
     </div>
-    <a href="#stocks" class="mrow main-nav"><span class="micon"><i data-lucide="trending-up" width="19" height="19" stroke-width="2.5"></i></span><span>Stocks</span></a>
-    <a href="#transactions" class="mrow main-nav"><span class="micon"><i data-lucide="history" width="19" height="19" stroke-width="2.5"></i></span><span>Transactions</span></a>
+    <a href="#stocks" class="mrow"><span class="micon"><i data-lucide="trending-up" width="19" height="19" stroke-width="2.5"></i></span><span>Stocks</span></a>
+    <a href="#transactions" class="mrow"><span class="micon"><i data-lucide="history" width="19" height="19" stroke-width="2.5"></i></span><span>Transactions</span></a>
     <span class="mrow is-off" aria-disabled="true" title="Launch coming soon"><span class="micon"><i data-lucide="rocket" width="19" height="19" stroke-width="2.5"></i></span><span>Launch</span><span class="soon-badge">soon</span></span>
     <div class="sheet-div" aria-hidden="true"></div>
     <div class="mobile-foot">
@@ -2788,7 +2718,6 @@
       }
       function closeMenu() {
         menu.classList.remove('open');
-        menu.classList.remove('more');
         btn.setAttribute('aria-expanded', 'false');
         btn.setAttribute('aria-label', 'Open menu');
         document.getElementById('menuIconOpen').style.display = '';
@@ -6314,41 +6243,7 @@
         origSetActive(hash);
         if (hash === '#stocks') refreshStocksCards();
         if (hash === '#transactions') refreshActivity();
-        // Bottom tab bar mirrors the active section (Swap tab + FAB together).
-        try {
-          var map = { '#swap': ['tabSwap', 'tabFab'], '#stocks': ['tabStocks'], '#transactions': ['tabTx'] };
-          var on = map[hash] || [];
-          ['tabSwap', 'tabStocks', 'tabFab', 'tabTx'].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.classList.toggle('active', on.indexOf(id) >= 0);
-          });
-        } catch (_) {}
       };
-      // Bottom tab bar wiring (mobile only; hidden on desktop by CSS).
-      function goTab(hash) {
-        try { history.replaceState(null, '', hash); } catch (_) {}
-        try { setActive(hash); } catch (_) {}
-        try { closeMenu(); } catch (_) {}
-      }
-      on('tabSwap', 'click', function () { goTab('#swap'); });
-      on('tabStocks', 'click', function () { goTab('#stocks'); });
-      on('tabFab', 'click', function () { goTab('#swap'); });
-      on('tabTx', 'click', function () { goTab('#transactions'); });
-      on('tabMore', 'click', function () {
-        // Overflow sheet only: main nav already lives in the bar.
-        try { menu.classList.add('more'); } catch (_) {}
-        try { btn.click(); } catch (_) {}
-      });
-      // Paint the initial tab from the landing hash.
-      try {
-        var initHash = window.location.hash || '#swap';
-        var initMap = { '#swap': ['tabSwap', 'tabFab'], '#stocks': ['tabStocks'], '#transactions': ['tabTx'] };
-        var initOn = initMap[initHash] || ['tabSwap', 'tabFab'];
-        ['tabSwap', 'tabStocks', 'tabFab', 'tabTx'].forEach(function (id) {
-          var el = document.getElementById(id);
-          if (el) el.classList.toggle('active', initOn.indexOf(id) >= 0);
-        });
-      } catch (_) {}
     })();
   </script>
   <div id="infoTip" class="info-tip"></div>
@@ -6563,14 +6458,5 @@
       window.umbraReown = { ready: false };
     }
   </script>
-  <!-- Mobile bottom tab bar (PancakeSwap-style). Desktop keeps the top nav. -->
-  <nav class="tabbar" aria-label="Primary">
-    <button class="tab" id="tabSwap" type="button"><i data-lucide="repeat" width="21" height="21"></i><span>Swap</span></button>
-    <button class="tab" id="tabStocks" type="button"><i data-lucide="trending-up" width="21" height="21"></i><span>Stocks</span></button>
-    <button class="tabfab" id="tabFab" type="button" aria-label="Swap now"><i data-lucide="arrow-left-right" width="24" height="24"></i></button>
-    <button class="tab" id="tabTx" type="button"><i data-lucide="history" width="21" height="21"></i><span>Txns</span></button>
-    <button class="tab" id="tabMore" type="button" aria-label="More"><svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg><span>More</span></button>
-  </nav>
-
 </body>
 </html>
