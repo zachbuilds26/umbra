@@ -308,7 +308,8 @@
       padding: 8px 16px;
       border-radius: 8px;
       border: 0;
-      background: var(--umbra-surface);
+      /* Lifted off the page so it reads as a card, not flat bg. */
+      background: #262626;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       font-size: 14px;
@@ -3140,8 +3141,7 @@
             if (!ch || !ch.live) return;
             selectedChain = name;
             paintNetBtn();
-            chainMenuEl.style.display = 'none';
-            if (netBtnEl) netBtnEl.setAttribute('aria-expanded', 'false');
+            setChainMenu(false);
             try { syncSwapUrl(); } catch (_) {}
             // Picker open on another tab already lists everything; refresh so
             // the new filter applies without retyping.
@@ -3312,7 +3312,7 @@
 
       function closeModal() {
         tokenModalEl.classList.remove('open');
-        if (chainMenuEl) chainMenuEl.style.display = 'none';
+        if (chainMenuEl) setChainMenu(false);
         if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') {
           try { modalReturnFocus.focus(); } catch (_) {}
         }
@@ -3378,19 +3378,23 @@
         if (e.target === tokenModalEl) closeModal();
       });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { closeModal(); if (chainMenuEl) chainMenuEl.style.display = 'none'; }
+        if (e.key === 'Escape') { closeModal(); try { setChainMenu(false); } catch (_) {} }
       });
+      // Single door for the menu: display + triangle state always move
+      // together, however it was closed (select, outside tap, Escape).
+      function setChainMenu(open) {
+        chainMenuEl.style.display = open ? 'block' : 'none';
+        if (netBtnEl) netBtnEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
       function toggleChainMenu(e) {
         if (e) e.stopPropagation();
         renderChainMenu();
-        var isOpen = chainMenuEl.style.display === 'block';
-        chainMenuEl.style.display = isOpen ? 'none' : 'block';
-        if (netBtnEl) netBtnEl.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+        setChainMenu(chainMenuEl.style.display !== 'block');
       }
       on('netBtn', 'click', toggleChainMenu);
       document.addEventListener('click', function (e) {
         var inNet = netBtnEl && netBtnEl.contains(e.target);
-        if (!inNet && !chainMenuEl.contains(e.target)) chainMenuEl.style.display = 'none';
+        if (!inNet && !chainMenuEl.contains(e.target)) setChainMenu(false);
       });
 
       on('flipBtn', 'click', function () {
