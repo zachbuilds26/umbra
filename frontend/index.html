@@ -46,19 +46,19 @@
      * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
      * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
      * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
-     * Palette + type are Umbra's own: #0e0a1c / #7e63ce, Sora body, Cinzel wordmark.
+     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
      */
     :root {
-      --umbra-bg: #0e0a1c;
-      --umbra-surface: #1d1734;
+      --umbra-bg: #121212;
+      --umbra-surface: #1a1a1a;
       --umbra-secondary: rgba(255, 255, 255, 0.07);
       --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
-      --umbra-accent: #7e63ce;
-      --umbra-accent-soft: rgba(126, 99, 206, 0.22);
-      --umbra-accent-ink: #ffffff;
+      --umbra-accent: #55b98a;
+      --umbra-accent-soft: rgba(85, 185, 138, 0.2);
+      --umbra-accent-ink: #121212;
       --umbra-text: #ffffff;
-      --umbra-muted: #a29bc7;
-      --umbra-border: rgba(255, 255, 255, 0.09);
+      --umbra-muted: #9aa0a6;
+      --umbra-border: rgba(255, 255, 255, 0.08);
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -97,9 +97,9 @@
 
     body {
       background:
-        radial-gradient(circle at 20% 85%, rgba(126, 99, 206, 0.25), transparent 35%),
-        radial-gradient(circle at 75% 100%, rgba(126, 99, 206, 0.16), transparent 38%),
-        linear-gradient(#0e0a1c 0%, #0e0a1c 45%, #0a0716 100%);
+        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
+        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
+        linear-gradient(#121212 0%, #121212 45%, #0e1512 100%);
       background-attachment: fixed;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
@@ -317,7 +317,7 @@
     }
 
     .network-btn:hover {
-      background: rgba(126, 99, 206, 0.3);
+      background: rgba(85, 185, 138, 0.28);
     }
     .network-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -681,7 +681,7 @@
       pointer-events: none;
       background-image:
         radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px),
-        linear-gradient(rgba(126, 99, 206, 0.06), transparent 60%);
+        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
       background-size:
         22px 22px,
         auto;
@@ -746,7 +746,7 @@
         110deg,
         #ffffff 20%,
         var(--umbra-accent) 38%,
-        #e6defc 50%,
+        #d9f6e7 50%,
         var(--umbra-accent) 62%,
         #ffffff 80%
       );
@@ -1885,8 +1885,8 @@
        center it in whatever space the card leaves behind. */
     .api-pill { display: none; }
     @keyframes apiPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(126, 99, 206, 0.5); }
-      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(126, 99, 206, 0); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(85, 185, 138, 0.5); }
+      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(85, 185, 138, 0); }
     }
     @keyframes apiBlinkSlow {
       0%, 100% { opacity: 1; }
@@ -2166,8 +2166,7 @@
         display: block;
         width: 100%;
         height: auto;
-        /* Art was graded green: rotate its hue into violet, then the violet glow. */
-        filter: hue-rotate(110deg) drop-shadow(0 0 42px rgba(126, 99, 206, 0.35));
+        filter: drop-shadow(0 0 42px rgba(85, 185, 138, 0.35));
       }
     }
 
@@ -2215,7 +2214,7 @@
       height: 42%;
       border-radius: 50%;
       border: 2px solid var(--umbra-surface);
-      background: #0e0a1c;
+      background: #121212;
       object-fit: contain;
       display: block;
     }
@@ -5073,7 +5072,7 @@
           var file = (name||'').replace(/\s+/g,'');
           var src = './assets/chains/' + file + '.png';
           // Fallback to colored letter if image fails
-          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#241e3f;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#241e3f\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
         }
         function chainIconImg(name) {
           var file = (name||'').replace(/\s+/g,'');
@@ -5357,7 +5356,7 @@
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
         themeMode: 'dark',
-        themeVariables: { '--w3m-accent': '#7e63ce' }
+        themeVariables: { '--w3m-accent': '#55B98A' }
       });
       var solProvider = null;
       try {
