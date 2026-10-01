@@ -3043,11 +3043,27 @@
         var file = manifest[symbol]
           ? './assets/tokens/' + encodeURIComponent(manifest[symbol])
           : '';
+        // Flaky phone connections can fail an icon once and stick the letter
+        // fallback in the DOM. Retry once (cache-busted) before giving up.
         var main = file
-          ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<span class=&quot;tk-letter&quot;>' + esc(symbol.charAt(0)) + '</span>\'" />'
+          ? '<img class="tk-main" src="' + esc(file) + '" alt="" loading="lazy" data-letter="' + esc(symbol.charAt(0)) + '" onerror="window.umbraIconRetry(this)" />'
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="./assets/solana-mark.png" alt="" loading="lazy" /></span>';
       }
+      window.umbraIconRetry = function (img) {
+        try {
+          if (img && !img.getAttribute('data-retried')) {
+            img.setAttribute('data-retried', '1');
+            var s = img.getAttribute('src') || '';
+            img.src = s + (s.indexOf('?') >= 0 ? '&' : '?') + 'r=1';
+            return;
+          }
+        } catch (_) {}
+        try {
+          var ch = (img && img.getAttribute('data-letter')) || '?';
+          img.outerHTML = '<span class="tk-letter">' + esc(String(ch).charAt(0)) + '</span>';
+        } catch (_) {}
+      };
 
       /* ---------- Swap card ---------- */
       var sellSym = 'NVDAx';
