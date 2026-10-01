@@ -2240,15 +2240,6 @@
       display: block;
       background: var(--umbra-surface);
     }
-    /* Chain rings: BNB yellow on BSC icons, Solana purple on Solana ones. */
-    .tk.net-bsc .tk-main,
-    .tk.net-bsc .tk-letter {
-      box-shadow: 0 0 0 2px rgba(240, 185, 11, 0.85);
-    }
-    .tk.net-sol .tk-main,
-    .tk.net-sol .tk-letter {
-      box-shadow: 0 0 0 2px rgba(153, 69, 255, 0.8);
-    }
     .tk .tk-letter {
       width: 100%;
       height: 100%;
@@ -3073,9 +3064,7 @@
           : '<span class="tk-letter">' + esc(symbol.charAt(0)) + '</span>';
         // Chain badge follows the token's execution network.
         var badge = net === 'bsc' ? './assets/chains/BnbChain.png' : './assets/solana-mark.png';
-        // Ring follows the same network: BNB yellow vs Solana purple.
-        var ring = net === 'bsc' ? ' net-bsc' : (net === 'sol' ? ' net-sol' : '');
-        return '<span class="tk ' + (size || 'tk-20') + ring + '">' + main + '<img class="tk-chain" src="' + badge + '" alt="" loading="lazy" /></span>';
+        return '<span class="tk ' + (size || 'tk-20') + '">' + main + '<img class="tk-chain" src="' + badge + '" alt="" loading="lazy" /></span>';
       }
       window.umbraIconRetry = function (img) {
         try {
@@ -4147,6 +4136,29 @@
             var vd = (b === null || b === undefined || !isFinite(Number(b))) ? null : -Number(b) / 100;
             setBuyChange(vd);
           })();
+          // Funds gate (Solana parity): amount above the EVM balance locks
+          // the button with "Insufficient funds" instead of a live Swap.
+          // No provider/account readable = unknown, not zero: leave it live.
+          try {
+            var bev = await evmAccount(false);
+            var bprov = null;
+            try { bprov = evmProvider(); } catch (_) {}
+            var bmeta = bscMeta[String(sellSym || '').toUpperCase()];
+            var bdec = Number(data.sellDecimals) || 18;
+            if (mySeq === quoteSeq && bev && bprov && bmeta && lastQuote) {
+              var bbal = await bscTokenBalance(bprov, bmeta.address, bev);
+              if (mySeq === quoteSeq && lastQuote) {
+                try {
+                  if (BigInt(displayToBase(amt, bdec)) > BigInt(displayToBase(bbal, 18))) {
+                    lastQuote = null;
+                    swapBlocked = 'INSUFFICIENT_BALANCE';
+                    swapBlockedMsg = '';
+                    try { updateActionBtn(); } catch (_) {}
+                  }
+                } catch (_) {}
+              }
+            }
+          } catch (_) { /* balance unknown: leave whatever the quote set */ }
         } catch (e) {
           if (mySeq !== quoteSeq) return;
           buyAmountEl.value = '';
