@@ -46,20 +46,22 @@
      * nav gap-1, every item a px-4/py-2 rounded-full text-sm pill · right gap-2/sm:gap-3
      * network button rounded-lg px-4/py-2, 20px tinted icon disc · gear p-2 rounded-lg
      * connect h-10 pill · nav + extras collapse under 1200px/640px like theirs
-     * Palette + type are Umbra's own: #121212 / #55B98A, Sora body, Cinzel wordmark.
+     * Palette + type are Umbra's own: #0a0b0d / #fdc70c, Sora body, Cinzel wordmark.
      */
     :root {
-      --umbra-bg: #0e1512;
-      --umbra-surface: #1a1a1a;
-      --umbra-secondary: rgba(255, 255, 255, 0.07);
-      --umbra-secondary-hover: rgba(255, 255, 255, 0.12);
-      --umbra-accent: #55b98a;
-      --umbra-accent-soft: rgba(85, 185, 138, 0.2);
-      --umbra-accent-ink: #121212;
-      --umbra-gold: #d8a657;
+      color-scheme: dark;
+      --umbra-bg: #0a0b0d;
+      --umbra-surface: #14161a;
+      --umbra-secondary: rgba(255, 255, 255, 0.06);
+      --umbra-secondary-hover: rgba(255, 255, 255, 0.1);
+      --umbra-accent: #fdc70c;
+      --umbra-accent-soft: rgba(253, 199, 12, 0.12);
+      --umbra-accent-ink: #0a0b0d;
+      --umbra-gold: #fdc70c;
       --umbra-text: #ffffff;
-      --umbra-muted: #9aa0a6;
-      --umbra-border: rgba(255, 255, 255, 0.08);
+      --umbra-muted: #bfbfbf;
+      --umbra-border: rgba(233, 233, 236, 0.12);
+      --umbra-up: #2bb673;
       --umbra-font-body: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -96,12 +98,12 @@
       background: #3a3a3a;
     }
 
-    body {
-      background:
-        radial-gradient(circle at 20% 85%, rgba(85, 185, 138, 0.18), transparent 35%),
-        radial-gradient(circle at 75% 100%, rgba(85, 185, 138, 0.1), transparent 38%),
-        linear-gradient(#0e1512 0%, #0e1512 45%, #0c100e 100%);
-      background-attachment: fixed;
+body {
+background:
+radial-gradient(circle at 20% 85%, rgba(253, 199, 12, 0.05), transparent 35%),
+radial-gradient(circle at 75% 100%, rgba(253, 199, 12, 0.03), transparent 38%),
+linear-gradient(#0a0b0d 0%, #0a0b0d 45%, #08090b 100%);
+background-attachment: fixed;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       -webkit-font-smoothing: antialiased;
@@ -317,8 +319,8 @@ font-weight: 600;
       padding: 8px 16px;
       border-radius: 8px;
       border: 0;
-      /* Lifted off the page so it reads as a card, not flat bg. */
-      background: #262626;
+/* Lifted off the page so it reads as a card, not flat bg. */
+background: #23262c;
       color: var(--umbra-text);
       font-family: var(--umbra-font-body);
       font-size: 14px;
@@ -327,9 +329,9 @@ font-weight: 600;
       transition: background 0.15s ease;
     }
 
-    .network-btn:hover {
-      background: rgba(85, 185, 138, 0.28);
-    }
+.network-btn:hover {
+background: rgba(253, 199, 12, 0.16);
+}
     .network-btn .short { display: none; }
     /* Tight bar on small phones: icon-only network pill. */
     @media (max-width: 640px) {
@@ -347,11 +349,11 @@ font-weight: 600;
       .brand { margin-right: 4px; }
     }
 
-    .network-btn .disc {
-      width: 20px;
-      height: 20px;
-      border-radius: 7px;
-      background: #2b2b31;
+.network-btn .disc {
+width: 20px;
+height: 20px;
+border-radius: 7px;
+background: #2e3238;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -419,7 +421,7 @@ font-weight: 600;
       width: 18px;
       height: 18px;
       flex: none;
-      background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23d8a657' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12V7H5a2 2 0 0 1 0-4h14v4'/%3E%3Cpath d='M3 5v14a2 2 0 0 0 2 2h16v-5'/%3E%3Cpath d='M18 12a2 2 0 0 0 0 4h4v-4Z'/%3E%3C/svg%3E");
+      background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23fdc70c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12V7H5a2 2 0 0 1 0-4h14v4'/%3E%3Cpath d='M3 5v14a2 2 0 0 0 2 2h16v-5'/%3E%3Cpath d='M18 12a2 2 0 0 0 0 4h4v-4Z'/%3E%3C/svg%3E");
     }
     .connect-btn .short { display: none; }
     @media (max-width: 640px) {
@@ -587,13 +589,9 @@ font-weight: 600;
       font-weight: 600;
     }
 
-    .mobile-menu a.mrow:hover {
-      background: var(--umbra-secondary);
-    }
-
-    .mobile-menu a.mrow:hover {
-      background: #242424;
-    }
+.mobile-menu a.mrow:hover {
+background: var(--umbra-secondary-hover);
+}
     .mobile-menu .mrow.active {
       background: transparent;
     }
@@ -680,7 +678,7 @@ font-weight: 600;
       width: 18px;
       height: 18px;
       flex: none;
-      background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23d8a657' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12V7H5a2 2 0 0 1 0-4h14v4'/%3E%3Cpath d='M3 5v14a2 2 0 0 0 2 2h16v-5'/%3E%3Cpath d='M18 12a2 2 0 0 0 0 4h4v-4Z'/%3E%3C/svg%3E");
+      background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23fdc70c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12V7H5a2 2 0 0 1 0-4h14v4'/%3E%3Cpath d='M3 5v14a2 2 0 0 0 2 2h16v-5'/%3E%3Cpath d='M18 12a2 2 0 0 0 0 4h4v-4Z'/%3E%3C/svg%3E");
     }
 
     .mobile-chain {
@@ -723,9 +721,9 @@ font-weight: 600;
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background-image:
-        radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px),
-        linear-gradient(rgba(85, 185, 138, 0.05), transparent 60%);
+background-image:
+radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.65px, transparent 0.7px),
+linear-gradient(rgba(253, 199, 12, 0.04), transparent 60%);
       background-size:
         22px 22px,
         auto;
@@ -778,8 +776,8 @@ font-weight: 600;
       letter-spacing: -0.01em;
       color: var(--umbra-text);
     }
-    /* Light band sweeping across the headline (nimglyde wave, our green).
-       Text stays readable: white with a mint shimmer passing through. */
+    /* Light band sweeping across the headline.
+       Text stays readable: white with a gold shimmer passing through. */
     @keyframes wave-x {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
@@ -790,7 +788,7 @@ font-weight: 600;
         110deg,
         #ffffff 20%,
         var(--umbra-accent) 38%,
-        #d9f6e7 50%,
+        #ffedb8 50%,
         var(--umbra-accent) 62%,
         #ffffff 80%
       );
@@ -1011,8 +1009,12 @@ font-weight: 600;
       margin-left: 6px;
     }
 
-    #buyChange.up { color: var(--umbra-accent); }
+    #buyChange.up { color: var(--umbra-up); }
     #buyChange.down { color: #f6465d; }
+
+    .chg-up { color: var(--umbra-up); }
+    .chg-down { color: #f6465d; }
+    .chg-none { color: var(--umbra-muted); }
 
     /* Tappable change badge: dashed underline like the big venues — tapping
        explains the number through the shared tooltip. */
@@ -1260,10 +1262,10 @@ font-weight: 600;
       font-weight: 600;
     }
 
-    .quote-lines .warn {
-      color: #d8a657;
-      font-weight: 600;
-    }
+.quote-lines .warn {
+color: #fdc70c;
+font-weight: 600;
+}
 
     .quote-lines .error {
       color: #f6465d;
@@ -1639,12 +1641,12 @@ font-weight: 600;
       #tokenModal.open .token-modal { animation: none; }
     }
     /* Chain dropdown card anchored to the header pill */
-    #chainMenu {
-      left: auto;
-      right: 0;
-      min-width: 230px;
-      background: #1a1a1a;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+#chainMenu {
+left: auto;
+right: 0;
+min-width: 230px;
+background: var(--umbra-surface);
+border: 1px solid var(--umbra-border);
       border-radius: 14px;
       padding: 6px;
       max-height: 320px;
@@ -1664,7 +1666,7 @@ font-weight: 600;
       padding: 10px 12px;
       border-radius: 10px;
     }
-    #chainMenu .token-opt .meta b { font-size: 14px; font-weight: 600; color: #d7d7de; }
+    #chainMenu .token-opt .meta b { font-size: 14px; font-weight: 600; color: var(--umbra-text); }
     #chainMenu .token-opt .meta span { color: var(--umbra-muted); }
     #chainMenu .chain-pick-coin { width: 26px; height: 26px; font-size: 11px; }
     .chain-btn {
@@ -1702,12 +1704,12 @@ font-weight: 600;
       object-fit: cover;
       display: block;
     }
-    .chain-pick-coin {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      overflow: hidden;
-      background: #2b2b31;
+.chain-pick-coin {
+width: 30px;
+height: 30px;
+border-radius: 50%;
+overflow: hidden;
+background: #2e3238;
       color: var(--umbra-accent);
       display: inline-flex;
       align-items: center;
@@ -1954,10 +1956,10 @@ font-weight: 600;
        an indicator, not a control: no pointer, no click handler. Auto margins
        center it in whatever space the card leaves behind. */
     .api-pill { display: none; }
-    @keyframes apiPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(85, 185, 138, 0.5); }
-      50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(85, 185, 138, 0); }
-    }
+@keyframes apiPulse {
+0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(253, 199, 12, 0.5); }
+50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(253, 199, 12, 0); }
+}
     @keyframes apiBlinkSlow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
@@ -1988,7 +1990,7 @@ font-weight: 600;
         flex: none;
       }
       .api-pill.ok .api-dot { background: var(--umbra-accent); animation: apiPulse 1.8s ease-in-out infinite; }
-      .api-pill.slow .api-dot { background: #d8a657; animation: apiBlinkSlow 1.6s ease-in-out infinite; }
+      .api-pill.slow .api-dot { background: #fdc70c; animation: apiBlinkSlow 1.6s ease-in-out infinite; }
       .api-pill.bad .api-dot { background: #f6465d; }
       .api-ms { color: var(--umbra-muted); font-variant-numeric: tabular-nums; }
 
@@ -2177,13 +2179,13 @@ font-weight: 600;
       background: var(--umbra-accent-soft);
       color: var(--umbra-accent);
     }
-    .tx-menu {
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      min-width: 150px;
-      background: #262626;
-      border: 1px solid rgba(255,255,255,0.14);
+.tx-menu {
+position: absolute;
+top: calc(100% + 6px);
+left: 0;
+min-width: 150px;
+background: var(--umbra-surface);
+border: 1px solid var(--umbra-border);
       border-radius: 12px;
       padding: 6px;
       box-shadow: 0 12px 32px rgba(0,0,0,0.6);
@@ -2236,7 +2238,7 @@ font-weight: 600;
         display: block;
         width: 100%;
         height: auto;
-        filter: drop-shadow(0 0 42px rgba(85, 185, 138, 0.35));
+        filter: drop-shadow(0 0 42px rgba(253, 199, 12, 0.28));
       }
     }
 
@@ -2524,7 +2526,7 @@ font-weight: 600;
                 <span id="stocksFilterLabel" style="white-space:nowrap;">All</span>
                 <span class="css-chev" aria-hidden="true"></span>
               </button>
-              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#262626; border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,0.6); z-index:50;">
+              <div id="stocksFilterMenu" class="filter-menu" style="display:none; position:absolute; top:calc(100% + 8px); right:0; min-width:170px; background:#1a1d22; border:1px solid rgba(255,255,255,0.14); border-radius:12px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,0.6); z-index:50;">
                 <button class="token-opt" data-filter="all" style="width:100%;"><span class="meta"><b>All</b></span><span class="tag" id="countAll">—</span></button>
                 <button class="token-opt" data-filter="xstock" style="width:100%;"><span class="meta"><b>xStocks</b></span><span class="tag" id="countX">—</span></button>
                 <button class="token-opt" data-filter="pre" style="width:100%;"><span class="meta"><b>Pre-IPO</b></span><span class="tag" id="countPre">—</span></button>
@@ -5815,9 +5817,9 @@ font-weight: 600;
         var coords = vals.map(function (v, i) { return { x: xOf(i), y: yOf(v) }; });
         var linePath = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
         var up = vals[vals.length - 1] >= vals[0];
-        var col = up ? '#55B98A' : '#f6465d';
-        var gridCol = 'rgba(255,255,255,0.08)';
-        var txtCol = '#9aa0a6';
+var col = up ? '#2bb673' : '#f6465d';
+var gridCol = 'rgba(255,255,255,0.08)';
+var txtCol = '#bfbfbf';
         // Gridlines + right axis at max / mid / min
         var levels = [max - range * 0.1, (max + min) / 2, min + range * 0.1];
         var grid = levels.map(function (lv) {
@@ -5937,7 +5939,7 @@ font-weight: 600;
           } else {
             var sign = chg > 0 ? '+' : '';
             drawerChangeEl.textContent = sign + chg.toFixed(2) + '%';
-            drawerChangeEl.style.color = chg >= 0 ? 'var(--umbra-accent)' : '#f6465d';
+            drawerChangeEl.style.color = chg >= 0 ? 'var(--umbra-up)' : '#f6465d';
           }
           drawerSubEl.textContent = (s.asset && s.asset.underlyingSymbol ? s.asset.underlyingSymbol + ' • ' : '') + (s.asset && s.asset.network ? s.asset.network : '');
           renderSparkline(s.sparkline || [], chg, symbol);
@@ -6010,7 +6012,7 @@ font-weight: 600;
           var file = (name||'').replace(/\s+/g,'');
           var src = './assets/chains/' + file + '.png';
           // Fallback to colored letter if image fails
-          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#1a1a1a;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#1a1a1a\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
+          return '<span style="width:20px; height:20px; border-radius:50%; overflow:hidden; display:inline-flex; background:#23262c;"><img src="'+src+'" alt="" style="width:20px; height:20px; object-fit:cover;" onerror="this.style.display=\'none\'; this.parentElement.textContent=\''+(name||'?').charAt(0).toUpperCase()+'\'; this.parentElement.style.background=\'#23262c\'; this.parentElement.style.color=\'#fff\'; this.parentElement.style.fontSize=\'10px\'; this.parentElement.style.fontWeight=\'800\'; this.parentElement.style.justifyContent=\'center\'; this.parentElement.style.alignItems=\'center\';" /></span>';
         }
         function chainIconImg(name) {
           var file = (name||'').replace(/\s+/g,'');
@@ -6306,7 +6308,7 @@ font-weight: 600;
         projectId: '99d43dc670342b0063917d5178d86816',
         features: { email: false, socials: [] },
         themeMode: 'dark',
-        themeVariables: { '--w3m-accent': '#55B98A' }
+        themeVariables: { '--w3m-accent': '#fdc70c' }
       });
       var solProvider = null;
       try {
