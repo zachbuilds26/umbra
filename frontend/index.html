@@ -128,12 +128,17 @@
       }
     }
 
-    .nav-left,
-    .nav-right {
-      display: flex;
-      align-items: center;
-      position: relative;
-    }
+.nav-left,
+.nav-right {
+display: flex;
+align-items: center;
+position: relative;
+}
+
+/* The centered nav positions against the header, not this container. */
+.nav-left {
+position: static;
+}
 
     .nav-left {
       gap: 16px;
@@ -200,11 +205,14 @@
       gap: 4px;
     }
 
-    @media (min-width: 1200px) {
-      .nav-links {
-        display: flex;
-      }
-    }
+@media (min-width: 1200px) {
+.nav-links {
+display: flex;
+position: absolute;
+left: 50%;
+transform: translateX(-50%);
+}
+}
 
     .nav-pill {
       display: inline-flex;
@@ -228,11 +236,11 @@
       background: var(--umbra-secondary);
     }
 
-    .nav-pill.active {
-      background: var(--umbra-accent-soft);
-      color: var(--umbra-accent);
-      font-weight: 600;
-    }
+.nav-pill.active {
+background: transparent;
+color: var(--umbra-accent);
+font-weight: 600;
+}
 
     .nav-pill.is-off {
       opacity: 0.45;
