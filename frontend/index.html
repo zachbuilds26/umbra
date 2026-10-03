@@ -819,59 +819,18 @@ linear-gradient(rgba(253, 199, 12, 0.04), transparent 60%);
       z-index: 1;
     }
 
-.swap-card {
-width: 100%;
-max-width: 28rem;
-background: var(--umbra-surface);
-border: 1px solid var(--umbra-border);
-border-radius: 20px;
-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-padding: 12px;
-display: flex;
-flex-direction: column;
-position: relative;
-}
-
-/* Swap card surfacing: deep card, near-black inset boxes, compact dark flip
-   chip overlapping the gap, outline CTA. Layout and picker untouched. */
-.swap-card.ox {
-background: #101215;
-}
-.swap-card.ox .ox-side {
-background: #0b0c0e;
-}
-.swap-card.ox .ox-div > span {
-display: none;
-}
-.swap-card.ox .ox-div .flip-btn {
-width: 34px;
-height: 34px;
-border-radius: 10px;
-background: #1a1d22;
-border: 1px solid var(--umbra-border);
-box-shadow: none;
-color: var(--umbra-accent);
-}
-.swap-card.ox .ox-div .flip-btn:hover {
-background: #22262c;
-color: var(--umbra-accent);
-opacity: 1;
-}
-.swap-card.ox .swap-action {
-background: transparent;
-border: 1px solid var(--umbra-accent);
-color: var(--umbra-accent);
-}
-.swap-card.ox .swap-action:hover {
-opacity: 1;
-background: rgba(253, 199, 12, 0.08);
-}
-.swap-card.ox .swap-action:disabled {
-background: transparent;
-border-color: rgba(255, 255, 255, 0.14);
-color: var(--umbra-muted);
-opacity: 1;
-}
+    .swap-card {
+      width: 100%;
+      max-width: 28rem;
+      background: var(--umbra-surface);
+      border: 1px solid var(--umbra-border);
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
 
     /* Card top: mini Swap/Bridge pill tabs + slippage tool */
     .swap-top {
@@ -2477,7 +2436,7 @@ border: 1px solid var(--umbra-border);
 
           <div class="quote-lines" id="quoteLines" hidden></div>
 
-          <button class="swap-action" id="actionBtn" title="Connect a wallet to swap">Connect Wallet</button>
+          <button class="swap-action" id="actionBtn" disabled title="Connect a wallet to swap">Connect Wallet</button>
           </div>
           <div id="bridgeView" hidden>
             <div style="background: var(--umbra-secondary); border: 1px solid var(--umbra-border); border-radius: 16px; padding: 16px; margin-bottom: 8px;">
@@ -2994,12 +2953,12 @@ border: 1px solid var(--umbra-border);
             action.title = 'Sign and submit this swap';
             action.setAttribute('aria-label', 'Swap now');
           }
-} else {
-action.removeAttribute('disabled');
-action.textContent = 'Connect Wallet';
-action.title = 'Connect a wallet to swap';
-action.setAttribute('aria-label', 'Connect wallet to swap');
-}
+        } else {
+          action.setAttribute('disabled', '');
+          action.textContent = 'Connect Wallet';
+          action.title = 'Connect a wallet to swap';
+          action.setAttribute('aria-label', 'Connect wallet to swap');
+        }
       }
       var balancesSeq = 0;
       function paintSellBalance(text) {
